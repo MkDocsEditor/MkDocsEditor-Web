@@ -1,15 +1,18 @@
 <template>
     <div class="page-container">
         <md-app>
-            <md-app-toolbar class="md-primary" md-elevation="0">
-                <md-button class="md-icon-button" @click="toggleMenu" v-if="!menuVisible">
+            <md-app-toolbar class="md-primary" md-elevation="2">
+                <md-button class="md-icon-button menuToggle" @click="toggleMenu" v-if="!menuVisible">
                     <md-icon>menu</md-icon>
                 </md-button>
+                <md-avatar style="margin: 0">
+                    <img src="./assets/logo.png" alt="App Logo">
+                </md-avatar>
                 <span class="md-title">{{ $appName }}</span>
             </md-app-toolbar>
 
             <md-app-drawer :md-active.sync="menuVisible" md-persistent="mini">
-                <md-toolbar class="md-transparent" md-elevation="0">
+                <md-toolbar class="md-transparent" md-elevation="2">
                     <span>Navigation</span>
 
                     <div class="md-toolbar-section-end">
@@ -78,7 +81,6 @@
 
     @import "~vue-material/dist/theme/all"; // Apply the theme
 
-
     /* ====================== */
     /*   Other app wide css   */
     /* ====================== */
@@ -91,6 +93,10 @@
     .md-app {
         min-height: calc(100vh);
         border: 1px solid rgba(#000, .12);
+    }
+
+    .menuToggle {
+        margin-right: 45px
     }
 
     // Demo purposes only
