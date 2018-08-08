@@ -1,8 +1,21 @@
 import Vue from 'vue'
 import App from './App.vue'
+import VueMaterial from 'vue-material'
+import VueRouter from 'vue-router'
 
-Vue.config.productionTip = false
+import Routes from './routes.js'
+
+import 'vue-material/dist/vue-material.css'
+import 'vue-material/dist/theme/default.css'
+
+Vue.config.productionTip = false;
+Vue.use(VueMaterial);
+Vue.use(VueRouter);
+
+const router = new VueRouter({routes: Routes});
 
 new Vue({
-  render: h => h(App)
-}).$mount('#app')
+    el: '#app',
+    render: h => h(App),
+    router: router
+}).$mount('#app');
