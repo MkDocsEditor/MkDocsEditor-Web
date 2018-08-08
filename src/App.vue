@@ -95,6 +95,10 @@
         border: 1px solid rgba(#000, .12);
     }
 
+    .md-content {
+        height: calc(100vh - 80px);
+    }
+
     .menuToggle {
         margin-right: 45px
     }

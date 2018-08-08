@@ -2,11 +2,13 @@
     <div id="editor">
         <h1>{{ file_name }}</h1>
 
-        <div class="codemirror">
-            <!-- codemirror -->
-            <codemirror v-model="input" :options="codeMirrorOptions"></codemirror>
+        <div id="editor-container">
+            <div class="codemirror">
+                <!-- codemirror -->
+                <codemirror ref="code-editor" v-model="input" :options="codeMirrorOptions"></codemirror>
+            </div>
+            <div id="compiled-markdown" v-html="compiledMarkdown"></div>
         </div>
-        <div v-html="compiledMarkdown"></div>
 
     </div>
 </template>
@@ -34,9 +36,12 @@
             codeMirrorOptions: {
                 undoDepth: 1000,
                 tabSize: 4,
+                // scroll: none,
+                fixedGutter: false,
+                scrollbarStyle: "native",
                 styleActiveLine: true,
                 lineNumbers: true,
-                lineWrapping: false,
+                lineWrapping: true,
                 line: true,
                 indentWithTabs: false,
                 readOnly: false,
@@ -62,6 +67,32 @@
 </script>
 
 <style scoped>
+
+    #editor {
+        height: calc(100vh - 80px);
+    }
+
+    #editor-container {
+        display: flex;
+        flex-direction: row;
+        height: 100%;
+        width: 100%;
+    }
+
+    #compiled-markdown {
+        width: 50%;
+        height: 100%;
+    }
+
+    .codemirror {
+        width: 50%;
+        height: 100%;
+    }
+
+    /* Why does this have no effect? */
+    .CodeMirror {
+        height: 100% !important;
+    }
 
     /* TODO */
 
