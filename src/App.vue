@@ -51,11 +51,9 @@
 </template>
 
 <script>
-    import FileBrowser from "./components/FileBrowser";
 
     export default {
         name: 'MainAppLayout',
-        components: {FileBrowser},
         data: () => ({
             menuVisible: false
         }),
@@ -75,7 +73,7 @@
 
 <style lang="scss" scoped>
     .md-app {
-        min-height: 350px;
+        min-height: calc(100vh);
         border: 1px solid rgba(#000, .12);
     }
 

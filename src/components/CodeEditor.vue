@@ -2,17 +2,38 @@
     <div id="editor">
         <h1>{{ file_name }}</h1>
 
-        <textarea :value="input" @input="update"></textarea>
+        <div class="codemirror">
+            <!-- codemirror -->
+            <codemirror v-model="input" :options="codeMirrorOptions"></codemirror>
+        </div>
         <div v-html="compiledMarkdown"></div>
+
     </div>
 </template>
 
 <script>
+    // require component
+    import {codemirror} from 'vue-codemirror'
+
+    // require styles
+    import 'codemirror/lib/codemirror.css'
+
+    // require more codemirror resource...
+
     export default {
         name: "CodeEditor",
         data: () => ({
             file_name: "Main.md",
-            input: '# hello'
+            input: '# hello',
+            codeMirrorOptions: {
+                tabSize: 4,
+                styleActiveLine: true,
+                lineNumbers: true,
+                lineWrapping: false,
+                line: true,
+                mode: 'text/x-markdown',
+                theme: 'lesser-dark'
+            }
         }),
         computed: {
             compiledMarkdown: function () {
@@ -23,38 +44,15 @@
             update: _.debounce(function (e) {
                 this.input = e.target.value
             }, 150)
+        },
+        components: {
+            codemirror
         }
     }
 </script>
 
 <style scoped>
-    html, body, #editor {
-        margin: 0;
-        height: 100%;
-        color: #333;
-    }
 
-    textarea, #editor div {
-        display: inline-block;
-        width: 49%;
-        height: 100%;
-        vertical-align: top;
-        box-sizing: border-box;
-        padding: 0 20px;
-    }
+  /* TODO */
 
-    textarea {
-        border: none;
-        border-right: 1px solid #ccc;
-        resize: none;
-        outline: none;
-        background-color: #f6f6f6;
-        font-size: 14px;
-        font-family: 'Roboto Mono', 'Monaco', courier, monospace;
-        padding: 20px;
-    }
-
-    code {
-        color: #f66;
-    }
 </style>

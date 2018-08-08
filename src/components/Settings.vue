@@ -1,15 +1,6 @@
 <template>
     <div class="full-control">
         <md-list>
-            <md-subheader>Notifications</md-subheader>
-
-            <md-list-item>
-                <md-checkbox v-model="notification" value="light"/>
-                <span class="md-list-item-text">Notification light</span>
-            </md-list-item>
-        </md-list>
-
-        <md-list>
             <md-subheader>Server</md-subheader>
 
             <md-list-item>
@@ -32,7 +23,6 @@
                     <md-input v-model="settings.server.password" type="password"></md-input>
                 </md-field>
             </md-list-item>
-
         </md-list>
 
         <md-list>
@@ -55,6 +45,15 @@
                 <span class="md-list-item-text">Data Usage</span>
             </md-list-item>
         </md-list>
+
+        <md-list>
+            <md-subheader>Notifications</md-subheader>
+
+            <md-list-item>
+                <md-checkbox v-model="notification" value="light"/>
+                <span class="md-list-item-text">Notification light</span>
+            </md-list-item>
+        </md-list>
     </div>
 </template>
 
@@ -62,7 +61,6 @@
     export default {
         name: 'Settings',
         data: () => ({
-            ringtone: 'peace',
             settings: {
                 server: {
                     url: "",
@@ -70,7 +68,6 @@
                     password: ""
                 },
                 wifi: true,
-                bluetooth: false
             },
             notification: ['sound', 'vibrate']
         })
