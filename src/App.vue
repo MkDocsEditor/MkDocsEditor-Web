@@ -66,6 +66,22 @@
 </script>
 
 <style lang="scss">
+    /* ====================== */
+    /*  Vue Material Theming  */
+    /* ====================== */
+    @import "~vue-material/dist/theme/engine"; // Import the theme engine
+
+    @include md-register-theme("default", (
+            primary: md-get-palette-color(lightgreen, 700), // The primary color of your application
+            accent: md-get-palette-color(lightblue, A700) // The accent or secondary color
+    ));
+
+    @import "~vue-material/dist/theme/all"; // Apply the theme
+
+
+    /* ====================== */
+    /*   Other app wide css   */
+    /* ====================== */
     * {
         font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
     }
