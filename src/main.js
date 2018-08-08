@@ -14,8 +14,12 @@ Vue.use(VueRouter);
 
 const router = new VueRouter({routes: Routes});
 
+Vue.prototype.$appName = 'MkDocs Editor';
+
 new Vue({
     el: '#app',
+    data: {
+    },
     render: h => h(App),
     router: router
 }).$mount('#app');

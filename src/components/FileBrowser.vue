@@ -12,13 +12,7 @@
 
     export default {
         name: "FileBrowser",
-        data () {
-            tree = RestClient.getTree()
-        },
         methods: {
-            getSection() {
-
-            }
         }
     }
 </script>
