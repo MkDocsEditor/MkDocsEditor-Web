@@ -67,6 +67,12 @@
     }
 </script>
 
+<style lang="scss">
+    * {
+        font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    }
+</style>
+
 <style lang="scss" scoped>
     .md-app {
         min-height: 350px;
