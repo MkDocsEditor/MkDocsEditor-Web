@@ -19,6 +19,12 @@
     import 'codemirror/lib/codemirror.css'
 
     // require more codemirror resource...
+    import 'codemirror/mode/gfm/gfm.js'
+    import 'codemirror/mode/xml/xml.js'
+
+    // theme
+    import 'codemirror/theme/darcula.css'
+    import 'codemirror/theme/idea.css'
 
     export default {
         name: "CodeEditor",
@@ -26,13 +32,17 @@
             file_name: "Main.md",
             input: '# hello',
             codeMirrorOptions: {
+                undoDepth: 1000,
                 tabSize: 4,
                 styleActiveLine: true,
                 lineNumbers: true,
                 lineWrapping: false,
                 line: true,
-                mode: 'text/x-markdown',
-                theme: 'lesser-dark'
+                indentWithTabs: false,
+                readOnly: false,
+                mode: 'gfm',
+                gitHubSpice: true,
+                theme: 'darcula'
             }
         }),
         computed: {
@@ -53,6 +63,6 @@
 
 <style scoped>
 
-  /* TODO */
+    /* TODO */
 
 </style>
