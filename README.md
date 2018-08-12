@@ -12,6 +12,11 @@ npm install -g @vue/cli
 npm run serve
 ```
 
+User friendly debugging in chrome:
+```
+https://github.com/vuejs/vue-devtools#vue-devtools
+```
+
 ### Compiles and minifies for production
 ```
 npm run build

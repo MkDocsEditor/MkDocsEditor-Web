@@ -1,5 +1,11 @@
 .DS_Store
-node_modules
+
+node_modules/*
+!node_modules/bin
+node_modules/bin/*
+!node_modules/bin/vue-cli-service
+!node_modules/bin/vue-cli-service.cmd
+
 /dist
 
 # local env files
