@@ -1,9 +1,8 @@
 <template>
     <div>
-
         <md-list-item>
             <md-avatar>
-                <img src="../assets/logo.png" alt="App Logo">
+                <img src="../../../assets/logo.png" alt="App Logo">
             </md-avatar>
             <h1>{{ $appName }}</h1>
         </md-list-item>

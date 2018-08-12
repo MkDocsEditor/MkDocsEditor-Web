@@ -9,9 +9,11 @@
   },
   "dependencies": {
     "axios": "^0.18.0",
+    "vue": "^2.5.17",
     "vue-codemirror": "^4.0.5",
     "vue-material": "^1.0.0-beta-10.2",
-    "vue-router": "^3.0.1"
+    "vue-router": "^3.0.1",
+    "mavon-editor": "^2.6.15"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.0.0-rc.11",

@@ -1,12 +1,14 @@
 import FileBrowser from './components/browser/FileBrowser.vue'
 import CodeEditor from './components/CodeEditor.vue'
 import Settings from './components/Settings.vue'
-import About from './components/About.vue'
+import About from './components/about/About.vue'
+import AboutLibraries from './components/about/pages/AboutLibraries.vue'
 
 export default [
     {path: '/', component: FileBrowser},
     {path: '/file_browser', component: FileBrowser},
     {path: '/code_editor', component: CodeEditor},
     {path: '/settings', component: Settings},
-    {path: '/about', component: About}
+    {path: '/about', component: About},
+    {path: '/about/libraries', component: AboutLibraries}
 ]

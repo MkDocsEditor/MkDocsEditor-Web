@@ -13,6 +13,11 @@ Vue.config.productionTip = false;
 
 Vue.use(VueMaterial);
 
+import MavonEditor from "mavon-editor"
+import 'mavon-editor/dist/css/index.css'
+
+Vue.use(MavonEditor);
+
 
 Vue.use(VueRouter);
 

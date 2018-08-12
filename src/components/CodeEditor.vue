@@ -2,13 +2,15 @@
     <div id="editor">
         <h1>{{ file_name }}</h1>
 
-        <div id="editor-container">
-            <div class="codemirror">
-                <!-- codemirror -->
-                <codemirror ref="code-editor" v-model="input" :options="codeMirrorOptions"></codemirror>
-            </div>
-            <div id="compiled-markdown" v-html="compiledMarkdown"></div>
-        </div>
+        <mavon-editor
+                language="en"
+                placeholder="Empty document ¯\_(ツ)_/¯"
+                :toolbars="toolbarOptions"
+                :editable="editable"
+                :defaultOpen="defaultOpen"
+                :subfield="subfield"
+                :imageFilter="acceptImageFile"
+                v-model="input"/>
 
     </div>
 </template>
@@ -16,55 +18,71 @@
 <script lang="ts">
     import Vue from "vue"
 
-    // require component
-    import {codemirror} from 'vue-codemirror'
-
-    // require styles
-    import 'codemirror/lib/codemirror.css'
-
-    // require more codemirror resource...
-    import 'codemirror/mode/gfm/gfm.js'
-    import 'codemirror/mode/xml/xml.js'
-
-    // theme
-    import 'codemirror/theme/darcula.css'
-    import 'codemirror/theme/idea.css'
-
     export default Vue.extend({
         name: "CodeEditor",
-        data: () => ({
-            file_name: "Main.md",
-            input: '# hello',
-            codeMirrorOptions: {
-                undoDepth: 1000,
-                tabSize: 4,
-                // scroll: none,
-                fixedGutter: false,
-                scrollbarStyle: "native",
-                styleActiveLine: true,
-                lineNumbers: true,
-                lineWrapping: true,
-                line: true,
-                indentWithTabs: false,
-                readOnly: false,
-                mode: 'gfm',
-                gitHubSpice: true,
-                theme: 'darcula'
-            }
-        }),
-        computed: {
-            compiledMarkdown: function () {
-                return marked(this.input, {sanitize: true})
+        props: {
+            initiallyShow: {
+                type: String,
+                required: false,
+                default: 'preview',
+                validator: function (value) {
+                    // The value must match one of these strings
+                    return ['editor', 'preview', 'both'].indexOf(value) !== -1
+                }
+            },
+        },
+        data: function () {
+            return {
+                file_name: "Main.md",
+                input: '# hello',
+                editable: true,
+                defaultOpen: (this.initiallyShow == 'preview' || this.initiallyShow == 'both') ? 'preview' : 'edit',
+                subfield: this.initiallyShow == 'both',
+                toolbarOptions: {
+                    bold: true,
+                    italic: true,
+                    header: true,
+                    underline: true,
+                    strikethrough: true,
+                    mark: true,
+                    superscript: true,
+                    subscript: true,
+                    quote: true,
+                    ol: true,
+                    ul: true,
+                    link: true,
+                    imagelink: true,
+                    code: true,
+                    table: true,
+                    fullscreen: false,
+                    readmodel: false,
+                    /* 1.3.5 */
+                    undo: true,
+                    redo: true,
+                    trash: false,
+                    save: false,
+                    /* 1.4.2 */
+                    navigation: true,
+                    /* 2.1.8 */
+                    alignleft: true,
+                    aligncenter: true,
+                    alignright: true,
+                    /* 2.2.1 */
+                    subfield: true,
+                    preview: true,
+
+                    htmlcode: true,
+                    help: true,
+                }
             }
         },
         methods: {
-            update: _.debounce(function (e) {
-                this.input = e.target.value
-            }, 150)
+            acceptImageFile: function () {
+                // don't allow uploading files (yet)
+                return false
+            }
+
         },
-        components: {
-            codemirror
-        }
     })
 </script>
 
@@ -79,21 +97,6 @@
         flex-direction: row;
         height: 100%;
         width: 100%;
-    }
-
-    #compiled-markdown {
-        width: 50%;
-        height: 100%;
-    }
-
-    .codemirror {
-        width: 50%;
-        height: 100%;
-    }
-
-    /* Why does this have no effect? */
-    .CodeMirror {
-        height: 100% !important;
     }
 
     /* TODO */
