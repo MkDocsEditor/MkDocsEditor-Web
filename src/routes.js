@@ -1,4 +1,4 @@
-import FileBrowser from './components/FileBrowser.vue'
+import FileBrowser from './components/browser/FileBrowser.vue'
 import CodeEditor from './components/CodeEditor.vue'
 import Settings from './components/Settings.vue'
 import About from './components/About.vue'

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import SectionModel from "./model/SectionModel";
-import DocumentModel from "./model/DocumentModel.js";
-import ResourceModel from "./model/ResourceModel.js";
+// import DocumentModel from "./model/DocumentModel.js";
+// import ResourceModel from "./model/ResourceModel.js";
 
 export default class RestClient {
 
