@@ -1,13 +1,9 @@
 export default class SectionModel {
-    constructor () {
-        this._businessProperty = 'Example'
-    }
-
-    getTree () {
-        return SectionModel
-    }
-
-    get businessProperty () {
-        return this._businessProperty
+    constructor(id, name, subsections, documents, resources) {
+        this.id = id;
+        this.name = name;
+        this.subsections = subsections;
+        this.documents = documents;
+        this.resources = resources;
     }
 }

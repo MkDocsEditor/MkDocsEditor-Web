@@ -1,4 +1,7 @@
 import axios from 'axios';
+import SectionModel from "./model/SectionModel";
+import DocumentModel from "./model/DocumentModel.js";
+import ResourceModel from "./model/ResourceModel.js";
 
 export default class RestClient {
 
@@ -7,13 +10,12 @@ export default class RestClient {
         headers: {
             Authorization: 'Bearer {token}'
         }
-    })
+    });
 
-    constructor () {
+    constructor() {
     }
 
-    getTree () {
-
-        return SectionModel
+    getTree() {
+        return new SectionModel(0, "Hallo", [], [], [])
     }
 }

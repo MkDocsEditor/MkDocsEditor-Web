@@ -6,6 +6,7 @@ import VueRouter from 'vue-router'
 import Routes from './routes.js'
 
 import 'vue-material/dist/vue-material.css'
+import RestClient from "./business/rest/RestClient";
 // import 'vue-material/dist/theme/default.css'
 
 Vue.config.productionTip = false;
@@ -19,6 +20,7 @@ const router = new VueRouter({routes: Routes});
 
 // GLOBAL PROPERTIES
 Vue.prototype.$appName = 'MkDocs Editor';
+Vue.prototype.$restClient = new RestClient();
 
 new Vue({
     el: '#app',
