@@ -17,6 +17,7 @@ Vue.use(VueRouter);
 
 const router = new VueRouter({routes: Routes});
 
+// GLOBAL PROPERTIES
 Vue.prototype.$appName = 'MkDocs Editor';
 
 new Vue({

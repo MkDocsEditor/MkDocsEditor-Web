@@ -58,7 +58,9 @@
 </template>
 
 <script>
-    export default {
+    import Vue from "vue"
+
+    export default Vue.extend({
         name: 'Settings',
         data: () => ({
             settings: {
@@ -71,7 +73,7 @@
             },
             notification: ['sound', 'vibrate']
         })
-    }
+    })
 </script>
 
 <style lang="scss" scoped>

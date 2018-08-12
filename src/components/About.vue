@@ -34,7 +34,9 @@
 </template>
 
 <script>
-    export default {
+    import Vue from "vue"
+
+    export default Vue.extend({
         name: 'About',
         props: {
             msg: String
@@ -44,7 +46,7 @@
                 window.open(url.toString(), '_blank');
             }
         }
-    }
+    })
 </script>
 
 <style scoped>

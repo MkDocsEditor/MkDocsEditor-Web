@@ -5,6 +5,7 @@ Webapp Editor for MkDocs projects.
 ## Project setup
 ```
 npm install -g @vue/cli
+npm install -g @vue/cli-service-global
 ```
 
 ### Compiles and hot-reloads for development

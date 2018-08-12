@@ -14,6 +14,8 @@
 </template>
 
 <script>
+    import Vue from "vue"
+
     // require component
     import {codemirror} from 'vue-codemirror'
 
@@ -28,7 +30,7 @@
     import 'codemirror/theme/darcula.css'
     import 'codemirror/theme/idea.css'
 
-    export default {
+    export default Vue.extend({
         name: "CodeEditor",
         data: () => ({
             file_name: "Main.md",
@@ -63,7 +65,7 @@
         components: {
             codemirror
         }
-    }
+    })
 </script>
 
 <style scoped>

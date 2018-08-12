@@ -53,19 +53,22 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 
-    export default {
+    import Vue from "vue"
+
+    export default Vue.extend({
         name: 'MainAppLayout',
         data: () => ({
             menuVisible: false
         }),
         methods: {
             toggleMenu() {
-                this.menuVisible = !this.menuVisible
+                this.menuVisible = !this.menuVisible;
+                return this.menuVisible
             }
         }
-    }
+    })
 </script>
 
 <style lang="scss">

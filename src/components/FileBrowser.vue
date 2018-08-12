@@ -8,13 +8,15 @@
 </template>
 
 <script>
+    import Vue from "vue"
+
     import RestClient from '../business/rest/RestClient.js';
 
-    export default {
+    export default Vue.extend({
         name: "FileBrowser",
         methods: {
         }
-    }
+    })
 </script>
 
 <style scoped>
