@@ -79,8 +79,10 @@
             }
         },
         mounted: function () {
+            // get preference value
             let initiallyShow = this.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
 
+            // and map it to the (slightly weird) properties of the component
             this.defaultOpen = (initiallyShow == 'preview' || initiallyShow == 'both') ? 'preview' : 'edit';
             this.subfield = initiallyShow == 'both';
         },

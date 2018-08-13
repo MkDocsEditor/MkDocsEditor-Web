@@ -2,7 +2,7 @@ import FileBrowser from './components/browser/FileBrowser.vue'
 import CodeEditor from './components/CodeEditor.vue'
 import Settings from './components/Settings.vue'
 import About from './components/about/About.vue'
-import AboutLibraries from './components/about/pages/AboutLibraries.vue'
+import AboutLibraries from './components/about/pages/libraries/AboutLibraries.vue'
 
 export default [
     {path: '/', component: FileBrowser},
