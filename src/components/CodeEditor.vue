@@ -39,7 +39,7 @@
                 input: '# hello',
                 editable: true,
                 defaultOpen: 'edit',
-                subfield: 'both',
+                subfield: false,
                 toolbarOptions: {
                     bold: true,
                     italic: true,
