@@ -113,5 +113,6 @@
         overflow: auto;
         border: 1px solid rgba(#000, .12);
         vertical-align: top;
+        margin: 4px;
     }
 </style>
