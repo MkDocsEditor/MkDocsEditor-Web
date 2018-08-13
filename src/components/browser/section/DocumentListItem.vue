@@ -6,7 +6,7 @@
             <md-button class="md-icon-button md-list-action">
                 <md-icon>edit</md-icon>
             </md-button>
-            <md-button class="md-icon-button md-list-action">
+            <md-button v-on:click="$emit('delete-document', document.id)" class="md-icon-button md-list-action">
                 <md-icon>delete</md-icon>
             </md-button>
         </md-list-item>
