@@ -85,6 +85,13 @@
     @import "~vue-material/dist/theme/all"; // Apply the theme
 
     /* ====================== */
+    /*         Toasted        */
+    /* ====================== */
+    //.my-toast .toasted.primary.info {
+    //    background: #3c3c3c;
+    //}
+
+    /* ====================== */
     /*   Other app wide css   */
     /* ====================== */
     * {

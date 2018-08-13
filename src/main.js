@@ -10,15 +10,26 @@ import Routes from './routes.js'
 import MavonEditor from "mavon-editor"
 import 'mavon-editor/dist/css/index.css'
 
+import Toasted from 'vue-toasted'
+
 import RestClient from "./business/rest/RestClient";
 import LocalStorageManager from "./business/persistence/localstorage/LocalStorageManager";
 import PreferenceManager from "./business/persistence/localstorage/preferences/PreferenceManger.";
 
+
 Vue.config.productionTip = true;
 
 Vue.use(VueMaterial);
-Vue.use(MavonEditor);
 Vue.use(VueRouter);
+Vue.use(MavonEditor);
+Vue.use(Toasted, {
+    position: 'bottom-left',
+    className: null,
+    duration: 4000,
+    type: null,
+    theme: 'primary',
+    iconPack: 'material'
+});
 
 const router = new VueRouter({routes: Routes});
 

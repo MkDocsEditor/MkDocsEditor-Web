@@ -3,7 +3,7 @@
         <md-list-item>
             <md-icon>folder</md-icon>
             <span class="md-list-item-text">{{ section.name }}</span>
-            <md-button class="md-icon-button md-list-action">
+            <md-button v-on:click="$emit('edit-section', section.id)"  class="md-icon-button md-list-action">
                 <md-icon>edit</md-icon>
             </md-button>
             <md-button v-on:click="$emit('delete-section', section.id)" class="md-icon-button md-list-action">
@@ -26,6 +26,7 @@
                 required: true
             },
         },
+        methods: {}
     })
 </script>
 

@@ -1,21 +1,27 @@
 <template>
-    <div v-if="section"
-         v-on:delete-section="deleteSection($event)"
-         v-on:delete-document="deleteDocument($event)"
-         v-on:delete-resource="deleteResource($event)"
-    >
+    <div v-if="section">
+
         <h2>Section: <b>{{ section.name }}</b></h2>
         <md-list>
             <section-list-item v-for="subsection in section.subsections"
-                               v-bind:section="subsection" v-bind:key="subsection.id"></section-list-item>
+                               v-bind:section="subsection"
+                               v-bind:key="subsection.id"
+                               v-on:delete-section="deleteSection"
+                               v-on:edit-section="editSection"></section-list-item>
         </md-list>
         <md-list>
             <document-list-item v-for="document in section.documents"
-                                v-bind:document="document" v-bind:key="document.id"></document-list-item>
+                                v-bind:document="document"
+                                v-bind:key="document.id"
+                                v-on:delete-document="deleteDocument"
+                                v-on:edit-document="editDocument"></document-list-item>
         </md-list>
         <md-list>
             <resource-list-item v-for="resource in section.resources"
-                                v-bind:resource="resource" v-bind:key="resource.id"></resource-list-item>
+                                v-bind:resource="resource"
+                                v-bind:key="resource.id"
+                                v-on:delete-resource="deleteResource"
+                                v-on:edit-resource="editResource"></resource-list-item>
         </md-list>
 
     </div>
@@ -41,20 +47,23 @@
             }
         },
         methods: {
-            editSection(id) {
-
+            editSection: function (id) {
+                this.$toasted.show('edit ' + id)
             },
-            deleteSection(id) {
-
+            deleteSection: function (id) {
+                this.$toasted.show('delete ' + id)
             },
-            editDocument(id) {
-
+            editDocument: function (id) {
+                this.$toasted.show('edit ' + id)
             },
-            deleteDocument(id) {
-
+            deleteDocument: function (id) {
+                this.$toasted.show('delete ' + id)
             },
-            deleteResource(id) {
-
+            editResource: function (id) {
+                this.$toasted.show('edit ' + id)
+            },
+            deleteResource: function (id) {
+                this.$toasted.show('delete ' + id)
             }
         },
         components: {
