@@ -3,6 +3,9 @@ import SectionModel from "./model/SectionModel";
 // import DocumentModel from "./model/DocumentModel.js";
 // import ResourceModel from "./model/ResourceModel.js";
 
+/**
+ * Manager for server communication
+ */
 export default class RestClient {
 
     HTTP = axios.create({

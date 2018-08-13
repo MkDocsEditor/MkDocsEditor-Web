@@ -18,13 +18,15 @@
 <script lang="ts">
     import Vue from "vue"
 
+    import PreferenceItems from "../business/persistence/localstorage/preferences/PreferenceItems.js"
+
+
     export default Vue.extend({
         name: "CodeEditor",
         props: {
             initiallyShow: {
                 type: String,
                 required: false,
-                default: 'preview',
                 validator: function (value) {
                     // The value must match one of these strings
                     return ['editor', 'preview', 'both'].indexOf(value) !== -1
@@ -36,8 +38,8 @@
                 file_name: "Main.md",
                 input: '# hello',
                 editable: true,
-                defaultOpen: (this.initiallyShow == 'preview' || this.initiallyShow == 'both') ? 'preview' : 'edit',
-                subfield: this.initiallyShow == 'both',
+                defaultOpen: 'edit',
+                subfield: 'both',
                 toolbarOptions: {
                     bold: true,
                     italic: true,
@@ -75,6 +77,12 @@
                     help: true,
                 }
             }
+        },
+        mounted: function () {
+            let initiallyShow = this.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
+
+            this.defaultOpen = (initiallyShow == 'preview' || initiallyShow == 'both') ? 'preview' : 'edit';
+            this.subfield = initiallyShow == 'both';
         },
         methods: {
             acceptImageFile: function () {
