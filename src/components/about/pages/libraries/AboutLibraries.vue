@@ -9,13 +9,12 @@
 <script lang="ts">
     import Vue from "vue"
     import LibraryListItem from "./LibraryListItem.vue"
-    import Library from "./Library";
 
     export default Vue.extend({
         name: 'AboutLibraries',
         props: {
             msg: String,
-            libraries: [Library]
+            libraries: Array
         },
         methods: {
             openLinkInNewTab(url) {
