@@ -28,6 +28,15 @@ export default {
         null,
         "Sebastian Menendez"
     ),
+    diffMatchPatch: new Library(
+        4,
+        "diff-match-patch",
+        "Diff Match Patch is a high-performance library in multiple languages that manipulates plain text.",
+        "Apache 2.0",
+        "https://github.com/google/diff-match-patch",
+        null,
+        "Neil Fraser"
+    ),
 
     getAllLibraries: function () {
         let libraries = [];

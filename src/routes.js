@@ -7,7 +7,7 @@ import AboutLibraries from './components/about/pages/libraries/AboutLibraries.vu
 export default [
     {path: '/', component: FileBrowser},
     {path: '/file_browser', component: FileBrowser},
-    {path: '/code_editor', component: CodeEditor},
+    {path: '/code_editor/:id', component: CodeEditor},
     {path: '/settings', component: Settings},
     {path: '/about', component: About},
     {path: '/about/libraries', component: AboutLibraries}

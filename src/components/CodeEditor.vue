@@ -11,7 +11,6 @@
                 :subfield="subfield"
                 :imageFilter="acceptImageFile"
                 v-model="input"/>
-
     </div>
 </template>
 
@@ -19,7 +18,6 @@
     import Vue from "vue"
 
     import PreferenceItems from "../business/persistence/localstorage/preferences/PreferenceItems.js"
-
 
     export default Vue.extend({
         name: "CodeEditor",
@@ -36,7 +34,7 @@
         data: function () {
             return {
                 file_name: "Main.md",
-                input: '# hello',
+                input: '',
                 editable: true,
                 defaultOpen: 'edit',
                 subfield: false,
@@ -85,13 +83,25 @@
             // and map it to the (slightly weird) properties of the component
             this.defaultOpen = (initiallyShow == 'preview' || initiallyShow == 'both') ? 'preview' : 'edit';
             this.subfield = initiallyShow == 'both';
+
+            this.input = this.retrieveFileContent()
         },
         methods: {
+            getDocumentId: function () {
+                return this.$route.params.id
+            },
             acceptImageFile: function () {
                 // don't allow uploading files (yet)
                 return false
+            },
+            retrieveFileContent: function () {
+                let documentId = this.getDocumentId();
+                if (documentId != null) {
+                    return this.$restClient.getFileContent(documentId)
+                } else {
+                    return null;
+                }
             }
-
         },
     })
 </script>
