@@ -1,8 +1,26 @@
 <template>
     <md-card md-with-hover>
-        <md-card-header>{{ library.name }}</md-card-header>
+        <md-card-header>
+            <md-card-header-text>
+                <div class="md-title">{{ library.name }}</div>
+                <div class="md-subhead">{{ library.license}}</div>
+            </md-card-header-text>
+
+            <md-card-media v-if="library.imageUrl">
+                <img :src="library.imageUrl" alt="Library Image">
+            </md-card-media>
+        </md-card-header>
+
         <md-card-content>
-            {{ library.description}}
+            <div v-if="library.author">
+                <b>Author:</b>
+                {{ library.author}}
+
+            </div>
+            <div v-if="library.description">
+                <b>Description:</b>
+                {{ library.description}}
+            </div>
         </md-card-content>
         <md-card-actions v-if="library.url">
             <md-button v-if="library.url" v-on:click="openLinkInNewTab">Link</md-button>
@@ -12,11 +30,12 @@
 
 <script lang="ts">
     import Vue from "vue"
+    import Library from "./Library.js";
 
     export default Vue.extend({
         name: 'LibraryListItem',
         props: {
-            library: {}
+            library: Library
         },
         methods: {
             openLinkInNewTab() {
@@ -29,5 +48,13 @@
 <style scoped>
     .md-card {
         margin: 4px;
+    }
+
+    .md-card .md-card-content {
+        white-space: pre-line;
+    }
+
+    .md-card .md-card-content div {
+        white-space: pre-line;
     }
 </style>
