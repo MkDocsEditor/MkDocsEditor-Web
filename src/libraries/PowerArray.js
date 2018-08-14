@@ -167,8 +167,8 @@ mainContainer.pa.utils = {
      * @param {Object} dest destination object
      * @param {Array<String>} propsList list of properties to copy. if falsy is passed, all properties will be copied.
      * @param {boolean} excludeEmptyProps avoid the copy of empty props to the target
-     * @param {boolean} ignoreEmptyProps 
-     * @returns {} 
+     * @param {boolean} ignoreEmptyProps
+     * @returns {}
      */
     CopyObjectProps: function (source, dest, propsList, excludeEmptyProps, nullOrUndefinedAsEmptyString) {
         if (!propsList) {
@@ -264,6 +264,7 @@ mainContainer.pa.utils = {
                 .toString(16)
                 .substring(1);
         }
+
         return ((prefix !== undefined) ? prefix + '-' : '') +
             getRandom4Chars() + '-' +
             getRandom4Chars() + '-' +
@@ -274,7 +275,7 @@ mainContainer.pa.utils = {
         var result = [];
         for (var prop in obj) {
             if (obj.hasOwnProperty(prop)) {
-                result.push({ property: prop, value: (valueProcessor) ? valueProcessor(obj[prop]) : obj[prop] });
+                result.push({property: prop, value: (valueProcessor) ? valueProcessor(obj[prop]) : obj[prop]});
             }
         }
         return result;
@@ -475,6 +476,7 @@ mainContainer.pa.paWhereHelper = {
             && a !== 0         /* because 0 === -0, requires test by _equals()*/   // jshint ignore:line
             || _equals(a, b) /* handles not strictly equal or zero values*/   // jshint ignore:line
             ;
+
         function _equals(a, b) {
             // a and b have already failed test for strict equality or are zero
 
@@ -789,7 +791,7 @@ mainContainer.pa.auxiliaryFunctions = {
         };
     },
     LikeIgnoreCase: function (value) {
-        if(value === undefined) 
+        if (value === undefined)
             throw new Error("PowerArray Error => undefined was passed to LikeIgnoreCase");
 
         var valueCaseInsensitive = '';
@@ -1031,6 +1033,10 @@ mainContainer.pa.prototypedFunctions_Array = {
         var realConditions = [];
         var conditionType = typeof sortConditions;
 
+        let isString = function (s) {
+            return typeof(s) === 'string' || s instanceof String;
+        };
+
         switch (conditionType) {
             case "string":
                 //This call, with a first parameter of type string, should be "ASC" or "DESC"
@@ -1121,14 +1127,32 @@ mainContainer.pa.prototypedFunctions_Array = {
                             case mainContainer.pa.Sort.Asc:
                             case mainContainer.pa.Sort.AscendingIgnoringCase:
                             case mainContainer.pa.Sort.AscIgnoringCase:
-                                if (a[currentColumn] < b[currentColumn]) return  -1;
-                                if (a[currentColumn] > b[currentColumn]) return 1;
+                                let aC = a[currentColumn];
+                                let bC = b[currentColumn];
+                                if (isString(aC)) {
+                                    aC = aC.toLowerCase();
+                                }
+                                if (isString(bC)) {
+                                    bC = bC.toLowerCase();
+                                }
+
+                                if (aC < bC) return -1;
+                                if (aC > bC) return 1;
                             case mainContainer.pa.Sort.Descending:
                             case mainContainer.pa.Sort.Desc:
                             case mainContainer.pa.Sort.DescendingIgnoringCase:
                             case mainContainer.pa.Sort.DescIgnoringCase:
-                                if (a[currentColumn] < b[currentColumn]) return 1;
-                                if (a[currentColumn] > b[currentColumn]) return -1;
+                                aC = a[currentColumn];
+                                bC = b[currentColumn];
+                                if (isString(aC)) {
+                                    aC = aC.toLowerCase();
+                                }
+                                if (isString(bC)) {
+                                    bC = bC.toLowerCase();
+                                }
+
+                                if (aC < bC) return 1;
+                                if (aC > bC) return -1;
                         }
                     }
                     return 0;
@@ -1144,7 +1168,7 @@ mainContainer.pa.prototypedFunctions_Array = {
         }
     },
     Exists: function (whereConditions) {
-        if(typeof(whereConditions) === 'string') {
+        if (typeof(whereConditions) === 'string') {
             //transform single match strings to an EqualTo3
             whereConditions = EqualTo3(whereConditions);
         }
@@ -1155,7 +1179,7 @@ mainContainer.pa.prototypedFunctions_Array = {
         }
     },
     Remove: function (whereConditions) {
-        if(typeof(whereConditions) === 'string') {
+        if (typeof(whereConditions) === 'string') {
             //transform single match strings to an EqualTo3
             whereConditions = EqualTo3(whereConditions);
         }
@@ -1260,9 +1284,9 @@ mainContainer.pa.prototypedFunctions_Array = {
             }
         }
         if (justFirst) {
-            if (result!== undefined) { //it is important to check with undefined! (0 is a valid result when justIndexes = true)
+            if (result !== undefined) { //it is important to check with undefined! (0 is a valid result when justIndexes = true)
                 if (result.paIsArray) {
-                    if(result.length > 0) 
+                    if (result.length > 0)
                         return result[0]
                     return undefined; // there is only one
                 }
@@ -1302,7 +1326,7 @@ mainContainer.pa.prototypedFunctions_Array = {
         alc = al;
         while (alc--) {
             currentArgName = arguments[alc];
-            result[currentArgName] = { min: undefined, max: undefined };
+            result[currentArgName] = {min: undefined, max: undefined};
         }
         while (l--) {
             alc = al;

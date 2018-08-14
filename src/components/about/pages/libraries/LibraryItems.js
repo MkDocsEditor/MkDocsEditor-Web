@@ -1,4 +1,5 @@
 import Library from "./Library";
+import "../../../../libraries/PowerArray.js"
 
 export default {
     MavonEditor: new Library(
@@ -41,17 +42,17 @@ export default {
     getAllLibraries: function () {
         let libraries = [];
 
-        for (var key in this) {
+        for (let key in this) {
             if (this.hasOwnProperty.call(this, key)) {
-                var val = this[key];
+                let val = this[key];
                 if (val instanceof Library) {
                     libraries.push(val)
                 }
             }
         }
 
-        return libraries.sort(function (a, b) {
-            return a.name.localeCompare(b.name)
-        });
+        let sortedLibraries = libraries.Sort({name: Sort.AscendingIgnoringCase});
+
+        return sortedLibraries;
     }
 }

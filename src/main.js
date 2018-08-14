@@ -46,16 +46,3 @@ new Vue({
     render: h => h(App),
     router: router
 }).$mount('#app');
-
-
-require("./libraries/PowerArray.js");
-
-let o1 = {
-    name: "Z"
-};
-let o2 = {
-    name: "A"
-};
-
-let test = [o1, o2];
-let sortedTest = test.Sort({name: Sort.Ascendig});
