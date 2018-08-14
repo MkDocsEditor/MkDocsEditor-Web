@@ -19,9 +19,6 @@
 
     export default Vue.extend({
         name: 'About',
-        props: {
-            msg: String
-        },
         data: function () {
             return {
                 libraries: LibraryItems.getAllLibraries()

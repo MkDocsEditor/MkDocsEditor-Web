@@ -1,5 +1,5 @@
 <template>
-    <div v-if="section">
+    <div id="section-overview" v-if="section">
 
         <h2>Section: <b>{{ section.name }}</b></h2>
         <md-list>
@@ -36,8 +36,6 @@
     import DocumentListItem from "./DocumentListItem.vue"
     import ResourceListItem from "./ResourceListItem.vue"
 
-    import InputDialog from "../../dialog/InputDialog.vue"
-
     export default Vue.extend({
         name: "SectionOverview",
         props: {
@@ -48,26 +46,25 @@
         },
         methods: {
             editSection: function (id) {
-                this.$toasted.show('edit ' + id)
+                // this.$toasted.show('edit ' + id);
             },
             deleteSection: function (id) {
-                this.$toasted.show('delete ' + id)
+                // this.$toasted.show('delete ' + id)
             },
             editDocument: function (id) {
-                this.$toasted.show('edit ' + id)
+                // this.$toasted.show('edit ' + id)
             },
             deleteDocument: function (id) {
-                this.$toasted.show('delete ' + id)
+                // this.$toasted.show('delete ' + id)
             },
             editResource: function (id) {
-                this.$toasted.show('edit ' + id)
+                // this.$toasted.show('edit ' + id)
             },
             deleteResource: function (id) {
-                this.$toasted.show('delete ' + id)
+                // this.$toasted.show('delete ' + id)
             }
         },
         components: {
-            InputDialog,
             SectionListItem,
             DocumentListItem,
             ResourceListItem
@@ -76,5 +73,9 @@
 </script>
 
 <style scoped>
+
+    #section-overview {
+        max-width: 600px;
+    }
 
 </style>

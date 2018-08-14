@@ -13,7 +13,6 @@
     export default Vue.extend({
         name: 'AboutLibraries',
         props: {
-            msg: String,
             libraries: Array
         },
         methods: {

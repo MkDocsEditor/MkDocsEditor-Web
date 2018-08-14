@@ -37,9 +37,6 @@
 
     export default Vue.extend({
         name: 'AboutApp',
-        props: {
-            msg: String
-        },
         methods: {
             openLinkInNewTab(url) {
                 window.open(url.toString(), '_blank');
