@@ -7,9 +7,11 @@
             </md-card-header>
 
             <md-card-actions>
-                <md-button v-on:click="onEdit()" class="md-icon-button md-list-action">
-                    <md-icon>edit</md-icon>
-                </md-button>
+                <router-link :to="'/code_editor/' + document.id">
+                    <md-button v-on:click="onEdit()" class="md-icon-button md-list-action">
+                        <md-icon>edit</md-icon>
+                    </md-button>
+                </router-link>
                 <md-button v-on:click="onDelete()" class="md-icon-button md-list-action">
                     <md-icon>delete</md-icon>
                 </md-button>
@@ -52,7 +54,7 @@
                 this.deleteDialogActive = true;
             },
             onDeleteCanceled: function () {
-                this.$toasted.show("Deletion of document '" + this.document.name  + "' canceled");
+                this.$toasted.show("Deletion of document '" + this.document.name + "' canceled");
             },
             onDeleteConfirmed: function () {
                 this.$toasted.show("Document '" + this.document.name + "' deleted");
