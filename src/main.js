@@ -15,6 +15,7 @@ import Toasted from 'vue-toasted'
 import RestClient from "./business/rest/RestClient";
 import LocalStorageManager from "./business/persistence/localstorage/LocalStorageManager";
 import PreferenceManager from "./business/persistence/localstorage/preferences/PreferenceManger.";
+import PreferenceItems from "./business/persistence/localstorage/preferences/PreferenceItems.js"
 
 
 Vue.config.productionTip = true;
@@ -35,10 +36,16 @@ const router = new VueRouter({routes: Routes});
 
 // GLOBAL PROPERTIES
 Vue.prototype.$appName = 'MkDocs Editor';
-Vue.prototype.$restClient = new RestClient();
 
 let localStorageManager = new LocalStorageManager(Vue.prototype.localStorage);
-Vue.prototype.$preferenceManager = new PreferenceManager(localStorageManager);
+const preferenceManager = new PreferenceManager(localStorageManager);
+Vue.prototype.$preferenceManager = preferenceManager;
+
+const serverUrl = preferenceManager.loadPreferenceValue(PreferenceItems.Server.URL);
+const username = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Username);
+const password = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Password);
+
+Vue.prototype.$restClient = new RestClient(serverUrl, username, password);
 
 new Vue({
     el: '#app',

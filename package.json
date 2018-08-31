@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "axios": "^0.18.0",
+    "axios-rest-client": "^0.1.8",
     "diff-match-patch": "^1.0.1",
     "mavon-editor": "^2.6.15",
     "vue": "^2.5.17",

@@ -84,7 +84,10 @@
             this.defaultOpen = (initiallyShow == 'preview' || initiallyShow == 'both') ? 'preview' : 'edit';
             this.subfield = initiallyShow == 'both';
 
-            this.input = this.retrieveFileContent()
+            let that = this;
+            this.retrieveFileContent().then(function (result) {
+                that.input = result.data;
+            });
         },
         methods: {
             getDocumentId: function () {
@@ -96,11 +99,7 @@
             },
             retrieveFileContent: function () {
                 let documentId = this.getDocumentId();
-                if (documentId != null) {
-                    return this.$restClient.getFileContent(documentId)
-                } else {
-                    return null;
-                }
+                return this.$restClient.getFileContent(documentId)
             }
         },
     })
