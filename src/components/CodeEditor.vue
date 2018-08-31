@@ -89,7 +89,7 @@
                 if (result.status == 200) {
                     that.input = result.data;
                 } else {
-                    this.$toasted.show("Error loading file :-(");
+                    that.$toasted.show("Error loading file :-(");
                 }
             });
         },

@@ -53,8 +53,12 @@
 
                 let that = this;
                 restCall.then(function (result) {
-                    let data = result.data;
-                    that.currentSection = new SectionModel(data.id, data.name, data.subsections, data.documents, data.resources);
+                    if (result.isOk) {
+                        let data = result.data;
+                        that.currentSection = new SectionModel(data.id, data.name, data.subsections, data.documents, data.resources);
+                    } else {
+                        this.$toasted.show("Error loading section! :-(");
+                    }
                 });
             },
 
