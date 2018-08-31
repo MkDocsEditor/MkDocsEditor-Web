@@ -1,9 +1,14 @@
 <template>
     <div>
-        <md-card md-with-hover>
+        <md-card md-with-hover v-on:click.native="onEdit()">
             <md-card-header>
-                <div class="md-title">{{ document.name }}</div>
-                <div class="md-subhead">{{ document.file_size}}</div>
+                <div class="md-title">
+                    <md-icon>description</md-icon>
+                    {{ document.name }}
+                </div>
+                <div class="md-subhead">
+                    {{ document.file_size}}
+                </div>
             </md-card-header>
 
             <md-card-actions>
@@ -48,6 +53,7 @@
         methods: {
             onEdit: function () {
                 this.$emit('edit-document', this.document.id);
+                this.$router.push({name: 'CodeEditor', params: {id: this.document.id}})
             },
             onDelete: function () {
                 this.$emit('delete-document', this.document.id);
@@ -64,6 +70,11 @@
 </script>
 
 <style scoped>
+
+    .md-title .md-icon {
+        vertical-align: middle;
+        margin-bottom: 5px;
+    }
 
     .md-card {
         margin: 2px 16px

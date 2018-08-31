@@ -1,6 +1,6 @@
 <template>
     <div>
-        <md-card md-with-hover>
+        <md-card md-with-hover v-on:click.native="onOpenSection()">
             <md-list-item>
                 <md-icon>folder</md-icon>
                 <span class="md-list-item-text">{{ section.name }}</span>
@@ -53,6 +53,10 @@
             }
         },
         methods: {
+            onOpenSection: function () {
+                this.$emit('open-section', this.section.id);
+                this.$router.push({name: 'FileBrowser', params: {id: this.section.id}})
+            },
             onEdit: function () {
                 this.$emit('edit-section', this.section.id);
                 this.editDialogActive = true;
@@ -70,7 +74,16 @@
         },
         watch: {
             newSectionName: function (newValue, oldValue) {
-                this.$toasted.show("Section '" + this.section.name + "' renamed from '" + oldValue + "' to '" + newValue + "'");
+                this.$restClient.renameSection(this.section.id, newValue).then(value => {
+                    if (value.status != 200) {
+                        this.$toasted.show("Error renaming section! :-(");
+                    } else {
+                        this.$toasted.show("Section '" + this.section.name + "' renamed from '" + oldValue + "' to '" + newValue + "'");
+                        this.section.name = newValue;
+                    }
+                }).catch((err) => {
+                    this.$toasted.show("Unknown Error: " + err);
+                });
             }
         }
     })

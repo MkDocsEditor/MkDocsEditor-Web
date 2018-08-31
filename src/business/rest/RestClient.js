@@ -43,20 +43,111 @@ export default class RestClient {
     }
 
     /**
-     * Get the file content of the specified document
+     * Get the description of a specific section
      *
-     * @param documentId
-     * @returns {string}
+     * @param id
+     * @returns {promise}
      */
-    getDocument(documentId) {
-        return this.API.documents.find(documentId);
+    getSection(id) {
+        return this.API.sections.find(id);
     }
 
     /**
-     * Get the file content of the specified document
+     * Get the description of a specific section
+     *
+     * @param id
+     * @returns {promise}
+     */
+    renameSection(id, newName) {
+        return this.API.sections.update(id, {});
+    }
+
+    /**
+     * Creates a new section as a child section of the specified parent section
+     *
+     * @param parentId the id of the desired parent section
+     * @param name the name of the section
+     * @returns {promise}
+     */
+    createSection(parentId, name) {
+        return this.API.sections.create({
+            Parent: parentId,
+            Name: name
+        });
+    }
+
+    /**
+     * Deletes a section and all of it's child sections, documents and resources.
+     * Note that this will fail if a user is currently editing any of the sections documents.
+     *
+     * @param id the id of the section
+     * @returns {promise}
+     */
+    deleteSection(id) {
+        return this.API.sections.delete(id);
+    }
+
+    /**
+     * Get the description of a specific document
+     *
+     * @param id
+     * @returns {promise}
+     */
+    getDocument(id) {
+        return this.API.documents.find(id);
+    }
+
+    /**
+     * Creates a new document in the specified section
+     *
+     * @param sectionId the id of the desired parent section
+     * @param name the name of the section
+     * @returns {promise}
+     */
+    createDocument(sectionId, name) {
+        return this.API.documents.create({
+            Parent: sectionId,
+            Name: name
+        });
+    }
+
+    /**
+     * Deletes a document entirely.
+     * Note that this will fail if a user is still editing the file.
+     *
+     * @param id the id of the document
+     * @returns {promise}
+     */
+    deleteDocument(id) {
+        return this.API.documents.delete(id);
+    }
+
+    /**
+     * Get the description of a specific document
+     *
+     * @param id
+     * @returns {promise}
+     */
+    getResource(id) {
+        return this.API.resources.find(id);
+    }
+
+    /**
+     * Deletes a resource.
+     *
+     * @param id the id of the resource
+     * @returns {promise}
+     */
+    deleteResource(id) {
+        return this.API.resources.delete(id);
+    }
+
+    /**
+     * Get the file content of the specified document.
+     * Note that this does NOT reflect any changes made while a user (or multiple) is editing the document.
      *
      * @param documentId
-     * @returns {string}
+     * @returns {promise}
      */
     getFileContent(documentId) {
         return this.axiosAPI.get('/document/' + documentId + '/content/');

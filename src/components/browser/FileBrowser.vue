@@ -2,6 +2,10 @@
     <div>
         <h1>File Browser</h1>
         <section-overview v-if="currentSection" :section="currentSection"></section-overview>
+        <md-button class="md-fab md-fab-bottom-right">
+            <md-icon>add</md-icon>
+            <md-icon>edit</md-icon>
+        </md-button>
     </div>
 </template>
 
@@ -31,14 +35,42 @@
             //     ])
         }),
         mounted: function () {
-            let that = this;
-            this.$restClient.getTree().then(function (result) {
-                let data = result.data;
-
-                that.currentSection = new SectionModel(data.id, data.name, data.subsections, data.documents, data.resources);
-            });
+            this.loadSectionData();
         },
-        methods: {}
+        methods: {
+            /**
+             * Loads the currently specified section (per url param) from the server
+             */
+            loadSectionData: function () {
+                let sectionId = this.getSectionId();
+
+                let restCall;
+                if (sectionId) {
+                    restCall = this.$restClient.getSection(sectionId);
+                } else {
+                    restCall = this.$restClient.getTree();
+                }
+
+                let that = this;
+                restCall.then(function (result) {
+                    let data = result.data;
+                    that.currentSection = new SectionModel(data.id, data.name, data.subsections, data.documents, data.resources);
+                });
+            },
+
+            /**
+             * @return the section id to show, or null if the root section should be shown
+             */
+            getSectionId: function () {
+                return this.$route.params.id
+            },
+
+        },
+        watch: {
+            '$route'(to, from) {
+                this.loadSectionData();
+            }
+        }
     })
 </script>
 

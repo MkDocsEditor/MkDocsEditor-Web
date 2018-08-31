@@ -33,7 +33,7 @@
         },
         data: function () {
             return {
-                file_name: "Main.md",
+                file_name: "",
                 input: '',
                 editable: true,
                 defaultOpen: 'edit',
@@ -86,7 +86,11 @@
 
             let that = this;
             this.retrieveFileContent().then(function (result) {
-                that.input = result.data;
+                if (result.status == 200) {
+                    that.input = result.data;
+                } else {
+                    this.$toasted.show("Error loading file :-(");
+                }
             });
         },
         methods: {
