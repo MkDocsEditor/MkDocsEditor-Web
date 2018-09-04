@@ -8,7 +8,7 @@ import axios from "axios";
 export default class RestClient {
 
     API;
-    axiosAPI;
+    fallbackAPI;
 
     constructor(host, user, password) {
         if (!host) {
@@ -17,6 +17,7 @@ export default class RestClient {
 
         let config = {
             baseUrl: host,
+            timeout: 1000,
             baseURL: host,
             auth: {
                 username: user,
@@ -24,7 +25,7 @@ export default class RestClient {
             }
         };
 
-        this.axiosAPI = axios.create(config);
+        this.fallbackAPI = axios.create(config);
 
         const axiosRestClient = require('axios-rest-client');
         this.API = axiosRestClient.default(config);
@@ -150,6 +151,6 @@ export default class RestClient {
      * @returns {promise}
      */
     getFileContent(documentId) {
-        return this.axiosAPI.get('/document/' + documentId + '/content/');
+        return this.API.documents[documentId].content.all();
     }
 }

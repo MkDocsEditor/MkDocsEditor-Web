@@ -38,6 +38,15 @@ export default {
         null,
         "Neil Fraser"
     ),
+    axios_rest: new Library(
+        5,
+        "axios-rest",
+        "A simple axios wrapper to make rest api call delightful",
+        "MIT",
+        "https://github.com/eldomagan/axios-rest",
+        "https://avatars1.githubusercontent.com/u/8585729?s=400&v=4",
+        "Eldo Magan"
+    ),
 
     getAllLibraries: function () {
         let libraries = [];
