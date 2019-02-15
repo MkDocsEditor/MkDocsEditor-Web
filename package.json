@@ -9,19 +9,21 @@
   },
   "dependencies": {
     "axios": "^0.18.0",
-    "axios-rest-client": "^0.1.8",
-    "diff-match-patch": "^1.0.1",
-    "mavon-editor": "^2.6.15",
-    "vue": "^2.5.17",
+    "axios-rest-client": "^0.1.11",
+    "diff-match-patch": "^1.0.4",
+    "mavon-editor": "^2.6.17",
+    "vue": "^2.6.6",
     "vue-material": "^1.0.0-beta-10.2",
-    "vue-router": "^3.0.1",
-    "vue-toasted": "^1.1.24"
+    "vue-router": "^3.0.2",
+    "vue-toasted": "^1.1.26"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^3.0.0-rc.11",
-    "@vue/cli-plugin-eslint": "^3.0.0-rc.11",
-    "@vue/cli-service": "^3.0.0-rc.11",
-    "node-sass": "^4.9.2",
+    "@vue/cli-plugin-babel": "^3.4.0",
+    "@vue/cli-plugin-eslint": "^3.4.0",
+    "@vue/cli-service": "^3.4.0",
+    "husky": "^1.3.1",
+    "lint-staged": "^8.1.4",
+    "node-sass": "^4.11.0",
     "sass-loader": "^7.1.0",
     "vue-template-compiler": "^2.5.17"
   },
