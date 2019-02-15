@@ -1,6 +1,5 @@
-# mkdocseditor_web
-
-Webapp Editor for MkDocs projects.
+# MkDocsEditor-Web
+MkDocsEditor web client.
 
 ## Project setup
 ```
