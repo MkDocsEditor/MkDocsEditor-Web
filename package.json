@@ -8,24 +8,24 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
-    "axios": "^0.18.0",
+    "axios": "^0.19.0",
     "axios-rest-client": "^0.1.11",
     "diff-match-patch": "^1.0.4",
-    "mavon-editor": "^2.6.17",
-    "vue": "^2.6.6",
-    "vue-material": "^1.0.0-beta-10.2",
-    "vue-router": "^3.0.2",
-    "vue-toasted": "^1.1.26"
+    "mavon-editor": "^2.7.5",
+    "vue": "^2.6.10",
+    "vue-material": "^1.0.0-beta-11",
+    "vue-router": "^3.0.6",
+    "vue-toasted": "^1.1.27"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^3.4.0",
-    "@vue/cli-plugin-eslint": "^3.4.0",
-    "@vue/cli-service": "^3.4.0",
-    "husky": "^1.3.1",
-    "lint-staged": "^8.1.4",
-    "node-sass": "^4.11.0",
+    "@vue/cli-plugin-babel": "^3.8.0",
+    "@vue/cli-plugin-eslint": "^3.8.0",
+    "@vue/cli-service": "^3.8.4",
+    "husky": "^2.7.0",
+    "lint-staged": "^8.2.1",
+    "node-sass": "^4.12.0",
     "sass-loader": "^7.1.0",
-    "vue-template-compiler": "^2.6.6"
+    "vue-template-compiler": "^2.6.10"
   },
   "eslintConfig": {
     "root": true,
