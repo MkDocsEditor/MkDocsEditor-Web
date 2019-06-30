@@ -10,6 +10,6 @@ export default [
     {name: "FileBrowser", path: '/file_browser/:id', component: FileBrowser},
     {name: "CodeEditor", path: '/code_editor/:id', component: CodeEditor},
     {name: "Settings", path: '/settings', component: Settings},
-    {name: "About", path: '/about', component: About},
-    {name: "AboutLibraries", path: '/about/libraries', component: AboutLibraries}
+    {name: "AboutApp", path: '/about', component: About},
+    {name: "AboutLibraries", path: '/about/libraries', component: About}
 ]

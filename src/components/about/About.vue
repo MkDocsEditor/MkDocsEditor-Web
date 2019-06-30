@@ -1,10 +1,10 @@
 <template>
     <div>
         <md-tabs md-sync-route>
-            <md-tab id="tab-app" md-label="App">
+            <md-tab id="tab-app" md-label="App" to="/about" exact>
                 <about-app></about-app>
             </md-tab>
-            <md-tab id="tab-libraries" md-label="Libraries">
+            <md-tab id="tab-libraries" md-label="Libraries" to="/about/libraries">
                 <about-libraries :libraries="libraries"></about-libraries>
             </md-tab>
         </md-tabs>
