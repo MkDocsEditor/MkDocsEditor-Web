@@ -4,10 +4,10 @@
             <md-list-item>
                 <md-icon>folder</md-icon>
                 <span class="md-list-item-text">{{ section.name }}</span>
-                <md-button v-on:click="onEdit()" class="md-icon-button md-list-action">
+                <md-button v-on:click="onEdit()" v-on:click.stop class="md-icon-button md-list-action">
                     <md-icon>edit</md-icon>
                 </md-button>
-                <md-button v-on:click="onDelete()" class="md-icon-button md-list-action">
+                <md-button v-on:click="onDelete()" v-on:click.stop class="md-icon-button md-list-action">
                     <md-icon>delete</md-icon>
                 </md-button>
             </md-list-item>

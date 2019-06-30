@@ -13,11 +13,11 @@
 
             <md-card-actions>
                 <router-link :to="'/code_editor/' + document.id">
-                    <md-button v-on:click="onEdit()" class="md-icon-button md-list-action">
+                    <md-button v-on:click="onEdit()" v-on:click.stop class="md-icon-button md-list-action">
                         <md-icon>edit</md-icon>
                     </md-button>
                 </router-link>
-                <md-button v-on:click="onDelete()" class="md-icon-button md-list-action">
+                <md-button v-on:click="onDelete()" v-on:click.stop class="md-icon-button md-list-action">
                     <md-icon>delete</md-icon>
                 </md-button>
             </md-card-actions>
