@@ -29,11 +29,10 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
-    import Library from "./Library.js";
+    import {Component, Vue} from 'vue-property-decorator';
+    import Library from '@/components/about/pages/libraries/Library';
 
-    export default Vue.extend({
-        name: 'LibraryListItem',
+    @Component({
         props: {
             library: Library
         },
@@ -43,9 +42,11 @@
             },
         }
     })
+    export default class LibraryListItem extends Vue {
+    }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
     .md-card {
         margin: 4px;
     }

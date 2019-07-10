@@ -1,8 +1,8 @@
 import Library from "./Library";
-import "../../../../libraries/PowerArray.js"
+import "@/libraries/PowerArray.js"
 
-export default {
-    MavonEditor: new Library(
+export default class LibraryItems {
+    MavonEditor: Library = new Library(
         1,
         "mavonEditor",
         "A markdown editor based on Vue that supports a variety of personalized features",
@@ -10,8 +10,8 @@ export default {
         "https://md.zhystar.com/",
         null,
         "HinesZhu"
-    ),
-    VueToasted: new Library(
+    );
+    VueToasted = new Library(
         2,
         "vue-toasted",
         "Responsive Touch Compatible Toast plugin for VueJS 2+",
@@ -19,8 +19,8 @@ export default {
         "https://github.com/shakee93/vue-toasted",
         "https://camo.githubusercontent.com/ad2f797f88f98ee4988dc82a4d70e72936170871/68747470733a2f2f66726573687069786c2e636f6d2f7675652d746f61737465642e706e673f6e6577",
         "Shakeeb Sadikeen"
-    ),
-    PowerArray: new Library(
+    );
+    PowerArray = new Library(
         3,
         "PowerArray",
         "Power Array allows you to operate with javascript arrays in a comfortable and much easier way",
@@ -28,8 +28,8 @@ export default {
         "https://github.com/detky/PowerArray",
         null,
         "Sebastian Menendez"
-    ),
-    diffMatchPatch: new Library(
+    );
+    diffMatchPatch = new Library(
         4,
         "diff-match-patch",
         "Diff Match Patch is a high-performance library in multiple languages that manipulates plain text.",
@@ -37,8 +37,8 @@ export default {
         "https://github.com/google/diff-match-patch",
         null,
         "Neil Fraser"
-    ),
-    axios_rest: new Library(
+    );
+    axios_rest = new Library(
         5,
         "axios-rest",
         "A simple axios wrapper to make rest api call delightful",
@@ -46,10 +46,10 @@ export default {
         "https://github.com/eldomagan/axios-rest",
         "https://avatars1.githubusercontent.com/u/8585729?s=400&v=4",
         "Eldo Magan"
-    ),
+    );
 
-    getAllLibraries: function () {
-        let libraries = [];
+    getAllLibraries() {
+        let libraries: Library[] = [];
 
         for (let key in this) {
             if (this.hasOwnProperty.call(this, key)) {
@@ -60,8 +60,8 @@ export default {
             }
         }
 
-        let sortedLibraries = libraries.Sort({name: Sort.AscendingIgnoringCase});
-
+        // TODO: fix PowerArray imports
+        const sortedLibraries = libraries.Sort({name: Sort.AscendingIgnoringCase});
         return sortedLibraries;
-    }
+    };
 }

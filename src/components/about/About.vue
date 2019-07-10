@@ -12,28 +12,23 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
-    import AboutApp from "./pages/AboutApp.vue"
-    import AboutLibraries from "./pages/libraries/AboutLibraries.vue"
-    import LibraryItems from "./pages/libraries/LibraryItems.js";
+    import {Component, Vue} from 'vue-property-decorator';
 
-    export default Vue.extend({
+    import AboutLibraries from '@/components/about/pages/libraries/AboutLibraries.vue';
+    import AboutApp from '@/components/about/pages/AboutApp.vue';
+    import LibraryItems from '@/components/about/pages/libraries/LibraryItems';
+
+    @Component({
         name: 'About',
-        data: function () {
-            return {
-                libraries: LibraryItems.getAllLibraries()
-            }
-        },
-        methods: {},
         components: {
             AboutApp,
             AboutLibraries
         },
     })
+    export default class About extends Vue {
+        libraries = new LibraryItems().getAllLibraries();
+    }
 </script>
 
-<style scoped>
-    li {
-        display: inline-block;
-    }
+<style lang="scss" scoped>
 </style>

@@ -28,51 +28,54 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
+    import {Component, Vue} from 'vue-property-decorator';
 
-    import SectionModel from "../../../business/rest/model/SectionModel.js"
+    import SectionModel from '@/business/rest/model/SectionModel';
+    import SectionListItem from '@/components/browser/section/SectionListItem.vue';
+    import DocumentListItem from '@/components/browser/section/DocumentListItem.vue';
+    import ResourceListItem from '@/components/browser/section/ResourceListItem.vue';
 
-    import SectionListItem from "./SectionListItem.vue"
-    import DocumentListItem from "./DocumentListItem.vue"
-    import ResourceListItem from "./ResourceListItem.vue"
-
-    export default Vue.extend({
-        name: "SectionOverview",
+    @Component({
         props: {
             section: {
                 type: SectionModel,
-                required: true
-            }
-        },
-        methods: {
-            editSection: function (id) {
-                // this.$toasted.show('edit ' + id);
+                required: true,
             },
-            deleteSection: function (id) {
-                // this.$toasted.show('delete ' + id)
-            },
-            editDocument: function (id) {
-                // this.$toasted.show('edit ' + id)
-            },
-            deleteDocument: function (id) {
-                // this.$toasted.show('delete ' + id)
-            },
-            editResource: function (id) {
-                // this.$toasted.show('edit ' + id)
-            },
-            deleteResource: function (id) {
-                // this.$toasted.show('delete ' + id)
-            }
         },
         components: {
             SectionListItem,
             DocumentListItem,
-            ResourceListItem
-        }
+            ResourceListItem,
+        },
     })
+    export default class SectionOverview extends Vue {
+        editSection(id: string): void {
+            // this.$toasted.show('edit ' + id);
+        }
+
+        deleteSection(id: string): void {
+            // this.$toasted.show('delete ' + id)
+        }
+
+        editDocument(id: string): void {
+            // this.$toasted.show('edit ' + id)
+        }
+
+        deleteDocument(id: string): void {
+            // this.$toasted.show('delete ' + id)
+        }
+
+        editResource(id: string): void {
+            // this.$toasted.show('edit ' + id)
+        }
+
+        deleteResource(id: string): void {
+            // this.$toasted.show('delete ' + id)
+        }
+    }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 
     #section-overview {
         max-width: 600px;

@@ -3,7 +3,7 @@
  */
 export default class DocumentSyncManager {
 
-    constructor(url, username, password, documentId) {
+    constructor(url: string, username: string, password: string, documentId: string) {
     }
 
 }

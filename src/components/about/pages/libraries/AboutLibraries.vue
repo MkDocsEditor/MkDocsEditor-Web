@@ -7,10 +7,10 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
-    import LibraryListItem from "./LibraryListItem.vue"
+    import {Component, Vue} from 'vue-property-decorator';
+    import LibraryListItem from '@/components/about/pages/libraries/LibraryListItem.vue';
 
-    export default Vue.extend({
+    @Component({
         name: 'AboutLibraries',
         props: {
             libraries: Array
@@ -24,10 +24,9 @@
             LibraryListItem,
         }
     })
+    export default class AboutLibraries extends Vue {
+    }
 </script>
 
-<style scoped>
-    li {
-        display: inline-block;
-    }
+<style lang="scss" scoped>
 </style>

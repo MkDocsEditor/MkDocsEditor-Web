@@ -1,11 +1,11 @@
 <template>
-    <div>
-        <md-list-item>
+    <div style="text-align: center;">
+        <h1>
             <md-avatar>
                 <img src="../../../assets/logo.png" alt="App Logo">
             </md-avatar>
-            <h1>{{ $appName }}</h1>
-        </md-list-item>
+            {{ $appName }}
+        </h1>
 
         <p>
             MkDocs Editor is a Markdown editor for MkDocs projects.
@@ -17,36 +17,41 @@
 
         <h3>More Info</h3>
 
-        <md-list-item>
+        <div>
             <md-avatar>
                 <img src="https://avatars1.githubusercontent.com/u/14024504" alt="Markus Ressel">
             </md-avatar>
 
-            <span class="md-list-item-text">Markus Ressel</span>
+            <span>Markus Ressel</span>
 
-            <md-button v-on:click="openLinkInNewTab('https://github.com/markusressel')" class="md-icon-button md-list-action">
+            <md-button class="md-icon-button md-list-action"
+                       v-on:click="openLinkInNewTab('https://github.com/markusressel')">
                 <md-icon class="md-primary">link</md-icon>
             </md-button>
-        </md-list-item>
+        </div>
 
     </div>
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
+    import {Component, Vue} from 'vue-property-decorator';
 
-    export default Vue.extend({
+    @Component({
         name: 'AboutApp',
-        methods: {
-            openLinkInNewTab(url) {
-                window.open(url.toString(), '_blank');
-            }
-        }
     })
+    export default class AboutApp extends Vue {
+
+        openLinkInNewTab(url: string): void {
+            window.open(url.toString(), '_blank');
+        }
+
+    }
 </script>
 
-<style scoped>
-    li {
-        display: inline-block;
-    }
+<style lang="scss" scoped>
+    /*#avatarMarkus {*/
+    /*    display: flex;*/
+    /*    align-items: center;*/
+    /*    justify-content: space-between;*/
+    /*}*/
 </style>

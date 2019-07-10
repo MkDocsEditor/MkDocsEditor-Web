@@ -10,11 +10,11 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
-    import SectionModel from "../../business/rest/model/SectionModel.js"
-    import SectionOverview from "./section/SectionOverview.vue"
+    import {Component, Vue} from 'vue-property-decorator';
+    import SectionOverview from "@/components/browser/section/SectionOverview.vue";
+    import SectionModel from "@/business/rest/model/SectionModel"
 
-    export default Vue.extend({
+    @Component({
         name: "FileBrowser",
         components: {
             SectionOverview
@@ -76,8 +76,11 @@
             }
         }
     })
+
+    export default class FileBrowser extends Vue {
+    }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 
 </style>

@@ -1,6 +1,6 @@
 import axios from "axios";
-// import DocumentModel from "./model/DocumentModel.js";
-// import ResourceModel from "./model/ResourceModel.js";
+// import DocumentModel from "./model/DocumentModel.ts";
+// import ResourceModel from "./model/ResourceModel.ts";
 
 /**
  * Manager for server communication
@@ -10,12 +10,12 @@ export default class RestClient {
     API;
     fallbackAPI;
 
-    constructor(host, user, password) {
+    constructor(host: string, user: string, password: string) {
         if (!host) {
             host = "localhost"
         }
 
-        let config = {
+        const config = {
             baseUrl: host,
             timeout: 1000,
             baseURL: host,
@@ -49,17 +49,18 @@ export default class RestClient {
      * @param id
      * @returns {promise}
      */
-    getSection(id) {
+    getSection(id: string) {
         return this.API.sections.find(id);
     }
 
     /**
-     * Get the description of a specific section
+     * Update the name of a section
      *
      * @param id
+     * @param newName the new name
      * @returns {promise}
      */
-    renameSection(id, newName) {
+    renameSection(id: string, newName: string) {
         return this.API.sections.update(id, {});
     }
 
@@ -70,7 +71,7 @@ export default class RestClient {
      * @param name the name of the section
      * @returns {promise}
      */
-    createSection(parentId, name) {
+    createSection(parentId: string, name: string) {
         return this.API.sections.create({
             Parent: parentId,
             Name: name
@@ -84,7 +85,7 @@ export default class RestClient {
      * @param id the id of the section
      * @returns {promise}
      */
-    deleteSection(id) {
+    deleteSection(id: string) {
         return this.API.sections.delete(id);
     }
 
@@ -94,7 +95,7 @@ export default class RestClient {
      * @param id
      * @returns {promise}
      */
-    getDocument(id) {
+    getDocument(id: string) {
         return this.API.documents.find(id);
     }
 
@@ -105,7 +106,7 @@ export default class RestClient {
      * @param name the name of the section
      * @returns {promise}
      */
-    createDocument(sectionId, name) {
+    createDocument(sectionId: string, name: string) {
         return this.API.documents.create({
             Parent: sectionId,
             Name: name
@@ -119,7 +120,7 @@ export default class RestClient {
      * @param id the id of the document
      * @returns {promise}
      */
-    deleteDocument(id) {
+    deleteDocument(id: string) {
         return this.API.documents.delete(id);
     }
 
@@ -129,7 +130,7 @@ export default class RestClient {
      * @param id
      * @returns {promise}
      */
-    getResource(id) {
+    getResource(id: string) {
         return this.API.resources.find(id);
     }
 
@@ -139,7 +140,7 @@ export default class RestClient {
      * @param id the id of the resource
      * @returns {promise}
      */
-    deleteResource(id) {
+    deleteResource(id: string) {
         return this.API.resources.delete(id);
     }
 
@@ -150,7 +151,7 @@ export default class RestClient {
      * @param documentId
      * @returns {promise}
      */
-    getFileContent(documentId) {
+    getFileContent(documentId: string) {
         return this.API.documents[documentId].content.all();
     }
 }

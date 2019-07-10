@@ -1,11 +1,39 @@
 {
   "compilerOptions": {
-    // this aligns with Vue's browser support
-    "target": "es5",
-    // this enables stricter inference for data properties on `this`
+    "target": "esnext",
+    "module": "esnext",
     "strict": true,
-    // if using webpack 2+ or rollup, to leverage tree shaking:
-    "module": "es2015",
-    "moduleResolution": "node"
-  }
+    "jsx": "preserve",
+    "importHelpers": true,
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "types": [
+      "webpack-env"
+    ],
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "scripthost"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

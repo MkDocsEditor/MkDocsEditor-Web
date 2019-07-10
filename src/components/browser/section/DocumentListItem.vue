@@ -35,41 +35,41 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
+    import {Component, Vue} from 'vue-property-decorator';
+    import DocumentModel from '@/business/rest/model/DocumentModel'
 
-    import DocumentModel from "../../../business/rest/model/DocumentModel.js"
-
-    export default Vue.extend({
-        name: "DocumentListItem",
+    @Component({
         props: {
             document: {
                 type: DocumentModel,
-                required: true
+                required: true,
             },
-        },
-        data: () => ({
-            deleteDialogActive: false
-        }),
-        methods: {
-            onEdit: function () {
-                this.$emit('edit-document', this.document.id);
-                this.$router.push({name: 'CodeEditor', params: {id: this.document.id}})
-            },
-            onDelete: function () {
-                this.$emit('delete-document', this.document.id);
-                this.deleteDialogActive = true;
-            },
-            onDeleteCanceled: function () {
-                this.$toasted.show("Deletion of document '" + this.document.name + "' canceled");
-            },
-            onDeleteConfirmed: function () {
-                this.$toasted.show("Document '" + this.document.name + "' deleted");
-            }
         }
     })
+    export default class DocumentListItem extends Vue {
+        deleteDialogActive = false;
+
+        onEdit(): void {
+            this.$emit('edit-document', this.document.id);
+            this.$router.push({name: 'CodeEditor', params: {id: this.document.id}});
+        }
+
+        onDelete(): void {
+            this.$emit('delete-document', this.document.id);
+            this.deleteDialogActive = true;
+        }
+
+        onDeleteCanceled(): void {
+            this.$toasted.show('Deletion of document "' + this.document.name + '" canceled');
+        }
+
+        onDeleteConfirmed(): void {
+            this.$toasted.show('Document "' + this.document.name + '" deleted');
+        }
+    }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 
     .md-title .md-icon {
         vertical-align: middle;

@@ -15,101 +15,100 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
+    import {Component, Vue} from 'vue-property-decorator';
+    import PreferenceItems from '@/business/persistence/localstorage/preferences/PreferenceItems';
 
-    import PreferenceItems from "../business/persistence/localstorage/preferences/PreferenceItems.js"
-
-    export default Vue.extend({
-        name: "CodeEditor",
+    @Component({
         props: {
             initiallyShow: {
                 type: String,
                 required: false,
-                validator: function (value) {
+                validator(value) {
                     // The value must match one of these strings
-                    return ['editor', 'preview', 'both'].indexOf(value) !== -1
-                }
+                    return ['editor', 'preview', 'both'].indexOf(value) !== -1;
+                },
             },
         },
-        data: function () {
-            return {
-                file_name: "",
-                input: '',
-                editable: true,
-                defaultOpen: 'edit',
-                subfield: false,
-                toolbarOptions: {
-                    bold: true,
-                    italic: true,
-                    header: true,
-                    underline: true,
-                    strikethrough: true,
-                    mark: true,
-                    superscript: true,
-                    subscript: true,
-                    quote: true,
-                    ol: true,
-                    ul: true,
-                    link: true,
-                    imagelink: true,
-                    code: true,
-                    table: true,
-                    fullscreen: false,
-                    readmodel: false,
-                    /* 1.3.5 */
-                    undo: true,
-                    redo: true,
-                    trash: false,
-                    save: false,
-                    /* 1.4.2 */
-                    navigation: true,
-                    /* 2.1.8 */
-                    alignleft: true,
-                    aligncenter: true,
-                    alignright: true,
-                    /* 2.2.1 */
-                    subfield: true,
-                    preview: true,
-
-                    htmlcode: true,
-                    help: true,
-                }
-            }
-        },
-        mounted: function () {
+        mounted() {
             // get preference value
-            let initiallyShow = this.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
+            const initiallyShow = this.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
 
             // and map it to the (slightly weird) properties of the component
-            this.defaultOpen = (initiallyShow == 'preview' || initiallyShow == 'both') ? 'preview' : 'edit';
-            this.subfield = initiallyShow == 'both';
+            this.defaultOpen = (initiallyShow === 'preview' || initiallyShow === 'both') ? 'preview' : 'edit';
+            this.subfield = initiallyShow === 'both';
 
-            let that = this;
-            this.retrieveFileContent().then(function (result) {
-                if (result.status == 200) {
+            const that = this;
+            this.retrieveFileContent().then((result) => {
+                if (result.status === 200) {
                     that.input = result.data;
                 } else {
-                    that.$toasted.show("Error loading file :-(");
+                    that.$toasted.show('Error loading file :-(');
                 }
             });
         },
-        methods: {
-            getDocumentId: function () {
-                return this.$route.params.id
-            },
-            acceptImageFile: function () {
-                // don't allow uploading files (yet)
-                return false
-            },
-            retrieveFileContent: function () {
-                let documentId = this.getDocumentId();
-                return this.$restClient.getFileContent(documentId)
-            }
-        },
     })
+    export default class CodeEditor extends Vue {
+
+        file_name: string = '';
+        input: string = '';
+        editable: boolean = true;
+        defaultOpen: string = 'edit';
+        subfield: boolean = false;
+        toolbarOptions = {
+            bold: true,
+            italic: true,
+            header: true,
+            underline: true,
+            strikethrough: true,
+            mark: true,
+            superscript: true,
+            subscript: true,
+            quote: true,
+            ol: true,
+            ul: true,
+            link: true,
+            imagelink: true,
+            code: true,
+            table: true,
+            fullscreen: false,
+            readmodel: false,
+            /* 1.3.5 */
+            undo: true,
+            redo: true,
+            trash: false,
+            save: false,
+            /* 1.4.2 */
+            navigation: true,
+            /* 2.1.8 */
+            alignleft: true,
+            aligncenter: true,
+            alignright: true,
+            /* 2.2.1 */
+            subfield: true,
+            preview: true,
+
+            htmlcode: true,
+            help: true,
+        };
+
+        getDocumentId() {
+            return this.$route.params.id;
+        }
+
+        acceptImageFile() {
+            // don't allow uploading files (yet)
+            return false;
+        }
+
+        retrieveFileContent() {
+            const documentId = this.getDocumentId();
+            return this.$restClient.getFileContent(documentId);
+        }
+
+    }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 
     #editor {
         height: calc(100vh - 80px);

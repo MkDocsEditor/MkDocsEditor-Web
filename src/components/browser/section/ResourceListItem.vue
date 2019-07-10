@@ -32,51 +32,49 @@
 </template>
 
 <script lang="ts">
-    import Vue from "vue"
+    import {Component, Vue} from 'vue-property-decorator';
+    import ResourceModel from '@/business/rest/model/ResourceModel'
 
-    import ResourceModel from "../../../business/rest/model/ResourceModel.js"
-
-    export default Vue.extend({
-        name: "ResourceListItem",
+    @Component({
         props: {
             resource: {
                 type: ResourceModel,
-                required: true
+                required: true,
             },
-        },
-        data: function () {
-            return {
-                editDialogActive: false,
-                deleteDialogActive: false,
-                newResourceName: this.resource.name
-            };
-        },
-        methods: {
-            onEdit: function () {
-                this.$emit('edit-resource', this.resource.id);
-                this.newResourceName = this.resource.name;
-                this.editDialogActive = true;
-            },
-            onDelete: function () {
-                this.$emit('delete-resource', this.resource.id);
-                this.deleteDialogActive = true;
-            },
-            onDeleteCanceled: function () {
-                this.$toasted.show("Deletion of resource '" + this.resource.name + "' canceled");
-            },
-            onDeleteConfirmed: function () {
-                this.$toasted.show("Resource '" + this.resource.name + "' deleted");
-            }
         },
         watch: {
             newResourceName: function (newValue, oldValue) {
-                this.$toasted.show("Resource '" + this.resource.name + "' renamed from '" + oldValue + "' to '" + newValue + "'");
-            }
+                this.$toasted.show('Resource "' + this.resource.name + '" renamed from "' + oldValue + '" to "' + newValue + '"');
+            },
         }
     })
+    export default class ResourceListItem extends Vue {
+        editDialogActive = false;
+        deleteDialogActive = false;
+        newResourceName = this.resource.name;
+
+        onEdit(): void {
+            this.$emit('edit-resource', this.resource.id);
+            this.newResourceName = this.resource.name;
+            this.editDialogActive = true;
+        }
+
+        onDelete(): void {
+            this.$emit('delete-resource', this.resource.id);
+            this.deleteDialogActive = true;
+        }
+
+        onDeleteCanceled(): void {
+            this.$toasted.show('Deletion of resource "' + this.resource.name + '" canceled');
+        }
+
+        onDeleteConfirmed(): void {
+            this.$toasted.show('Resource "' + this.resource.name + '" deleted');
+        }
+    }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 
     .md-card {
         margin: 2px 16px

@@ -54,21 +54,16 @@
 </template>
 
 <script lang="ts">
+    import {Vue} from 'vue-property-decorator';
 
-    import Vue from "vue"
+    export default class MainAppLayout extends Vue {
+        menuVisible: boolean = false;
 
-    export default Vue.extend({
-        name: 'MainAppLayout',
-        data: () => ({
-            menuVisible: false
-        }),
-        methods: {
-            toggleMenu() {
-                this.menuVisible = !this.menuVisible;
-                return this.menuVisible
-            }
+        toggleMenu(): boolean {
+            this.menuVisible = !this.menuVisible;
+            return this.menuVisible
         }
-    })
+    }
 </script>
 
 <style lang="scss">
@@ -102,7 +97,7 @@
 <style lang="scss" scoped>
     .md-app {
         min-height: calc(100vh);
-        border: 1px solid rgba(#000, .12);
+        //border: 1px solid rgba(#000, .12);
     }
 
     .md-content {
