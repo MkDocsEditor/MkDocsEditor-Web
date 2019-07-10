@@ -32,44 +32,40 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
-    import ResourceModel from '@/business/rest/model/ResourceModel'
+    import {Component, Prop, Vue, Watch} from "vue-property-decorator";
+    import ResourceModel from "@/business/rest/model/ResourceModel";
 
-    @Component({
-        props: {
-            resource: {
-                type: ResourceModel,
-                required: true,
-            },
-        },
-        watch: {
-            newResourceName: function (newValue, oldValue) {
-                this.$toasted.show('Resource "' + this.resource.name + '" renamed from "' + oldValue + '" to "' + newValue + '"');
-            },
-        }
-    })
+    @Component({})
     export default class ResourceListItem extends Vue {
+
+        @Prop({type: ResourceModel, required: true}) readonly resource!: ResourceModel;
+
+        @Watch("newResourceName", {immediate: true, deep: true})
+        onNewResourceNameChanged(newValue: string, oldValue: string) {
+            this.$toasted.show("Resource \"" + this.resource.name + "\" renamed from \"" + oldValue + "\" to \"" + newValue + "\"");
+        }
+
         editDialogActive = false;
         deleteDialogActive = false;
         newResourceName = this.resource.name;
 
         onEdit(): void {
-            this.$emit('edit-resource', this.resource.id);
+            this.$emit("edit-resource", this.resource.id);
             this.newResourceName = this.resource.name;
             this.editDialogActive = true;
         }
 
         onDelete(): void {
-            this.$emit('delete-resource', this.resource.id);
+            this.$emit("delete-resource", this.resource.id);
             this.deleteDialogActive = true;
         }
 
         onDeleteCanceled(): void {
-            this.$toasted.show('Deletion of resource "' + this.resource.name + '" canceled');
+            this.$toasted.show("Deletion of resource \"" + this.resource.name + "\" canceled");
         }
 
         onDeleteConfirmed(): void {
-            this.$toasted.show('Resource "' + this.resource.name + '" deleted');
+            this.$toasted.show("Resource \"" + this.resource.name + "\" deleted");
         }
     }
 </script>

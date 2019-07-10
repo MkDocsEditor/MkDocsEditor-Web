@@ -1,5 +1,5 @@
-import Library from "./Library";
-import "@/libraries/PowerArray.js"
+import Library from './Library';
+import '@/libraries/PowerArray.js';
 
 export default class LibraryItems {
     MavonEditor: Library = new Library(
@@ -61,6 +61,7 @@ export default class LibraryItems {
         }
 
         // TODO: fix PowerArray imports
+        // @ts-ignore
         const sortedLibraries = libraries.Sort({name: Sort.AscendingIgnoringCase});
         return sortedLibraries;
     };

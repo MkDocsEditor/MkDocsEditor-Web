@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from 'axios';
 // import DocumentModel from "./model/DocumentModel.ts";
 // import ResourceModel from "./model/ResourceModel.ts";
 
@@ -7,8 +7,8 @@ import axios from "axios";
  */
 export default class RestClient {
 
-    API;
-    fallbackAPI;
+    API: any;
+    fallbackAPI: any;
 
     constructor(host: string, user: string, password: string) {
         if (!host) {

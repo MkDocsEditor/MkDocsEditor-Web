@@ -29,20 +29,18 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
-    import Library from '@/components/about/pages/libraries/Library';
+    import {Component, Prop, Vue} from "vue-property-decorator";
+    import Library from "@/components/about/pages/libraries/Library";
 
-    @Component({
-        props: {
-            library: Library
-        },
-        methods: {
-            openLinkInNewTab() {
-                window.open(this.library.url.toString(), '_blank');
-            },
-        }
-    })
+    @Component({})
     export default class LibraryListItem extends Vue {
+
+        @Prop(Library) readonly library!: Library;
+
+        openLinkInNewTab() {
+            window.open(this.library.url.toString(), "_blank");
+        }
+
     }
 </script>
 

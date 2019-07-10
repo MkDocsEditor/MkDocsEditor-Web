@@ -1,10 +1,10 @@
 export default class ResourceModel {
 
-    private id: string;
-    private type: string;
-    private name: string;
-    private mod_time: number;
-    private file_size: number;
+    public id: string;
+    public type: string;
+    public name: string;
+    public mod_time: number;
+    public file_size: number;
 
     constructor(id: string, name: string, mod_time: number, file_size: number) {
         this.id = id;

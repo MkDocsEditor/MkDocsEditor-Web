@@ -1,13 +1,13 @@
-import DocumentModel from "@/business/rest/model/DocumentModel";
-import ResourceModel from "@/business/rest/model/ResourceModel";
+import DocumentModel from '@/business/rest/model/DocumentModel';
+import ResourceModel from '@/business/rest/model/ResourceModel';
 
 export default class SectionModel {
 
-    private id: string;
-    private name: string;
-    private subsections: SectionModel[];
-    private documents: DocumentModel[];
-    private resources: ResourceModel[];
+    public id: string;
+    public name: string;
+    public subsections: SectionModel[];
+    public documents: DocumentModel[];
+    public resources: ResourceModel[];
 
     constructor(id: string, name: string, subsections: SectionModel[], documents: DocumentModel[], resources: ResourceModel[]) {
         this.id = id;

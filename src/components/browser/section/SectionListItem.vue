@@ -33,58 +33,53 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
-    import SectionModel from '@/business/rest/model/SectionModel'
+    import {Component, Prop, Vue, Watch} from "vue-property-decorator";
+    import SectionModel from "@/business/rest/model/SectionModel";
 
-    @Component({
-        props: {
-            section: {
-                type: SectionModel,
-                required: true,
-            },
-        },
-        watch: {
-            newSectionName: function (newValue, oldValue) {
-                this.$restClient.renameSection(this.section.id, newValue).then((value) => {
-                    if (value.status != 200) {
-                        this.$toasted.show('Error renaming section! :-(');
-                    } else {
-                        this.$toasted.show('Section "' + this.section.name + '" renamed from "' + oldValue + '" to "' + newValue + '"');
-                        this.section.name = newValue;
-                    }
-                }).catch((err) => {
-                    this.$toasted.show('Unknown Error: ' + err);
-                });
-            }
-        }
-    })
+    @Component({})
     export default class SectionListItem extends Vue {
+
+        @Prop({type: SectionModel, required: true}) readonly section!: SectionModel;
+
+        @Watch("newSectionName", {immediate: false, deep: false})
+        onNewSectionNameChanged(newValue: string, oldValue: string) {
+            this.$restClient.renameSection(this.section.id, newValue).then((value: any) => {
+                if (value.status != 200) {
+                    this.$toasted.show("Error renaming section! :-(");
+                } else {
+                    this.$toasted.show(`Section "${this.section.name}" renamed from "${oldValue}" to "${newValue}"`);
+                    this.section.name = newValue;
+                }
+            }).catch((err: any) => {
+                this.$toasted.show("Unknown Error: " + err);
+            });
+        }
 
         editDialogActive: boolean = false;
         deleteDialogActive: boolean = false;
         newSectionName: string = this.section.name;
 
         onOpenSection(): void {
-            this.$emit('open-section', this.section.id);
-            this.$router.push({name: 'FileBrowser', params: {id: this.section.id}});
+            this.$emit("open-section", this.section.id);
+            this.$router.push({name: "FileBrowser", params: {id: this.section.id}});
         }
 
         onEdit(): void {
-            this.$emit('edit-section', this.section.id);
+            this.$emit("edit-section", this.section.id);
             this.editDialogActive = true;
         }
 
         onDelete(): void {
-            this.$emit('delete-section', this.section.id);
+            this.$emit("delete-section", this.section.id);
             this.deleteDialogActive = true;
         }
 
         onDeleteCanceled(): void {
-            this.$toasted.show('Deletion of section "' + this.section.name + '" canceled');
+            this.$toasted.show("Deletion of section \"" + this.section.name + "\" canceled");
         }
 
         onDeleteConfirmed(): void {
-            this.$toasted.show('Section "' + this.section.name + '" deleted');
+            this.$toasted.show("Section \"" + this.section.name + "\" deleted");
         }
 
     }

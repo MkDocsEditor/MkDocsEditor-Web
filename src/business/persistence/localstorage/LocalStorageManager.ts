@@ -16,7 +16,7 @@ export default class LocalStorageManager {
      * @param defaultValue the default value to use if no persisted value was found
      */
     getValue(storeKey: string, defaultValue: any) {
-        let storeValue = localStorage.getItem(storeKey);
+        let storeValue: any = localStorage.getItem(storeKey);
         if (storeValue) {
             if (storeValue instanceof Object) {
                 // try to deserialize
@@ -24,6 +24,7 @@ export default class LocalStorageManager {
                 try {
                     storeValue = JSON.parse(storeValue);
                 } catch (e) {
+                    // @ts-ignore
                     this.console.error(e);
                 }
             }
@@ -53,6 +54,7 @@ export default class LocalStorageManager {
             try {
                 newValue = JSON.stringify(newValue);
             } catch (e) {
+                // @ts-ignore
                 this.console.error(e);
             }
         }

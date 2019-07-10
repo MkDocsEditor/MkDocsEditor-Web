@@ -43,38 +43,33 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
-    import PreferenceItems from '@/business/persistence/localstorage/preferences/PreferenceItems';
+    import {Component, Vue, Watch} from "vue-property-decorator";
+    import PreferenceItems from "@/business/persistence/localstorage/preferences/PreferenceItems";
     import PreferenceItem from "@/business/persistence/localstorage/preferences/PreferenceItem";
 
-    @Component({
-        watch: {
-            settings: {
-                handler() {
-                    this.savePreferenceValue(PreferenceItems.Server.URL, this.settings.server.url);
-                    this.savePreferenceValue(PreferenceItems.Server.Username, this.settings.server.username);
-
-                    // TODO: encrypt saved credentials somehow
-                    this.savePreferenceValue(PreferenceItems.Server.Password, this.settings.server.password);
-
-                    this.savePreferenceValue(PreferenceItems.Editor.openDefault, this.settings.editor.openDefault);
-                },
-                deep: true,
-            },
-        },
-
-    })
+    @Component({})
     export default class Settings extends Vue {
         settings = {
             server: {
-                url: '',
-                username: '',
-                password: '',
+                url: "",
+                username: "",
+                password: "",
             },
             editor: {
-                openDefault: '',
+                openDefault: "",
             },
         };
+
+        @Watch("settings", {immediate: false, deep: true})
+        onSettingsChanged() {
+            this.savePreferenceValue(PreferenceItems.Server.URL, this.settings.server.url);
+            this.savePreferenceValue(PreferenceItems.Server.Username, this.settings.server.username);
+
+            // TODO: encrypt saved credentials somehow
+            this.savePreferenceValue(PreferenceItems.Server.Password, this.settings.server.password);
+
+            this.savePreferenceValue(PreferenceItems.Editor.openDefault, this.settings.editor.openDefault);
+        }
 
         mounted() {
             this.settings.server.url = this.loadPreferenceValue(PreferenceItems.Server.URL);

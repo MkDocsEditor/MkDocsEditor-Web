@@ -15,8 +15,8 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
-    import PreferenceItems from '@/business/persistence/localstorage/preferences/PreferenceItems';
+    import {Component, Vue} from "vue-property-decorator";
+    import PreferenceItems from "@/business/persistence/localstorage/preferences/PreferenceItems";
 
     @Component({
         props: {
@@ -25,34 +25,17 @@
                 required: false,
                 validator(value) {
                     // The value must match one of these strings
-                    return ['editor', 'preview', 'both'].indexOf(value) !== -1;
+                    return ["editor", "preview", "both"].indexOf(value) !== -1;
                 },
             },
-        },
-        mounted() {
-            // get preference value
-            const initiallyShow = this.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
-
-            // and map it to the (slightly weird) properties of the component
-            this.defaultOpen = (initiallyShow === 'preview' || initiallyShow === 'both') ? 'preview' : 'edit';
-            this.subfield = initiallyShow === 'both';
-
-            const that = this;
-            this.retrieveFileContent().then((result) => {
-                if (result.status === 200) {
-                    that.input = result.data;
-                } else {
-                    that.$toasted.show('Error loading file :-(');
-                }
-            });
         },
     })
     export default class CodeEditor extends Vue {
 
-        file_name: string = '';
-        input: string = '';
+        file_name: string = "";
+        input: string = "";
         editable: boolean = true;
-        defaultOpen: string = 'edit';
+        defaultOpen: string = "edit";
         subfield: boolean = false;
         toolbarOptions = {
             bold: true,
@@ -90,6 +73,24 @@
             htmlcode: true,
             help: true,
         };
+
+        mounted() {
+            // get preference value
+            const initiallyShow = this.$data.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
+
+            // and map it to the (slightly weird) properties of the component
+            this.$data.defaultOpen = (initiallyShow === "preview" || initiallyShow === "both") ? "preview" : "edit";
+            this.$data.subfield = initiallyShow === "both";
+
+            const that = this;
+            this.retrieveFileContent().then((result: any) => {
+                if (result.status === 200) {
+                    that.$data.input = result.data;
+                } else {
+                    that.$toasted.show("Error loading file :-(");
+                }
+            });
+        }
 
         getDocumentId() {
             return this.$route.params.id;

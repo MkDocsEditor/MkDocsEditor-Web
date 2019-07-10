@@ -10,74 +10,57 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
+    import {Component, Vue, Watch} from "vue-property-decorator";
     import SectionOverview from "@/components/browser/section/SectionOverview.vue";
-    import SectionModel from "@/business/rest/model/SectionModel"
+    import SectionModel from "@/business/rest/model/SectionModel";
 
     @Component({
         name: "FileBrowser",
         components: {
             SectionOverview
         },
-        data: () => ({
-            currentSection: null
-            // new SectionModel(0, "root",
-            //     [
-            //         new SectionModel(1, "Some subsection", [], [], [])
-            //     ],
-            //     [
-            //         new DocumentModel(0, "Main.md", 100, 0),
-            //         new DocumentModel(1, "Second.md", 200, 0),
-            //         new DocumentModel(2, "Third.md", 300, 0)
-            //     ],
-            //     [
-            //         new ResourceModel(0, "text.txt", 10, 0)
-            //     ])
-        }),
-        mounted: function () {
-            this.loadSectionData();
-        },
-        methods: {
-            /**
-             * Loads the currently specified section (per url param) from the server
-             */
-            loadSectionData: function () {
-                let sectionId = this.getSectionId();
-
-                let restCall;
-                if (sectionId) {
-                    restCall = this.$restClient.getSection(sectionId);
-                } else {
-                    restCall = this.$restClient.getTree();
-                }
-
-                let that = this;
-                restCall.then(function (result) {
-                    if (result.isOk) {
-                        let data = result.data;
-                        that.currentSection = new SectionModel(data.id, data.name, data.subsections, data.documents, data.resources);
-                    } else {
-                        this.$toasted.show("Error loading section! :-(");
-                    }
-                });
-            },
-
-            /**
-             * @return the section id to show, or null if the root section should be shown
-             */
-            getSectionId: function () {
-                return this.$route.params.id
-            },
-
-        },
-        watch: {
-            '$route'(to, from) {
-                this.loadSectionData();
-            }
-        }
     })
 
     export default class FileBrowser extends Vue {
+        currentSection: SectionModel | null = null;
+
+        mounted() {
+            this.loadSectionData();
+        }
+
+        @Watch("$route", {immediate: true, deep: true})
+
+        /**
+         * Loads the currently specified section (per url param) from the server
+         */
+        loadSectionData() {
+            let sectionId = this.getSectionId();
+
+            let restCall;
+            if (sectionId) {
+                restCall = this.$restClient.getSection(sectionId);
+            } else {
+                restCall = this.$restClient.getTree();
+            }
+
+            let that = this;
+            restCall.then(function(result: any) {
+                if (result.isOk) {
+                    let data = result.data;
+                    that.currentSection = new SectionModel(data.id, data.name, data.subsections, data.documents, data.resources);
+                } else {
+                    that.$toasted.show("Error loading section! :-(");
+                }
+            });
+        }
+
+        /**
+         * @return the section id to show, or null if the root section should be shown
+         */
+        getSectionId(): string {
+            return this.$route.params.id;
+        }
+
     }
 </script>
 
