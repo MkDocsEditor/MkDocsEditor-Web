@@ -36,7 +36,7 @@ Vue.use(Toasted, {
 // const router = new VueRouter({routes: Routes});
 
 // GLOBAL PROPERTIES
-Vue.prototype.$appName = 'MkDocs Editor';
+Vue.prototype.$appName = 'MkDocsEditor';
 
 const localStorageManager = new LocalStorageManager(Vue.prototype.localStorage);
 const preferenceManager = new PreferenceManager(localStorageManager);

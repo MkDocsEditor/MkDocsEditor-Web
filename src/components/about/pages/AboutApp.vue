@@ -8,10 +8,11 @@
         </h1>
 
         <p>
-            MkDocs Editor is a Markdown editor for MkDocs projects.
+            MkDocsEditor is a Markdown editor for MkDocs projects.
         </p>
         <p>
-            It communicates with the <a href="">mkdocsrest</a> backend and allows easy
+            It communicates with the <a href="https://github.com/MkDocsEditor/MkDocsEditor-Backend">mkdocsrest</a>
+            backend and allows easy
             editing of Markdown files.
         </p>
 
