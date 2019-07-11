@@ -54,6 +54,8 @@
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-empty-interface": "off",
       "indent": "off",
+      "@typescript-eslint/indent": "off",
+      "@typescript-eslint/camelcase": "off",
       "vue/script-indent": [
         "warn",
         4,
