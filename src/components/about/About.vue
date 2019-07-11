@@ -26,7 +26,7 @@
     })
 
     export default class About extends Vue {
-        public libraries = new LibraryItems().getAllLibraries();
+    public libraries = new LibraryItems().getAllLibraries();
     }
 </script>
 

@@ -6,7 +6,7 @@ declare module "vue/types/vue" {
     interface Vue {
         $appName: string; // define real typings here if you want
         $preferenceManager: PreferenceManager;
-        $restClient: RestClient,
-        $toasted: Toasted
+        $restClient: RestClient;
+        $toasted: Toasted;
     }
 }

@@ -8,7 +8,7 @@ export default class DocumentModel {
     // tslint:disable variable-name
     public file_size: number;
 
-// tslint:disable variable-name
+    // tslint:disable variable-name
     constructor(id: string, name: string, mod_time: number, file_size: number) {
         this.id = id;
         this.type = "Document";
