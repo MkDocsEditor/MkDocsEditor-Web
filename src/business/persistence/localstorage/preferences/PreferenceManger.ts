@@ -6,10 +6,10 @@ import PreferenceItem from "@/business/persistence/localstorage/preferences/Pref
 
 export default class PreferenceManager {
 
-    localStorageManager: LocalStorageManager;
+    private localStorageManager: LocalStorageManager;
 
     constructor(localStorageManager: LocalStorageManager) {
-        this.localStorageManager = localStorageManager
+        this.localStorageManager = localStorageManager;
     }
 
     /**
@@ -17,9 +17,9 @@ export default class PreferenceManager {
      *
      * @param preferenceItem the preference item to retrieve
      */
-    loadPreferenceValue(preferenceItem: PreferenceItem) {
-        let key = preferenceItem.key;
-        let defaultValue = preferenceItem.defaultValue;
+    public loadPreferenceValue(preferenceItem: PreferenceItem): any {
+        const key = preferenceItem.key;
+        const defaultValue = preferenceItem.defaultValue;
 
         return this.localStorageManager.getValue(key, defaultValue);
     }
@@ -30,8 +30,8 @@ export default class PreferenceManager {
      * @param preferenceItem the preference item to set a new value for
      * @param newValue the new value to assign to it
      */
-    savePreferenceValue(preferenceItem: PreferenceItem, newValue: any) {
-        let key = preferenceItem.key;
+    public savePreferenceValue(preferenceItem: PreferenceItem, newValue: any) {
+        const key = preferenceItem.key;
         if (newValue == null) {
             newValue = preferenceItem.defaultValue;
         }

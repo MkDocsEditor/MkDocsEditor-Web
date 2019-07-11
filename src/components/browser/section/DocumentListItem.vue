@@ -39,28 +39,29 @@
     import DocumentModel from "@/business/rest/model/DocumentModel";
 
     @Component({})
+
     export default class DocumentListItem extends Vue {
 
-        @Prop({type: DocumentModel, required: true}) readonly document!: DocumentModel;
+        @Prop({type: DocumentModel, required: true}) private readonly document!: DocumentModel;
 
-        deleteDialogActive = false;
+        private deleteDialogActive = false;
 
-        onEdit(): void {
+        public onEdit(): void {
             this.$emit("edit-document", this.document.id);
             this.$router.push({name: "CodeEditor", params: {id: this.document.id}});
         }
 
-        onDelete(): void {
+        public onDelete(): void {
             this.$emit("delete-document", this.document.id);
             this.deleteDialogActive = true;
         }
 
-        onDeleteCanceled(): void {
-            this.$toasted.show("Deletion of document \"" + this.document.name + "\" canceled");
+        public onDeleteCanceled(): void {
+            this.$toasted.show(`Deletion of document '${this.document.name}' canceled`);
         }
 
-        onDeleteConfirmed(): void {
-            this.$toasted.show("Document \"" + this.document.name + "\" deleted");
+        public onDeleteConfirmed(): void {
+            this.$toasted.show(`Document '${this.document.name}' deleted`);
         }
     }
 </script>

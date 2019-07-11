@@ -15,16 +15,15 @@
     import SectionModel from "@/business/rest/model/SectionModel";
 
     @Component({
-        name: "FileBrowser",
         components: {
-            SectionOverview
+            SectionOverview,
         },
     })
 
     export default class FileBrowser extends Vue {
-        currentSection: SectionModel | null = null;
+        private currentSection: SectionModel | null = null;
 
-        mounted() {
+        public mounted(): void {
             this.loadSectionData();
         }
 
@@ -33,8 +32,8 @@
         /**
          * Loads the currently specified section (per url param) from the server
          */
-        loadSectionData() {
-            let sectionId = this.getSectionId();
+        private loadSectionData(): void {
+            const sectionId = this.getSectionId();
 
             let restCall;
             if (sectionId) {
@@ -43,11 +42,16 @@
                 restCall = this.$restClient.getTree();
             }
 
-            let that = this;
-            restCall.then(function(result: any) {
+            const that = this;
+            restCall.then((result: any) => {
                 if (result.isOk) {
-                    let data = result.data;
-                    that.currentSection = new SectionModel(data.id, data.name, data.subsections, data.documents, data.resources);
+                    const data = result.data;
+                    that.currentSection = new SectionModel(
+                        data.id,
+                        data.name,
+                        data.subsections,
+                        data.documents,
+                        data.resources);
                 } else {
                     that.$toasted.show("Error loading section! :-(");
                 }
@@ -57,7 +61,7 @@
         /**
          * @return the section id to show, or null if the root section should be shown
          */
-        getSectionId(): string {
+        private getSectionId(): string {
             return this.$route.params.id;
         }
 

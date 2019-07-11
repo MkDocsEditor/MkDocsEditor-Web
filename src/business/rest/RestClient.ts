@@ -1,4 +1,7 @@
-import axios from 'axios';
+import axios from "axios";
+import SectionModel from "@/business/rest/model/SectionModel";
+import DocumentModel from "@/business/rest/model/DocumentModel";
+import ResourceModel from "@/business/rest/model/ResourceModel";
 // import DocumentModel from "./model/DocumentModel.ts";
 // import ResourceModel from "./model/ResourceModel.ts";
 
@@ -7,12 +10,12 @@ import axios from 'axios';
  */
 export default class RestClient {
 
-    API: any;
-    fallbackAPI: any;
+    private API: any;
+    private fallbackAPI: any;
 
     constructor(host: string, user: string, password: string) {
         if (!host) {
-            host = "localhost"
+            host = "localhost";
         }
 
         const config = {
@@ -21,24 +24,24 @@ export default class RestClient {
             baseURL: host,
             auth: {
                 username: user,
-                password: password
-            }
+                password,
+            },
         };
 
         this.fallbackAPI = axios.create(config);
 
-        const axiosRestClient = require('axios-rest-client');
+        const axiosRestClient = require("axios-rest-client");
         this.API = axiosRestClient.default(config);
 
         this.API.endpoints({
-            tree: 'tree',
-            sections: 'section',
-            documents: 'document',
-            resources: 'resource',
-        })
+            tree: "tree",
+            sections: "section",
+            documents: "document",
+            resources: "resource",
+        });
     }
 
-    getTree() {
+    public getTree(): Promise<SectionModel> {
         return this.API.tree.all();
         // return new SectionModel(0, "Hallo", [], [], [])
     }
@@ -49,7 +52,7 @@ export default class RestClient {
      * @param id
      * @returns {promise}
      */
-    getSection(id: string) {
+    public getSection(id: string): Promise<SectionModel> {
         return this.API.sections.find(id);
     }
 
@@ -60,7 +63,7 @@ export default class RestClient {
      * @param newName the new name
      * @returns {promise}
      */
-    renameSection(id: string, newName: string) {
+    public renameSection(id: string, newName: string) {
         return this.API.sections.update(id, {});
     }
 
@@ -71,10 +74,10 @@ export default class RestClient {
      * @param name the name of the section
      * @returns {promise}
      */
-    createSection(parentId: string, name: string) {
+    public createSection(parentId: string, name: string) {
         return this.API.sections.create({
             Parent: parentId,
-            Name: name
+            Name: name,
         });
     }
 
@@ -85,7 +88,7 @@ export default class RestClient {
      * @param id the id of the section
      * @returns {promise}
      */
-    deleteSection(id: string) {
+    public deleteSection(id: string) {
         return this.API.sections.delete(id);
     }
 
@@ -95,7 +98,7 @@ export default class RestClient {
      * @param id
      * @returns {promise}
      */
-    getDocument(id: string) {
+    public getDocument(id: string): Promise<DocumentModel> {
         return this.API.documents.find(id);
     }
 
@@ -106,10 +109,10 @@ export default class RestClient {
      * @param name the name of the section
      * @returns {promise}
      */
-    createDocument(sectionId: string, name: string) {
+    public createDocument(sectionId: string, name: string) {
         return this.API.documents.create({
             Parent: sectionId,
-            Name: name
+            Name: name,
         });
     }
 
@@ -120,7 +123,7 @@ export default class RestClient {
      * @param id the id of the document
      * @returns {promise}
      */
-    deleteDocument(id: string) {
+    public deleteDocument(id: string) {
         return this.API.documents.delete(id);
     }
 
@@ -130,7 +133,7 @@ export default class RestClient {
      * @param id
      * @returns {promise}
      */
-    getResource(id: string) {
+    public getResource(id: string): Promise<ResourceModel> {
         return this.API.resources.find(id);
     }
 
@@ -140,7 +143,7 @@ export default class RestClient {
      * @param id the id of the resource
      * @returns {promise}
      */
-    deleteResource(id: string) {
+    public deleteResource(id: string) {
         return this.API.resources.delete(id);
     }
 
@@ -151,7 +154,7 @@ export default class RestClient {
      * @param documentId
      * @returns {promise}
      */
-    getFileContent(documentId: string) {
+    public getFileContent(documentId: string): Promise<string> {
         return this.API.documents[documentId].content.all();
     }
 }

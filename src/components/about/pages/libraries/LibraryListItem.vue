@@ -33,11 +33,12 @@
     import Library from "@/components/about/pages/libraries/Library";
 
     @Component({})
+
     export default class LibraryListItem extends Vue {
 
-        @Prop(Library) readonly library!: Library;
+        @Prop(Library) private readonly library!: Library;
 
-        openLinkInNewTab() {
+        public openLinkInNewTab(): void {
             window.open(this.library.url.toString(), "_blank");
         }
 

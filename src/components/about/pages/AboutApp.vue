@@ -35,15 +35,14 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
+    import {Component, Vue} from "vue-property-decorator";
 
-    @Component({
-        name: 'AboutApp',
-    })
+    @Component({})
+
     export default class AboutApp extends Vue {
 
-        openLinkInNewTab(url: string): void {
-            window.open(url.toString(), '_blank');
+        public openLinkInNewTab(url: string): void {
+            window.open(url.toString(), "_blank");
         }
 
     }

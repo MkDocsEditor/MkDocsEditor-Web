@@ -28,49 +28,47 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
+    import {Component, Prop, Vue} from "vue-property-decorator";
 
-    import SectionModel from '@/business/rest/model/SectionModel';
-    import SectionListItem from '@/components/browser/section/SectionListItem.vue';
-    import DocumentListItem from '@/components/browser/section/DocumentListItem.vue';
-    import ResourceListItem from '@/components/browser/section/ResourceListItem.vue';
+    import SectionModel from "@/business/rest/model/SectionModel";
+    import SectionListItem from "@/components/browser/section/SectionListItem.vue";
+    import DocumentListItem from "@/components/browser/section/DocumentListItem.vue";
+    import ResourceListItem from "@/components/browser/section/ResourceListItem.vue";
 
     @Component({
-        props: {
-            section: {
-                type: SectionModel,
-                required: true,
-            },
-        },
         components: {
             SectionListItem,
             DocumentListItem,
             ResourceListItem,
         },
     })
+
     export default class SectionOverview extends Vue {
-        editSection(id: string): void {
-            // this.$toasted.show('edit ' + id);
+
+        @Prop({type: SectionModel, required: true}) private readonly section!: SectionModel;
+
+        public editSection(id: string): void {
+            // this.$toasted.show("edit " + id);
         }
 
-        deleteSection(id: string): void {
-            // this.$toasted.show('delete ' + id)
+        public deleteSection(id: string): void {
+            // this.$toasted.show("delete " + id)
         }
 
-        editDocument(id: string): void {
-            // this.$toasted.show('edit ' + id)
+        public editDocument(id: string): void {
+            // this.$toasted.show("edit " + id)
         }
 
-        deleteDocument(id: string): void {
-            // this.$toasted.show('delete ' + id)
+        public deleteDocument(id: string): void {
+            // this.$toasted.show("delete " + id)
         }
 
-        editResource(id: string): void {
-            // this.$toasted.show('edit ' + id)
+        public editResource(id: string): void {
+            // this.$toasted.show("edit " + id)
         }
 
-        deleteResource(id: string): void {
-            // this.$toasted.show('delete ' + id)
+        public deleteResource(id: string): void {
+            // this.$toasted.show("delete " + id)
         }
     }
 </script>

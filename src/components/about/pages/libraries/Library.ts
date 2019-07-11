@@ -1,13 +1,14 @@
 export default class Library {
-    id: number;
-    name: string;
-    description: string;
-    license: string;
-    url: string;
-    imageUrl: string | null;
-    author: string;
+    public id: number;
+    public name: string;
+    public description: string;
+    public license: string;
+    public url: string;
+    public imageUrl: string | null;
+    public author: string;
 
-    constructor(id: number, name: string, description: string, license: string, url: string, imageUrl: string | null, author: string) {
+    constructor(id: number, name: string, description: string, license: string, url: string,
+                imageUrl: string | null, author: string) {
         this.id = id;
         this.name = name;
         this.description = description;

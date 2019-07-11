@@ -54,14 +54,14 @@
 </template>
 
 <script lang="ts">
-    import {Vue} from 'vue-property-decorator';
+    import {Vue} from "vue-property-decorator";
 
     export default class MainAppLayout extends Vue {
-        menuVisible: boolean = false;
+        private menuVisible: boolean = false;
 
-        toggleMenu(): boolean {
+        public toggleMenu(): boolean {
             this.menuVisible = !this.menuVisible;
-            return this.menuVisible
+            return this.menuVisible;
         }
     }
 </script>
@@ -90,7 +90,7 @@
     /*   Other app wide css   */
     /* ====================== */
     * {
-        font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+        font-family: "Roboto", "Helvetica Neue", Arial, sans-serif;
     }
 </style>
 

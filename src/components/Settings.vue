@@ -48,8 +48,9 @@
     import PreferenceItem from "@/business/persistence/localstorage/preferences/PreferenceItem";
 
     @Component({})
+
     export default class Settings extends Vue {
-        settings = {
+        private settings = {
             server: {
                 url: "",
                 username: "",
@@ -61,7 +62,7 @@
         };
 
         @Watch("settings", {immediate: false, deep: true})
-        onSettingsChanged() {
+        public onSettingsChanged() {
             this.savePreferenceValue(PreferenceItems.Server.URL, this.settings.server.url);
             this.savePreferenceValue(PreferenceItems.Server.Username, this.settings.server.username);
 
@@ -71,7 +72,7 @@
             this.savePreferenceValue(PreferenceItems.Editor.openDefault, this.settings.editor.openDefault);
         }
 
-        mounted() {
+        public mounted(): void {
             this.settings.server.url = this.loadPreferenceValue(PreferenceItems.Server.URL);
             this.settings.server.username = this.loadPreferenceValue(PreferenceItems.Server.Username);
             this.settings.server.password = this.loadPreferenceValue(PreferenceItems.Server.Password);
@@ -84,7 +85,7 @@
          *
          * @param preferenceItem the preference item
          */
-        loadPreferenceValue(preferenceItem: PreferenceItem): any {
+        public loadPreferenceValue(preferenceItem: PreferenceItem): any {
             return this.$preferenceManager.loadPreferenceValue(preferenceItem);
         }
 
@@ -94,7 +95,7 @@
          * @param storeKey the key to use in local storage
          * @param newValue the new value to assign to it
          */
-        savePreferenceValue(storeKey: PreferenceItem, newValue: any): any {
+        public savePreferenceValue(storeKey: PreferenceItem, newValue: any): any {
             this.$preferenceManager.savePreferenceValue(storeKey, newValue);
         }
     }

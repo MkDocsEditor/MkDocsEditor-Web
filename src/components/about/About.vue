@@ -12,21 +12,21 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from 'vue-property-decorator';
+    import {Component, Vue} from "vue-property-decorator";
 
-    import AboutLibraries from '@/components/about/pages/libraries/AboutLibraries.vue';
-    import AboutApp from '@/components/about/pages/AboutApp.vue';
-    import LibraryItems from '@/components/about/pages/libraries/LibraryItems';
+    import AboutLibraries from "@/components/about/pages/libraries/AboutLibraries.vue";
+    import AboutApp from "@/components/about/pages/AboutApp.vue";
+    import LibraryItems from "@/components/about/pages/libraries/LibraryItems";
 
     @Component({
-        name: 'About',
         components: {
             AboutApp,
-            AboutLibraries
+            AboutLibraries,
         },
     })
+
     export default class About extends Vue {
-        libraries = new LibraryItems().getAllLibraries();
+        public libraries = new LibraryItems().getAllLibraries();
     }
 </script>
 

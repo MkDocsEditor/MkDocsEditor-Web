@@ -37,14 +37,19 @@
     import SectionModel from "@/business/rest/model/SectionModel";
 
     @Component({})
+
     export default class SectionListItem extends Vue {
 
-        @Prop({type: SectionModel, required: true}) readonly section!: SectionModel;
+        @Prop({type: SectionModel, required: true}) public readonly section!: SectionModel;
+
+        public editDialogActive: boolean = false;
+        public deleteDialogActive: boolean = false;
+        public newSectionName: string = this.section.name;
 
         @Watch("newSectionName", {immediate: false, deep: false})
-        onNewSectionNameChanged(newValue: string, oldValue: string) {
+        public onNewSectionNameChanged(newValue: string, oldValue: string) {
             this.$restClient.renameSection(this.section.id, newValue).then((value: any) => {
-                if (value.status != 200) {
+                if (value.status !== 200) {
                     this.$toasted.show("Error renaming section! :-(");
                 } else {
                     this.$toasted.show(`Section "${this.section.name}" renamed from "${oldValue}" to "${newValue}"`);
@@ -55,30 +60,26 @@
             });
         }
 
-        editDialogActive: boolean = false;
-        deleteDialogActive: boolean = false;
-        newSectionName: string = this.section.name;
-
-        onOpenSection(): void {
+        public onOpenSection(): void {
             this.$emit("open-section", this.section.id);
             this.$router.push({name: "FileBrowser", params: {id: this.section.id}});
         }
 
-        onEdit(): void {
+        public onEdit(): void {
             this.$emit("edit-section", this.section.id);
             this.editDialogActive = true;
         }
 
-        onDelete(): void {
+        public onDelete(): void {
             this.$emit("delete-section", this.section.id);
             this.deleteDialogActive = true;
         }
 
-        onDeleteCanceled(): void {
+        public onDeleteCanceled(): void {
             this.$toasted.show("Deletion of section \"" + this.section.name + "\" canceled");
         }
 
-        onDeleteConfirmed(): void {
+        public onDeleteConfirmed(): void {
             this.$toasted.show("Section \"" + this.section.name + "\" deleted");
         }
 

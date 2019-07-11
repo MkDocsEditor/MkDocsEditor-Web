@@ -1,6 +1,6 @@
 <template>
     <div id="editor">
-        <h1>{{ file_name }}</h1>
+        <h1>{{ fileName }}</h1>
 
         <mavon-editor
                 language="en"
@@ -30,14 +30,15 @@
             },
         },
     })
+
     export default class CodeEditor extends Vue {
 
-        file_name: string = "";
-        input: string = "";
-        editable: boolean = true;
-        defaultOpen: string = "edit";
-        subfield: boolean = false;
-        toolbarOptions = {
+        public fileName: string = "";
+        public input: string = "";
+        public editable: boolean = true;
+        public defaultOpen: string = "edit";
+        public subfield: boolean = false;
+        public toolbarOptions = {
             bold: true,
             italic: true,
             header: true,
@@ -74,7 +75,7 @@
             help: true,
         };
 
-        mounted() {
+        public mounted(): void {
             // get preference value
             const initiallyShow = this.$data.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
 
@@ -92,16 +93,16 @@
             });
         }
 
-        getDocumentId() {
+        private getDocumentId(): string {
             return this.$route.params.id;
         }
 
-        acceptImageFile() {
+        private acceptImageFile(): boolean {
             // don't allow uploading files (yet)
             return false;
         }
 
-        retrieveFileContent() {
+        private retrieveFileContent(): Promise<string> {
             const documentId = this.getDocumentId();
             return this.$restClient.getFileContent(documentId);
         }

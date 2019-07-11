@@ -36,35 +36,36 @@
     import ResourceModel from "@/business/rest/model/ResourceModel";
 
     @Component({})
+
     export default class ResourceListItem extends Vue {
 
-        @Prop({type: ResourceModel, required: true}) readonly resource!: ResourceModel;
+        @Prop({type: ResourceModel, required: true}) public readonly resource!: ResourceModel;
+
+        private editDialogActive = false;
+        private deleteDialogActive = false;
+        private newResourceName = this.resource.name;
 
         @Watch("newResourceName", {immediate: true, deep: true})
-        onNewResourceNameChanged(newValue: string, oldValue: string) {
-            this.$toasted.show("Resource \"" + this.resource.name + "\" renamed from \"" + oldValue + "\" to \"" + newValue + "\"");
+        public onNewResourceNameChanged(newValue: string, oldValue: string) {
+            this.$toasted.show(`Resource '${this.resource.name}' renamed from '${oldValue}' to '${newValue}'`);
         }
 
-        editDialogActive = false;
-        deleteDialogActive = false;
-        newResourceName = this.resource.name;
-
-        onEdit(): void {
+        public onEdit(): void {
             this.$emit("edit-resource", this.resource.id);
             this.newResourceName = this.resource.name;
             this.editDialogActive = true;
         }
 
-        onDelete(): void {
+        public onDelete(): void {
             this.$emit("delete-resource", this.resource.id);
             this.deleteDialogActive = true;
         }
 
-        onDeleteCanceled(): void {
+        public onDeleteCanceled(): void {
             this.$toasted.show("Deletion of resource \"" + this.resource.name + "\" canceled");
         }
 
-        onDeleteConfirmed(): void {
+        public onDeleteConfirmed(): void {
             this.$toasted.show("Resource \"" + this.resource.name + "\" deleted");
         }
     }

@@ -3,10 +3,10 @@
  */
 export default class LocalStorageManager {
 
-    localStorage: any;
+    private localStorage: any;
 
     constructor(localStore: any) {
-        this.localStorage = localStore
+        this.localStorage = localStore;
     }
 
     /**
@@ -15,7 +15,7 @@ export default class LocalStorageManager {
      * @param storeKey the key used in local storage
      * @param defaultValue the default value to use if no persisted value was found
      */
-    getValue(storeKey: string, defaultValue: any) {
+    public getValue(storeKey: string, defaultValue: any): any {
         let storeValue: any = localStorage.getItem(storeKey);
         if (storeValue) {
             if (storeValue instanceof Object) {
@@ -31,9 +31,9 @@ export default class LocalStorageManager {
         }
 
         if (storeValue) {
-            return storeValue
+            return storeValue;
         } else {
-            return defaultValue
+            return defaultValue;
         }
     }
 
@@ -43,7 +43,7 @@ export default class LocalStorageManager {
      * @param storeKey the key to use in local storage
      * @param newValue the new value to assign to it
      */
-    setValue(storeKey: string, newValue: any) {
+    public setValue(storeKey: string, newValue: any): void {
         let serialized = false;
         if (newValue instanceof Object) {
             serialized = true;
