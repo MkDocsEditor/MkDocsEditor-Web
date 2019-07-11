@@ -50,27 +50,27 @@
     @Component({})
 
     export default class Settings extends Vue {
-        private settings = {
-            server: {
-                url: "",
-                username: "",
-                password: "",
-            },
-            editor: {
-                openDefault: "",
-            },
-        };
+    private settings = {
+        server: {
+            url: "",
+            username: "",
+            password: "",
+        },
+        editor: {
+            openDefault: "",
+        },
+    };
 
         @Watch("settings", {immediate: false, deep: true})
-        public onSettingsChanged() {
-            this.savePreferenceValue(PreferenceItems.Server.URL, this.settings.server.url);
-            this.savePreferenceValue(PreferenceItems.Server.Username, this.settings.server.username);
+    public onSettingsChanged() {
+        this.savePreferenceValue(PreferenceItems.Server.URL, this.settings.server.url);
+        this.savePreferenceValue(PreferenceItems.Server.Username, this.settings.server.username);
 
-            // TODO: encrypt saved credentials somehow
-            this.savePreferenceValue(PreferenceItems.Server.Password, this.settings.server.password);
+        // TODO: encrypt saved credentials somehow
+        this.savePreferenceValue(PreferenceItems.Server.Password, this.settings.server.password);
 
-            this.savePreferenceValue(PreferenceItems.Editor.openDefault, this.settings.editor.openDefault);
-        }
+        this.savePreferenceValue(PreferenceItems.Editor.openDefault, this.settings.editor.openDefault);
+    }
 
         public mounted(): void {
             this.settings.server.url = this.loadPreferenceValue(PreferenceItems.Server.URL);
