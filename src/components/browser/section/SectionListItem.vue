@@ -3,7 +3,7 @@
         <md-card md-with-hover v-on:click.native="onOpenSection()">
             <md-list-item>
                 <md-icon>folder</md-icon>
-                <span class="md-list-item-text">{{ section.name }}</span>
+                <span :key="section.id + '-label'" class="md-list-item-text">{{ section.name }}</span>
                 <md-button v-on:click="onEdit()" v-on:click.stop class="md-icon-button md-list-action">
                     <md-icon>edit</md-icon>
                 </md-button>
@@ -80,7 +80,15 @@
         }
 
         public onDeleteConfirmed(): void {
-            this.$toasted.show("Section \"" + this.section.name + "\" deleted");
+            this.$restClient.deleteSection(this.section.id).then((value: any) => {
+                if (value.status !== 200) {
+                    this.$toasted.show(`Error deleting section '${this.section.name}'`);
+                } else {
+                    this.$toasted.show(`Section '${this.section.name}' deleted`);
+                }
+            }).catch((err: any) => {
+                this.$toasted.show("Unknown Error: " + err);
+            });
         }
 
     }

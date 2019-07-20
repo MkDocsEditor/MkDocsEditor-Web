@@ -60,6 +60,7 @@
         }
 
         public deleteDocument(id: string): void {
+            // this.section.documents = this.section.documents.filter(document => document.id != id)
             // this.$toasted.show("delete " + id)
         }
 

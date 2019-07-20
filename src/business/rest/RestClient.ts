@@ -42,8 +42,41 @@ export default class RestClient {
     }
 
     public getTree(): Promise<SectionModel> {
-        return this.API.tree.all();
-        // return new SectionModel(0, "Hallo", [], [], [])
+        return this.API.tree.all().then(function (result: any) {
+            if (result.isOk) {
+                return RestClient.toSectionModel(result.data)
+            } else {
+                throw "Error loading section! :-(";
+            }
+        });
+    }
+
+    private static toSectionModel(data: any): SectionModel {
+        return new SectionModel(
+            data.id,
+            data.name,
+            data.subsections.map(RestClient.toSectionModel),
+            data.documents.map(RestClient.toDocumentModel),
+            data.resources.map(RestClient.toResourceModel)
+        )
+    }
+
+    private static toResourceModel(data: any): ResourceModel {
+        return new ResourceModel(
+            data.id,
+            data.name,
+            data.mod_time,
+            data.file_size,
+        )
+    }
+
+    private static toDocumentModel(data: any): DocumentModel {
+        return new DocumentModel(
+            data.id,
+            data.name,
+            data.mod_time,
+            data.file_size,
+        )
     }
 
     /**
@@ -53,7 +86,13 @@ export default class RestClient {
      * @returns {promise}
      */
     public getSection(id: string): Promise<SectionModel> {
-        return this.API.sections.find(id);
+        return this.API.sections.find(id).then(function (result: any) {
+            if (result.isOk) {
+                return RestClient.toSectionModel(result.data)
+            } else {
+                throw "Error loading section! :-(";
+            }
+        });
     }
 
     /**
@@ -99,7 +138,14 @@ export default class RestClient {
      * @returns {promise}
      */
     public getDocument(id: string): Promise<DocumentModel> {
-        return this.API.documents.find(id);
+        const that = this;
+        return this.API.documents.find(id).then(function (result: any) {
+            if (result.isOk) {
+                return RestClient.toDocumentModel(result.data)
+            } else {
+                throw "Error loading document! :-(";
+            }
+        });
     }
 
     /**

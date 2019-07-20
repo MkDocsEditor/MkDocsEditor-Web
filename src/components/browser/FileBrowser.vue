@@ -42,19 +42,10 @@
                 restCall = this.$restClient.getTree();
             }
 
-            const that = this;
-            restCall.then((result: any) => {
-                if (result.isOk) {
-                    const data = result.data;
-                    that.currentSection = new SectionModel(
-                        data.id,
-                        data.name,
-                        data.subsections,
-                        data.documents,
-                        data.resources);
-                } else {
-                    that.$toasted.show("Error loading section! :-(");
-                }
+            restCall.then((result: SectionModel) => {
+                this.currentSection = result;
+            }).catch((error: any) => {
+                this.$toasted.show("Error loading section: " + error);
             });
         }
 

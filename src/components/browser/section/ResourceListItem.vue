@@ -3,7 +3,7 @@
         <md-card md-with-hover>
             <md-list-item>
                 <md-icon>attach_file</md-icon>
-                <span class="md-list-item-text">{{ resource.name }}</span>
+                <span :key="resource.id + '-label'" class="md-list-item-text">{{ resource.name }}</span>
                 <md-button v-on:click="onEdit()" v-on:click.stop class="md-icon-button md-list-action">
                     <md-icon>edit</md-icon>
                 </md-button>
@@ -45,7 +45,7 @@
         private deleteDialogActive = false;
         private newResourceName = this.resource.name;
 
-        @Watch("newResourceName", {immediate: true, deep: true})
+        @Watch("newResourceName", {immediate: false, deep: true})
         public onNewResourceNameChanged(newValue: string, oldValue: string) {
             this.$toasted.show(`Resource '${this.resource.name}' renamed from '${oldValue}' to '${newValue}'`);
         }
@@ -66,7 +66,15 @@
         }
 
         public onDeleteConfirmed(): void {
-            this.$toasted.show("Resource \"" + this.resource.name + "\" deleted");
+            this.$restClient.deleteResource(this.resource.id).then((value: any) => {
+                if (value.status !== 200) {
+                    this.$toasted.show(`Error deleting resource '${this.resource.name}'`);
+                } else {
+                    this.$toasted.show(`Resource '${this.resource.name}' deleted`);
+                }
+            }).catch((err: any) => {
+                this.$toasted.show("Unknown Error: " + err);
+            });
         }
     }
 </script>

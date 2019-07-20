@@ -2,7 +2,7 @@
     <div>
         <md-card md-with-hover v-on:click.native="onEdit()">
             <md-card-header>
-                <div class="md-title">
+                <div :key="document.id + '-label'" class="md-title">
                     <md-icon>description</md-icon>
                     {{ document.name }}
                 </div>
@@ -61,7 +61,15 @@
         }
 
         public onDeleteConfirmed(): void {
-            this.$toasted.show(`Document '${this.document.name}' deleted`);
+            this.$restClient.deleteDocument(this.document.id).then((value: any) => {
+                if (value.status !== 200) {
+                    this.$toasted.show(`Error deleting document '${this.document.name}'`);
+                } else {
+                    this.$toasted.show(`Document '${this.document.name}' deleted`);
+                }
+            }).catch((err: any) => {
+                this.$toasted.show("Unknown Error: " + err);
+            });
         }
     }
 </script>
