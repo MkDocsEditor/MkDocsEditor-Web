@@ -13,6 +13,34 @@ export default class RestClient {
     private API: any;
     private fallbackAPI: any;
 
+    private static toSectionModel(data: any): SectionModel {
+        return new SectionModel(
+            data.id,
+            data.name,
+            data.subsections.map(RestClient.toSectionModel),
+            data.documents.map(RestClient.toDocumentModel),
+            data.resources.map(RestClient.toResourceModel),
+        );
+    }
+
+    private static toResourceModel(data: any): ResourceModel {
+        return new ResourceModel(
+            data.id,
+            data.name,
+            data.mod_time,
+            data.file_size,
+        );
+    }
+
+    private static toDocumentModel(data: any): DocumentModel {
+        return new DocumentModel(
+            data.id,
+            data.name,
+            data.mod_time,
+            data.file_size,
+        );
+    }
+
     public constructor(host: string, user: string, password: string) {
         if (!host) {
             host = 'localhost';
@@ -39,34 +67,6 @@ export default class RestClient {
             documents: 'document',
             resources: 'resource',
         });
-    }
-
-    private static toSectionModel(data: any): SectionModel {
-        return new SectionModel(
-            data.id,
-            data.name,
-            data.subsections.map(RestClient.toSectionModel),
-            data.documents.map(RestClient.toDocumentModel),
-            data.resources.map(RestClient.toResourceModel)
-        );
-    }
-
-    private static toResourceModel(data: any): ResourceModel {
-        return new ResourceModel(
-            data.id,
-            data.name,
-            data.mod_time,
-            data.file_size,
-        );
-    }
-
-    private static toDocumentModel(data: any): DocumentModel {
-        return new DocumentModel(
-            data.id,
-            data.name,
-            data.mod_time,
-            data.file_size,
-        );
     }
 
     public getTree(): Promise<SectionModel> {
