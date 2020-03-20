@@ -3,23 +3,23 @@
 
         <h2>Section: <b>{{ section.name }}</b></h2>
         <md-list>
-            <section-list-item v-for="subsection in section.subsections"
+            <section-list-item v-bind:key="subsection.id"
                                v-bind:section="subsection"
-                               v-bind:key="subsection.id"
+                               v-for="subsection in section.subsections"
                                v-on:delete-section="deleteSection"
                                v-on:edit-section="editSection"></section-list-item>
         </md-list>
         <md-list>
-            <document-list-item v-for="document in section.documents"
-                                v-bind:document="document"
+            <document-list-item v-bind:document="document"
                                 v-bind:key="document.id"
+                                v-for="document in section.documents"
                                 v-on:delete-document="deleteDocument"
                                 v-on:edit-document="editDocument"></document-list-item>
         </md-list>
         <md-list>
-            <resource-list-item v-for="resource in section.resources"
+            <resource-list-item v-bind:key="resource.id"
                                 v-bind:resource="resource"
-                                v-bind:key="resource.id"
+                                v-for="resource in section.resources"
                                 v-on:delete-resource="deleteResource"
                                 v-on:edit-resource="editResource"></resource-list-item>
         </md-list>
@@ -28,12 +28,12 @@
 </template>
 
 <script lang="ts">
-    import {Component, Prop, Vue} from "vue-property-decorator";
+    import {Component, Prop, Vue} from 'vue-property-decorator';
 
-    import SectionModel from "@/business/rest/model/SectionModel";
-    import SectionListItem from "@/components/browser/section/SectionListItem.vue";
-    import DocumentListItem from "@/components/browser/section/DocumentListItem.vue";
-    import ResourceListItem from "@/components/browser/section/ResourceListItem.vue";
+    import SectionModel from '@/business/rest/model/SectionModel';
+    import SectionListItem from '@/components/browser/section/SectionListItem.vue';
+    import DocumentListItem from '@/components/browser/section/DocumentListItem.vue';
+    import ResourceListItem from '@/components/browser/section/ResourceListItem.vue';
 
     @Component({
         components: {

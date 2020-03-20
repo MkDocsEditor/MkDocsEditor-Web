@@ -3,20 +3,20 @@
         <h1>{{ fileName }}</h1>
 
         <mavon-editor
+                :defaultOpen="defaultOpen"
+                :editable="editable"
+                :imageFilter="acceptImageFile"
+                :subfield="subfield"
+                :toolbars="toolbarOptions"
                 language="en"
                 placeholder="Empty document ¯\_(ツ)_/¯"
-                :toolbars="toolbarOptions"
-                :editable="editable"
-                :defaultOpen="defaultOpen"
-                :subfield="subfield"
-                :imageFilter="acceptImageFile"
                 v-model="input"/>
     </div>
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from "vue-property-decorator";
-    import PreferenceItems from "@/business/persistence/localstorage/preferences/PreferenceItems";
+    import {Component, Vue} from 'vue-property-decorator';
+    import PreferenceItems from '@/business/persistence/localstorage/preferences/PreferenceItems';
 
     @Component({
         props: {
@@ -25,7 +25,7 @@
                 required: false,
                 validator(value) {
                     // The value must match one of these strings
-                    return ["editor", "preview", "both"].indexOf(value) !== -1;
+                    return ['editor', 'preview', 'both'].indexOf(value) !== -1;
                 },
             },
         },
@@ -33,10 +33,10 @@
 
     export default class CodeEditor extends Vue {
 
-        public fileName: string = "";
-        public input: string = "";
+        public fileName: string = '';
+        public input: string = '';
         public editable: boolean = true;
-        public defaultOpen: string = "edit";
+        public defaultOpen: string = 'edit';
         public subfield: boolean = false;
         public toolbarOptions = {
             bold: true,
@@ -80,15 +80,15 @@
             const initiallyShow = this.$data.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
 
             // and map it to the (slightly weird) properties of the component
-            this.$data.defaultOpen = (initiallyShow === "preview" || initiallyShow === "both") ? "preview" : "edit";
-            this.$data.subfield = initiallyShow === "both";
+            this.$data.defaultOpen = (initiallyShow === 'preview' || initiallyShow === 'both') ? 'preview' : 'edit';
+            this.$data.subfield = initiallyShow === 'both';
 
             const that = this;
             this.retrieveFileContent().then((result: any) => {
                 if (result.status === 200) {
                     that.$data.input = result.data;
                 } else {
-                    that.$toasted.show("Error loading file :-(");
+                    that.$toasted.show('Error loading file :-(');
                 }
             });
         }

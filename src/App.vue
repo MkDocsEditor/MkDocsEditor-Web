@@ -2,11 +2,11 @@
     <div class="page-container">
         <md-app>
             <md-app-toolbar class="md-primary" md-elevation="2">
-                <md-button class="md-icon-button menuToggle" @click="toggleMenu" v-if="!menuVisible">
+                <md-button @click="toggleMenu" class="md-icon-button menuToggle" v-if="!menuVisible">
                     <md-icon>menu</md-icon>
                 </md-button>
                 <md-avatar style="margin: 0">
-                    <img src="./assets/logo.png" alt="App Logo">
+                    <img alt="App Logo" src="./assets/logo.png">
                 </md-avatar>
                 <span class="md-title">{{ $appName }}</span>
             </md-app-toolbar>
@@ -16,7 +16,7 @@
                     <span>Navigation</span>
 
                     <div class="md-toolbar-section-end">
-                        <md-button class="md-icon-button md-dense" @click="toggleMenu">
+                        <md-button @click="toggleMenu" class="md-icon-button md-dense">
                             <md-icon>keyboard_arrow_left</md-icon>
                         </md-button>
                     </div>
@@ -54,15 +54,15 @@
 </template>
 
 <script lang="ts">
-    import {Vue} from "vue-property-decorator";
+    import {Vue} from 'vue-property-decorator';
 
     export default class MainAppLayout extends Vue {
-    private menuVisible: boolean = false;
+        private menuVisible: boolean = false;
 
-    public toggleMenu(): boolean {
-        this.menuVisible = !this.menuVisible;
-        return this.menuVisible;
-    }
+        public toggleMenu(): boolean {
+            this.menuVisible = !this.menuVisible;
+            return this.menuVisible;
+        }
     }
 </script>
 

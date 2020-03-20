@@ -20,7 +20,7 @@
             <md-list-item>
                 <md-field>
                     <label>Password</label>
-                    <md-input v-model="settings.server.password" type="password"></md-input>
+                    <md-input type="password" v-model="settings.server.password"></md-input>
                 </md-field>
             </md-list-item>
         </md-list>
@@ -31,7 +31,7 @@
             <md-list-item>
                 <md-field>
                     <label>Default view</label>
-                    <md-select v-model="settings.editor.openDefault" id="editorOpenDefault" name="opendefault">
+                    <md-select id="editorOpenDefault" name="opendefault" v-model="settings.editor.openDefault">
                         <md-option value="both">Editor & Preview</md-option>
                         <md-option value="preview">Only Preview</md-option>
                         <md-option value="editor">Only Editor</md-option>

@@ -1,7 +1,7 @@
 <template>
     <div>
         <md-tabs md-sync-route>
-            <md-tab id="tab-app" md-label="App" to="/about" exact>
+            <md-tab exact id="tab-app" md-label="App" to="/about">
                 <about-app></about-app>
             </md-tab>
             <md-tab id="tab-libraries" md-label="Libraries" to="/about/libraries">
@@ -12,11 +12,11 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from "vue-property-decorator";
+    import {Component, Vue} from 'vue-property-decorator';
 
-    import AboutLibraries from "@/components/about/pages/libraries/AboutLibraries.vue";
-    import AboutApp from "@/components/about/pages/AboutApp.vue";
-    import LibraryItems from "@/components/about/pages/libraries/LibraryItems";
+    import AboutLibraries from '@/components/about/pages/libraries/AboutLibraries.vue';
+    import AboutApp from '@/components/about/pages/AboutApp.vue';
+    import LibraryItems from '@/components/about/pages/libraries/LibraryItems';
 
     @Component({
         components: {
@@ -26,7 +26,7 @@
     })
 
     export default class About extends Vue {
-    public libraries = new LibraryItems().getAllLibraries();
+        public libraries = new LibraryItems().getAllLibraries();
     }
 </script>
 

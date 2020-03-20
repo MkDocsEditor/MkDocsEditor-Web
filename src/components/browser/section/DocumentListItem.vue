@@ -13,11 +13,11 @@
 
             <md-card-actions>
                 <router-link :to="'/code_editor/' + document.id">
-                    <md-button v-on:click="onEdit()" v-on:click.stop class="md-icon-button md-list-action">
+                    <md-button class="md-icon-button md-list-action" v-on:click="onEdit()" v-on:click.stop>
                         <md-icon>edit</md-icon>
                     </md-button>
                 </router-link>
-                <md-button v-on:click="onDelete()" v-on:click.stop class="md-icon-button md-list-action">
+                <md-button class="md-icon-button md-list-action" v-on:click="onDelete()" v-on:click.stop>
                     <md-icon>delete</md-icon>
                 </md-button>
             </md-card-actions>
@@ -25,18 +25,18 @@
 
         <md-dialog-confirm
                 :md-active.sync="deleteDialogActive"
-                md-title="Delete"
                 :md-content="'Do you really want to delete the document file <b>' + document.name + '</b> ?'"
-                md-confirm-text="Delete"
-                md-cancel-text="Cancel"
                 @md-cancel="onDeleteCanceled"
-                @md-confirm="onDeleteConfirmed"/>
+                @md-confirm="onDeleteConfirmed"
+                md-cancel-text="Cancel"
+                md-confirm-text="Delete"
+                md-title="Delete"/>
     </div>
 </template>
 
 <script lang="ts">
-    import {Component, Prop, Vue} from "vue-property-decorator";
-    import DocumentModel from "@/business/rest/model/DocumentModel";
+    import {Component, Prop, Vue} from 'vue-property-decorator';
+    import DocumentModel from '@/business/rest/model/DocumentModel';
 
     @Component({})
 
@@ -47,12 +47,12 @@
         private deleteDialogActive = false;
 
         public onEdit(): void {
-            this.$emit("edit-document", this.document.id);
-            this.$router.push({name: "CodeEditor", params: {id: this.document.id}});
+            this.$emit('edit-document', this.document.id);
+            this.$router.push({name: 'CodeEditor', params: {id: this.document.id}});
         }
 
         public onDelete(): void {
-            this.$emit("delete-document", this.document.id);
+            this.$emit('delete-document', this.document.id);
             this.deleteDialogActive = true;
         }
 
@@ -68,7 +68,7 @@
                     this.$toasted.show(`Document '${this.document.name}' deleted`);
                 }
             }).catch((err: any) => {
-                this.$toasted.show("Unknown Error: " + err);
+                this.$toasted.show('Unknown Error: ' + err);
             });
         }
     }

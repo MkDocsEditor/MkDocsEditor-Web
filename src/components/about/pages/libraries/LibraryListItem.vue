@@ -29,8 +29,8 @@
 </template>
 
 <script lang="ts">
-    import {Component, Prop, Vue} from "vue-property-decorator";
-    import Library from "@/components/about/pages/libraries/Library";
+    import {Component, Prop, Vue} from 'vue-property-decorator';
+    import Library from '@/components/about/pages/libraries/Library';
 
     @Component({})
 
@@ -39,7 +39,7 @@
         @Prop(Library) private readonly library!: Library;
 
         public openLinkInNewTab(): void {
-            window.open(this.library.url.toString(), "_blank");
+            window.open(this.library.url.toString(), '_blank');
         }
 
     }

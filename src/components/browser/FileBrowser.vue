@@ -1,7 +1,7 @@
 <template>
     <div>
         <h1>File Browser</h1>
-        <section-overview v-if="currentSection" :section="currentSection"></section-overview>
+        <section-overview :section="currentSection" v-if="currentSection"></section-overview>
         <md-button class="md-fab md-fab-bottom-right">
             <md-icon>add</md-icon>
             <md-icon>edit</md-icon>
@@ -10,9 +10,9 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue, Watch} from "vue-property-decorator";
-    import SectionOverview from "@/components/browser/section/SectionOverview.vue";
-    import SectionModel from "@/business/rest/model/SectionModel";
+    import {Component, Vue, Watch} from 'vue-property-decorator';
+    import SectionOverview from '@/components/browser/section/SectionOverview.vue';
+    import SectionModel from '@/business/rest/model/SectionModel';
 
     @Component({
         components: {
@@ -27,7 +27,7 @@
             this.loadSectionData();
         }
 
-        @Watch("$route", {immediate: true, deep: true})
+        @Watch('$route', {immediate: true, deep: true})
 
         /**
          * Loads the currently specified section (per url param) from the server
@@ -45,7 +45,7 @@
             restCall.then((result: SectionModel) => {
                 this.currentSection = result;
             }).catch((error: any) => {
-                this.$toasted.show("Error loading section: " + error);
+                this.$toasted.show('Error loading section: ' + error);
             });
         }
 

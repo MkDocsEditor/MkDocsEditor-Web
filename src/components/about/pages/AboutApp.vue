@@ -2,7 +2,7 @@
     <div style="text-align: center;">
         <h1>
             <md-avatar>
-                <img src="../../../assets/logo.png" alt="App Logo">
+                <img alt="App Logo" src="../../../assets/logo.png">
             </md-avatar>
             {{ $appName }}
         </h1>
@@ -20,7 +20,7 @@
 
         <div>
             <md-avatar>
-                <img src="https://avatars1.githubusercontent.com/u/14024504" alt="Markus Ressel">
+                <img alt="Markus Ressel" src="https://avatars1.githubusercontent.com/u/14024504">
             </md-avatar>
 
             <span>Markus Ressel</span>
@@ -35,14 +35,14 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue} from "vue-property-decorator";
+    import {Component, Vue} from 'vue-property-decorator';
 
     @Component({})
 
     export default class AboutApp extends Vue {
 
         public openLinkInNewTab(url: string): void {
-            window.open(url.toString(), "_blank");
+            window.open(url.toString(), '_blank');
         }
 
     }

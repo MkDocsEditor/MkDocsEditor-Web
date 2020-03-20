@@ -30,24 +30,14 @@ export default class RestClient {
 
         this.fallbackAPI = axios.create(config);
 
-        const axiosRestClient = require("axios-rest-client");
+        const axiosRestClient = require('axios-rest-client');
         this.API = axiosRestClient.default(config);
 
         this.API.endpoints({
-            tree: "tree",
-            sections: "section",
-            documents: "document",
-            resources: "resource",
-        });
-    }
-
-    public getTree(): Promise<SectionModel> {
-        return this.API.tree.all().then(function (result: any) {
-            if (result.isOk) {
-                return RestClient.toSectionModel(result.data)
-            } else {
-                throw "Error loading section! :-(";
-            }
+            tree: 'tree',
+            sections: 'section',
+            documents: 'document',
+            resources: 'resource',
         });
     }
 
@@ -58,7 +48,7 @@ export default class RestClient {
             data.subsections.map(RestClient.toSectionModel),
             data.documents.map(RestClient.toDocumentModel),
             data.resources.map(RestClient.toResourceModel)
-        )
+        );
     }
 
     private static toResourceModel(data: any): ResourceModel {
@@ -67,7 +57,7 @@ export default class RestClient {
             data.name,
             data.mod_time,
             data.file_size,
-        )
+        );
     }
 
     private static toDocumentModel(data: any): DocumentModel {
@@ -76,7 +66,17 @@ export default class RestClient {
             data.name,
             data.mod_time,
             data.file_size,
-        )
+        );
+    }
+
+    public getTree(): Promise<SectionModel> {
+        return this.API.tree.all().then(function(result: any) {
+            if (result.isOk) {
+                return RestClient.toSectionModel(result.data);
+            } else {
+                throw 'Error loading section! :-(';
+            }
+        });
     }
 
     /**
@@ -86,11 +86,11 @@ export default class RestClient {
      * @returns {promise}
      */
     public getSection(id: string): Promise<SectionModel> {
-        return this.API.sections.find(id).then(function (result: any) {
+        return this.API.sections.find(id).then(function(result: any) {
             if (result.isOk) {
-                return RestClient.toSectionModel(result.data)
+                return RestClient.toSectionModel(result.data);
             } else {
-                throw "Error loading section! :-(";
+                throw 'Error loading section! :-(';
             }
         });
     }
@@ -139,11 +139,11 @@ export default class RestClient {
      */
     public getDocument(id: string): Promise<DocumentModel> {
         const that = this;
-        return this.API.documents.find(id).then(function (result: any) {
+        return this.API.documents.find(id).then(function(result: any) {
             if (result.isOk) {
-                return RestClient.toDocumentModel(result.data)
+                return RestClient.toDocumentModel(result.data);
             } else {
-                throw "Error loading document! :-(";
+                throw 'Error loading document! :-(';
             }
         });
     }
