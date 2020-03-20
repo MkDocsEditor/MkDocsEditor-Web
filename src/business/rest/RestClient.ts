@@ -1,7 +1,7 @@
-import axios from "axios";
-import SectionModel from "@/business/rest/model/SectionModel";
-import DocumentModel from "@/business/rest/model/DocumentModel";
-import ResourceModel from "@/business/rest/model/ResourceModel";
+import axios from 'axios';
+import SectionModel from '@/business/rest/model/SectionModel';
+import DocumentModel from '@/business/rest/model/DocumentModel';
+import ResourceModel from '@/business/rest/model/ResourceModel';
 // import DocumentModel from "./model/DocumentModel.ts";
 // import ResourceModel from "./model/ResourceModel.ts";
 
@@ -13,9 +13,9 @@ export default class RestClient {
     private API: any;
     private fallbackAPI: any;
 
-    constructor(host: string, user: string, password: string) {
+    public constructor(host: string, user: string, password: string) {
         if (!host) {
-            host = "localhost";
+            host = 'localhost';
         }
 
         const config = {

@@ -1,5 +1,5 @@
-import DocumentModel from "@/business/rest/model/DocumentModel";
-import ResourceModel from "@/business/rest/model/ResourceModel";
+import DocumentModel from '@/business/rest/model/DocumentModel';
+import ResourceModel from '@/business/rest/model/ResourceModel';
 
 export default class SectionModel {
 
@@ -9,8 +9,8 @@ export default class SectionModel {
     public documents: DocumentModel[];
     public resources: ResourceModel[];
 
-    constructor(id: string, name: string, subsections: SectionModel[], documents: DocumentModel[],
-                resources: ResourceModel[]) {
+    public constructor(id: string, name: string, subsections: SectionModel[], documents: DocumentModel[],
+                       resources: ResourceModel[]) {
         this.id = id;
         this.name = name;
         this.subsections = subsections;

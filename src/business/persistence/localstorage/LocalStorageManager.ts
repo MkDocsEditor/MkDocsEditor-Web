@@ -5,7 +5,7 @@ export default class LocalStorageManager {
 
     private localStorage: any;
 
-    constructor(localStore: any) {
+    public constructor(localStore: any) {
         this.localStorage = localStore;
     }
 

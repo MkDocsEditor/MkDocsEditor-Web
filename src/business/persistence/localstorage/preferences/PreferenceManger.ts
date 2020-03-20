@@ -1,14 +1,14 @@
 /**
  * Manager for application preferences
  */
-import LocalStorageManager from "@/business/persistence/localstorage/LocalStorageManager";
-import PreferenceItem from "@/business/persistence/localstorage/preferences/PreferenceItem";
+import LocalStorageManager from '@/business/persistence/localstorage/LocalStorageManager';
+import PreferenceItem from '@/business/persistence/localstorage/preferences/PreferenceItem';
 
 export default class PreferenceManager {
 
     private localStorageManager: LocalStorageManager;
 
-    constructor(localStorageManager: LocalStorageManager) {
+    public constructor(localStorageManager: LocalStorageManager) {
         this.localStorageManager = localStorageManager;
     }
 
