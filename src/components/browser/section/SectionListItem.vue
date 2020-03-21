@@ -42,8 +42,8 @@
 
         @Prop({type: SectionModel, required: true}) public readonly section!: SectionModel;
 
-        public editDialogActive: boolean = false;
-        public deleteDialogActive: boolean = false;
+        public editDialogActive = false;
+        public deleteDialogActive = false;
         public newSectionName: string = this.section.name;
 
         @Watch('newSectionName', {immediate: false, deep: false})

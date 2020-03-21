@@ -61,8 +61,8 @@ export default class LibraryItems {
             }
         }
 
-        // TODO: fix PowerArray imports
         // @ts-ignore
+        // eslint-disable-next-line
         const sortedLibraries = libraries.Sort({name: Sort.AscendingIgnoringCase});
         return sortedLibraries;
     }

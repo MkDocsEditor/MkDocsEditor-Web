@@ -57,7 +57,7 @@
     import {Vue} from 'vue-property-decorator';
 
     export default class MainAppLayout extends Vue {
-        private menuVisible: boolean = false;
+        private menuVisible = false;
 
         public toggleMenu(): boolean {
             this.menuVisible = !this.menuVisible;

@@ -31,6 +31,7 @@ export default class RestClient {
 
         this.fallbackAPI = axios.create(config);
 
+        // eslint-disable-next-line
         const axiosRestClient = require('axios-rest-client');
         this.API = axiosRestClient.default(config);
 
@@ -142,7 +143,6 @@ export default class RestClient {
      * @returns {promise}
      */
     public getDocument(id: string): Promise<DocumentModel> {
-        const that = this;
         return this.API.documents.find(id).then((result: any) => {
             if (result.isOk) {
                 return RestClient.toDocumentModel(result.data);

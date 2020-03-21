@@ -33,11 +33,11 @@
 
     export default class CodeEditor extends Vue {
 
-        public fileName: string = '';
-        public input: string = '';
-        public editable: boolean = true;
-        public defaultOpen: string = 'edit';
-        public subfield: boolean = false;
+        public fileName = '';
+        public input = '';
+        public editable = true;
+        public defaultOpen = 'edit';
+        public subfield = false;
         public toolbarOptions = {
             bold: true,
             italic: true,
@@ -83,12 +83,11 @@
             this.$data.defaultOpen = (initiallyShow === 'preview' || initiallyShow === 'both') ? 'preview' : 'edit';
             this.$data.subfield = initiallyShow === 'both';
 
-            const that = this;
             this.retrieveFileContent().then((result: any) => {
                 if (result.status === 200) {
-                    that.$data.input = result.data;
+                    this.$data.input = result.data;
                 } else {
-                    that.$toasted.show('Error loading file :-(');
+                    this.$toasted.show('Error loading file :-(');
                 }
             });
         }
