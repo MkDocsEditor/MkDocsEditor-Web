@@ -55,6 +55,7 @@
                     this.$toasted.show(`Section "${this.section.name}" renamed from "${oldValue}" to "${newValue}"`);
                     this.section.name = newValue;
                 }
+                this.$emit('edit-section', this.section.id);
             }).catch((err: any) => {
                 this.$toasted.show('Unknown Error: ' + err);
             });
@@ -66,12 +67,10 @@
         }
 
         public onEdit(): void {
-            this.$emit('edit-section', this.section.id);
             this.editDialogActive = true;
         }
 
         public onDelete(): void {
-            this.$emit('delete-section', this.section.id);
             this.deleteDialogActive = true;
         }
 
@@ -86,6 +85,7 @@
                 } else {
                     this.$toasted.show(`Section '${this.section.name}' deleted`);
                 }
+                this.$emit('delete-section', this.section.id);
             }).catch((err: any) => {
                 this.$toasted.show('Unknown Error: ' + err);
             });

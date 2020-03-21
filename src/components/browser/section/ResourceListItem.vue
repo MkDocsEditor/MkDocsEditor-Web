@@ -48,16 +48,15 @@
         @Watch('newResourceName', {immediate: false, deep: true})
         public onNewResourceNameChanged(newValue: string, oldValue: string) {
             this.$toasted.show(`Resource '${this.resource.name}' renamed from '${oldValue}' to '${newValue}'`);
+            this.$emit('edit-resource', this.resource.id);
         }
 
         public onEdit(): void {
-            this.$emit('edit-resource', this.resource.id);
             this.newResourceName = this.resource.name;
             this.editDialogActive = true;
         }
 
         public onDelete(): void {
-            this.$emit('delete-resource', this.resource.id);
             this.deleteDialogActive = true;
         }
 
@@ -72,6 +71,7 @@
                 } else {
                     this.$toasted.show(`Resource '${this.resource.name}' deleted`);
                 }
+                this.$emit('delete-resource', this.resource.id);
             }).catch((err: any) => {
                 this.$toasted.show('Unknown Error: ' + err);
             });

@@ -52,7 +52,6 @@
         }
 
         public onDelete(): void {
-            this.$emit('delete-document', this.document.id);
             this.deleteDialogActive = true;
         }
 
@@ -67,6 +66,7 @@
                 } else {
                     this.$toasted.show(`Document '${this.document.name}' deleted`);
                 }
+                this.$emit('delete-document', this.document.id);
             }).catch((err: any) => {
                 this.$toasted.show('Unknown Error: ' + err);
             });
