@@ -77,7 +77,7 @@
 
         public mounted(): void {
             // get preference value
-            const initiallyShow = this.$data.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
+            const initiallyShow = this.$preferenceManager.loadPreferenceValue(PreferenceItems.Editor.openDefault);
 
             // and map it to the (slightly weird) properties of the component
             this.$data.defaultOpen = (initiallyShow === 'preview' || initiallyShow === 'both') ? 'preview' : 'edit';

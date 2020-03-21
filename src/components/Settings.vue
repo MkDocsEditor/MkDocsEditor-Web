@@ -6,21 +6,31 @@
             <md-list-item>
                 <md-field>
                     <label>URL</label>
-                    <md-input v-model="settings.server.url"></md-input>
+                    <md-input placeholder="http://localhost:7413" v-model="settings.server.url"></md-input>
                 </md-field>
+            </md-list-item>
+        </md-list>
+
+        <md-list>
+            <md-subheader>Authentication</md-subheader>
+
+            <md-list-item>
+                <md-checkbox v-model="settings.server.auth.enabled">
+                    <label>Enabled</label>
+                </md-checkbox>
             </md-list-item>
 
             <md-list-item>
                 <md-field>
                     <label>Username</label>
-                    <md-input v-model="settings.server.username"></md-input>
+                    <md-input v-model="settings.server.auth.username"></md-input>
                 </md-field>
             </md-list-item>
 
             <md-list-item>
                 <md-field>
                     <label>Password</label>
-                    <md-input type="password" v-model="settings.server.password"></md-input>
+                    <md-input type="password" v-model="settings.server.auth.password"></md-input>
                 </md-field>
             </md-list-item>
         </md-list>
@@ -52,9 +62,12 @@
     export default class Settings extends Vue {
         private settings = {
             server: {
-                url: '',
-                username: '',
-                password: '',
+                url: 'http://localhost:7413',
+                auth: {
+                    enabled: false,
+                    username: '',
+                    password: '',
+                },
             },
             editor: {
                 openDefault: '',
@@ -64,18 +77,22 @@
         @Watch('settings', {immediate: false, deep: true})
         public onSettingsChanged() {
             this.savePreferenceValue(PreferenceItems.Server.URL, this.settings.server.url);
-            this.savePreferenceValue(PreferenceItems.Server.Username, this.settings.server.username);
+
+            this.savePreferenceValue(PreferenceItems.Server.Auth.Enabled, this.settings.server.auth.enabled);
+            this.savePreferenceValue(PreferenceItems.Server.Auth.Username, this.settings.server.auth.username);
 
             // TODO: encrypt saved credentials somehow
-            this.savePreferenceValue(PreferenceItems.Server.Password, this.settings.server.password);
+            this.savePreferenceValue(PreferenceItems.Server.Auth.Password, this.settings.server.auth.password);
 
             this.savePreferenceValue(PreferenceItems.Editor.openDefault, this.settings.editor.openDefault);
         }
 
         public mounted(): void {
             this.settings.server.url = this.loadPreferenceValue(PreferenceItems.Server.URL);
-            this.settings.server.username = this.loadPreferenceValue(PreferenceItems.Server.Username);
-            this.settings.server.password = this.loadPreferenceValue(PreferenceItems.Server.Password);
+
+            this.settings.server.auth.enabled = this.loadPreferenceValue(PreferenceItems.Server.Auth.Enabled);
+            this.settings.server.auth.username = this.loadPreferenceValue(PreferenceItems.Server.Auth.Username);
+            this.settings.server.auth.password = this.loadPreferenceValue(PreferenceItems.Server.Auth.Password);
 
             this.settings.editor.openDefault = this.loadPreferenceValue(PreferenceItems.Editor.openDefault);
         }

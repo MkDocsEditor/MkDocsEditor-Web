@@ -6,8 +6,12 @@ import PreferenceItem from '@/business/persistence/localstorage/preferences/Pref
 export default {
     Server: {
         URL: new PreferenceItem('SettingsServerURL', ''),
-        Username: new PreferenceItem('settingsServerUsername', ''),
-        Password: new PreferenceItem('settingsServerPassword', ''),
+        Auth: {
+            Enabled: new PreferenceItem('settingsServerAuthEnabled', ''),
+            Username: new PreferenceItem('settingsServerAuthUsername', ''),
+            Password: new PreferenceItem('settingsServerAuthPassword', ''),
+        },
+
     },
     Editor: {
         openDefault: new PreferenceItem('settingsEditorOpenDefault', 'both'),

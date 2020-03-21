@@ -43,10 +43,11 @@ const preferenceManager = new PreferenceManager(localStorageManager);
 Vue.prototype.$preferenceManager = preferenceManager;
 
 const serverUrl = preferenceManager.loadPreferenceValue(PreferenceItems.Server.URL);
-const username = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Username);
-const password = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Password);
+const authEnabled = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Auth.Enabled);
+const username = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Auth.Username);
+const password = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Auth.Password);
 
-Vue.prototype.$restClient = new RestClient(serverUrl, username, password);
+Vue.prototype.$restClient = new RestClient(serverUrl, authEnabled, username, password);
 
 Vue.config.productionTip = false;
 

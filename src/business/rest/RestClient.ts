@@ -10,8 +10,37 @@ import ResourceModel from '@/business/rest/model/ResourceModel';
  */
 export default class RestClient {
 
-    private API: any;
-    private fallbackAPI: any;
+    public constructor(host: string, authEnabled: boolean, user: string, password: string) {
+        if (!host) {
+            host = 'localhost';
+        }
+
+        const config = {
+            baseUrl: host,
+            timeout: 1000,
+            baseURL: host,
+            auth: {
+                username: user,
+                password,
+            },
+        };
+
+        if (!authEnabled || !user || !password) {
+            delete config.auth;
+        }
+
+        this.fallbackAPI = axios.create(config);
+
+        const axiosRestClient = require('axios-rest-client');
+        this.API = axiosRestClient.default(config);
+
+        this.API.endpoints({
+            tree: 'tree',
+            sections: 'section',
+            documents: 'document',
+            resources: 'resource',
+        });
+    }
 
     private static toSectionModel(data: any): SectionModel {
         return new SectionModel(
@@ -32,6 +61,9 @@ export default class RestClient {
         );
     }
 
+    private API: any;
+    private fallbackAPI: any;
+
     private static toDocumentModel(data: any): DocumentModel {
         return new DocumentModel(
             data.id,
@@ -41,40 +73,12 @@ export default class RestClient {
         );
     }
 
-    public constructor(host: string, user: string, password: string) {
-        if (!host) {
-            host = 'localhost';
-        }
-
-        const config = {
-            baseUrl: host,
-            timeout: 1000,
-            baseURL: host,
-            auth: {
-                username: user,
-                password,
-            },
-        };
-
-        this.fallbackAPI = axios.create(config);
-
-        const axiosRestClient = require('axios-rest-client');
-        this.API = axiosRestClient.default(config);
-
-        this.API.endpoints({
-            tree: 'tree',
-            sections: 'section',
-            documents: 'document',
-            resources: 'resource',
-        });
-    }
-
     public getTree(): Promise<SectionModel> {
-        return this.API.tree.all().then(function(result: any) {
+        return this.API.tree.all().then((result: any) => {
             if (result.isOk) {
                 return RestClient.toSectionModel(result.data);
             } else {
-                throw 'Error loading section! :-(';
+                throw Error('Error loading section! :-(');
             }
         });
     }
@@ -86,11 +90,11 @@ export default class RestClient {
      * @returns {promise}
      */
     public getSection(id: string): Promise<SectionModel> {
-        return this.API.sections.find(id).then(function(result: any) {
+        return this.API.sections.find(id).then((result: any) => {
             if (result.isOk) {
                 return RestClient.toSectionModel(result.data);
             } else {
-                throw 'Error loading section! :-(';
+                throw Error('Error loading section! :-(');
             }
         });
     }
@@ -139,11 +143,11 @@ export default class RestClient {
      */
     public getDocument(id: string): Promise<DocumentModel> {
         const that = this;
-        return this.API.documents.find(id).then(function(result: any) {
+        return this.API.documents.find(id).then((result: any) => {
             if (result.isOk) {
                 return RestClient.toDocumentModel(result.data);
             } else {
-                throw 'Error loading document! :-(';
+                throw Error('Error loading document! :-(');
             }
         });
     }
