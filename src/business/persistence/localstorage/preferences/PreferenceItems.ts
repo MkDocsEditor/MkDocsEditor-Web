@@ -7,7 +7,7 @@ export default {
     Server: {
         URL: new PreferenceItem('SettingsServerURL', ''),
         Auth: {
-            Enabled: new PreferenceItem('settingsServerAuthEnabled', ''),
+            Enabled: new PreferenceItem('settingsServerAuthEnabled', false),
             Username: new PreferenceItem('settingsServerAuthUsername', ''),
             Password: new PreferenceItem('settingsServerAuthPassword', ''),
         },

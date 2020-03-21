@@ -90,7 +90,7 @@
         public mounted(): void {
             this.settings.server.url = this.loadPreferenceValue(PreferenceItems.Server.URL);
 
-            this.settings.server.auth.enabled = this.loadPreferenceValue(PreferenceItems.Server.Auth.Enabled);
+            this.settings.server.auth.enabled = (this.loadPreferenceValue(PreferenceItems.Server.Auth.Enabled) == 'true');
             this.settings.server.auth.username = this.loadPreferenceValue(PreferenceItems.Server.Auth.Username);
             this.settings.server.auth.password = this.loadPreferenceValue(PreferenceItems.Server.Auth.Password);
 
