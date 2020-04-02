@@ -83,12 +83,10 @@
             this.$data.defaultOpen = (initiallyShow === 'preview' || initiallyShow === 'both') ? 'preview' : 'edit';
             this.$data.subfield = initiallyShow === 'both';
 
-            this.retrieveFileContent().then((result: any) => {
-                if (result.status === 200) {
-                    this.$data.input = result.data;
-                } else {
-                    this.$toasted.show('Error loading file :-(');
-                }
+            this.retrieveFileContent().then((content: any) => {
+                this.$data.input = content;
+            }).catch(reason => {
+                this.$toasted.show('Error loading file :-(');
             });
         }
 

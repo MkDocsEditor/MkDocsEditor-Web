@@ -172,7 +172,13 @@ export default class RestClient {
      * @returns {promise}
      */
     public getResource(id: string): Promise<ResourceModel> {
-        return this.axiosClient.get(`resource/${id}`);
+        return this.axiosClient.get(`resource/${id}`)
+            .then((result: any) => {
+                if (result.status != 200) {
+                    throw Error('Error loading resource');
+                }
+                return result.data;
+            }).then((data: any) => RestClient.toResourceModel(data));
     }
 
     /**
@@ -193,6 +199,12 @@ export default class RestClient {
      * @returns {promise}
      */
     public getFileContent(documentId: string): Promise<string> {
-        return this.axiosClient.get(`document/${documentId}/content/`);
+        return this.axiosClient.get(`document/${documentId}/content/`)
+            .then(result => {
+                if (result.status != 200) {
+                    throw Error('Error loading document content');
+                }
+                return result.data;
+            });
     }
 }
