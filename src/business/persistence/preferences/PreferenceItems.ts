@@ -1,8 +1,8 @@
+import PreferenceItem from '@/business/persistence/preferences/PreferenceItem';
+
 /**
  * Preference constants
  */
-import PreferenceItem from '@/business/persistence/localstorage/preferences/PreferenceItem';
-
 export default {
     Server: {
         URL: new PreferenceItem('SettingsServerURL', ''),

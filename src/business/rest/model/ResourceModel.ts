@@ -1,3 +1,6 @@
+/**
+ * Model of a resource
+ */
 export default class ResourceModel {
 
     public id: string;

@@ -15,8 +15,8 @@ import Toasted from 'vue-toasted';
 
 import RestClient from './business/rest/RestClient';
 import LocalStorageManager from './business/persistence/localstorage/LocalStorageManager';
-import PreferenceManager from './business/persistence/localstorage/preferences/PreferenceManger';
-import PreferenceItems from './business/persistence/localstorage/preferences/PreferenceItems';
+import PreferenceManager from './business/persistence/preferences/PreferenceManger';
+import PreferenceItems from './business/persistence/preferences/PreferenceItems';
 
 import './registerServiceWorker';
 

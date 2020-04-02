@@ -1,3 +1,6 @@
+/**
+ * Model of a document
+ */
 export default class DocumentModel {
 
     public id: string;

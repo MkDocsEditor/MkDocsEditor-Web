@@ -16,7 +16,7 @@
 
 <script lang="ts">
     import {Component, Vue} from 'vue-property-decorator';
-    import PreferenceItems from '@/business/persistence/localstorage/preferences/PreferenceItems';
+    import PreferenceItems from '@/business/persistence/preferences/PreferenceItems';
 
     @Component({
         props: {

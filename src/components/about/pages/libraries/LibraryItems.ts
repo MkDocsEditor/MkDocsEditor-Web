@@ -1,6 +1,9 @@
 import Library from './Library';
 import '@/libraries/PowerArray.js';
 
+/**
+ * Definition of all library items
+ */
 export default class LibraryItems {
     private MavonEditor: Library = new Library(
         1,

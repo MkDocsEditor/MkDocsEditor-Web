@@ -1,6 +1,9 @@
 import DocumentModel from '@/business/rest/model/DocumentModel';
 import ResourceModel from '@/business/rest/model/ResourceModel';
 
+/**
+ * Model of a section
+ */
 export default class SectionModel {
 
     public id: string;

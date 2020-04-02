@@ -54,8 +54,8 @@
 
 <script lang="ts">
     import {Component, Vue, Watch} from 'vue-property-decorator';
-    import PreferenceItems from '@/business/persistence/localstorage/preferences/PreferenceItems';
-    import PreferenceItem from '@/business/persistence/localstorage/preferences/PreferenceItem';
+    import PreferenceItems from '@/business/persistence/preferences/PreferenceItems';
+    import PreferenceItem from '@/business/persistence/preferences/PreferenceItem';
 
     @Component({})
 

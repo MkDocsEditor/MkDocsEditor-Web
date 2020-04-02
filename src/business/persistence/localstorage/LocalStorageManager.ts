@@ -1,7 +1,9 @@
+import StorageManager from '@/business/persistence/StorageManager';
+
 /**
  * Manager for general access to local storage
  */
-export default class LocalStorageManager {
+export default class LocalStorageManager implements StorageManager {
 
     private localStorage: any;
 
@@ -9,12 +11,6 @@ export default class LocalStorageManager {
         this.localStorage = localStore;
     }
 
-    /**
-     * Load a preference from local storage into data section of this component
-     *
-     * @param storeKey the key used in local storage
-     * @param defaultValue the default value to use if no persisted value was found
-     */
     public getValue(storeKey: string, defaultValue: any): any {
         let storeValue: any = localStorage.getItem(storeKey);
         if (storeValue) {
@@ -37,12 +33,6 @@ export default class LocalStorageManager {
         }
     }
 
-    /**
-     * Save a preference in local storage
-     *
-     * @param storeKey the key to use in local storage
-     * @param newValue the new value to assign to it
-     */
     public setValue(storeKey: string, newValue: any): void {
         let serialized = false;
         if (newValue instanceof Object) {

@@ -1,15 +1,15 @@
+import LocalStorageManager from '@/business/persistence/localstorage/LocalStorageManager';
+import PreferenceItem from '@/business/persistence/preferences/PreferenceItem';
+
 /**
  * Manager for application preferences
  */
-import LocalStorageManager from '@/business/persistence/localstorage/LocalStorageManager';
-import PreferenceItem from '@/business/persistence/localstorage/preferences/PreferenceItem';
-
 export default class PreferenceManager {
 
-    private localStorageManager: LocalStorageManager;
+    private storageManager: LocalStorageManager;
 
-    public constructor(localStorageManager: LocalStorageManager) {
-        this.localStorageManager = localStorageManager;
+    public constructor(storageManager: LocalStorageManager) {
+        this.storageManager = storageManager;
     }
 
     /**
@@ -21,7 +21,7 @@ export default class PreferenceManager {
         const key = preferenceItem.key;
         const defaultValue = preferenceItem.defaultValue;
 
-        return this.localStorageManager.getValue(key, defaultValue);
+        return this.storageManager.getValue(key, defaultValue);
     }
 
     /**
@@ -36,7 +36,7 @@ export default class PreferenceManager {
             newValue = preferenceItem.defaultValue;
         }
 
-        this.localStorageManager.setValue(key, newValue);
+        this.storageManager.setValue(key, newValue);
     }
 
 }

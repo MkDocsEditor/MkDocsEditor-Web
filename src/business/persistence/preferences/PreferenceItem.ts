@@ -1,3 +1,6 @@
+/**
+ * Definition of a single preference item
+ */
 export default class PreferenceItem {
 
     public key: string;

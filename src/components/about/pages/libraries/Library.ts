@@ -1,3 +1,6 @@
+/**
+ * Definition of a library item
+ */
 export default class Library {
     public id: number;
     public name: string;
