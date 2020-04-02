@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "axios": "^0.19.2",
-    "axios-rest-client": "^0.1.11",
     "core-js": "^3.6.4",
     "diff-match-patch": "^1.0.4",
     "mavon-editor": "^2.8.0",

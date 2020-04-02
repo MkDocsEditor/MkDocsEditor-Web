@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, {AxiosInstance} from 'axios';
 import SectionModel from '@/business/rest/model/SectionModel';
 import DocumentModel from '@/business/rest/model/DocumentModel';
 import ResourceModel from '@/business/rest/model/ResourceModel';
@@ -10,38 +10,7 @@ import ResourceModel from '@/business/rest/model/ResourceModel';
  */
 export default class RestClient {
 
-    public constructor(host: string, authEnabled: boolean, user: string, password: string) {
-        if (!host) {
-            host = 'localhost';
-        }
-
-        const config = {
-            baseUrl: host,
-            timeout: 1000,
-            baseURL: host,
-            auth: {
-                username: user,
-                password,
-            },
-        };
-
-        if (!authEnabled || !user || !password) {
-            delete config.auth;
-        }
-
-        this.fallbackAPI = axios.create(config);
-
-        // eslint-disable-next-line
-        const axiosRestClient = require('axios-rest-client');
-        this.API = axiosRestClient.default(config);
-
-        this.API.endpoints({
-            tree: 'tree',
-            sections: 'section',
-            documents: 'document',
-            resources: 'resource',
-        });
-    }
+    private axiosClient: AxiosInstance;
 
     private static toSectionModel(data: any): SectionModel {
         return new SectionModel(
@@ -62,8 +31,27 @@ export default class RestClient {
         );
     }
 
-    private API: any;
-    private fallbackAPI: any;
+    public constructor(host: string, authEnabled: boolean, user: string, password: string) {
+        if (!host) {
+            host = 'localhost';
+        }
+
+        const config = {
+            baseUrl: host,
+            timeout: 1000,
+            baseURL: host,
+            auth: {
+                username: user,
+                password,
+            },
+        };
+
+        if (!authEnabled || !user || !password) {
+            delete config.auth;
+        }
+
+        this.axiosClient = axios.create(config);
+    }
 
     private static toDocumentModel(data: any): DocumentModel {
         return new DocumentModel(
@@ -75,13 +63,13 @@ export default class RestClient {
     }
 
     public getTree(): Promise<SectionModel> {
-        return this.API.tree.all().then((result: any) => {
-            if (result.isOk) {
-                return RestClient.toSectionModel(result.data);
-            } else {
-                throw Error('Error loading section! :-(');
-            }
-        });
+        return this.axiosClient.get('section')
+            .then((result: any) => {
+                if (result.status != 200) {
+                    throw Error('Error loading section! :-(');
+                }
+                return result.data;
+            }).then((data: any) => RestClient.toSectionModel(data));
     }
 
     /**
@@ -91,13 +79,13 @@ export default class RestClient {
      * @returns {promise}
      */
     public getSection(id: string): Promise<SectionModel> {
-        return this.API.sections.find(id).then((result: any) => {
-            if (result.isOk) {
-                return RestClient.toSectionModel(result.data);
-            } else {
-                throw Error('Error loading section! :-(');
-            }
-        });
+        return this.axiosClient.get(`section/${id}`)
+            .then((result: any) => {
+                if (result.status != 200) {
+                    throw Error('Error loading section! :-(');
+                }
+                return result.data;
+            }).then((data: any) => RestClient.toSectionModel(data));
     }
 
     /**
@@ -108,7 +96,7 @@ export default class RestClient {
      * @returns {promise}
      */
     public renameSection(id: string, newName: string) {
-        return this.API.sections.update(id, {});
+        return this.axiosClient.post('section', {id: id, data: {}});
     }
 
     /**
@@ -119,7 +107,7 @@ export default class RestClient {
      * @returns {promise}
      */
     public createSection(parentId: string, name: string) {
-        return this.API.sections.create({
+        return this.axiosClient.post('section', {
             Parent: parentId,
             Name: name,
         });
@@ -133,7 +121,7 @@ export default class RestClient {
      * @returns {promise}
      */
     public deleteSection(id: string) {
-        return this.API.sections.delete(id);
+        return this.axiosClient.delete(`section/${id}`);
     }
 
     /**
@@ -143,13 +131,13 @@ export default class RestClient {
      * @returns {promise}
      */
     public getDocument(id: string): Promise<DocumentModel> {
-        return this.API.documents.find(id).then((result: any) => {
-            if (result.isOk) {
-                return RestClient.toDocumentModel(result.data);
-            } else {
-                throw Error('Error loading document! :-(');
-            }
-        });
+        return this.axiosClient.get(`document/${id}`)
+            .then((result: any) => {
+                if (result.status != 200) {
+                    throw Error('Error loading document! :-(');
+                }
+                return result.data;
+            }).then((data: any) => RestClient.toDocumentModel(data));
     }
 
     /**
@@ -160,7 +148,7 @@ export default class RestClient {
      * @returns {promise}
      */
     public createDocument(sectionId: string, name: string) {
-        return this.API.documents.create({
+        return this.axiosClient.post('document', {
             Parent: sectionId,
             Name: name,
         });
@@ -174,7 +162,7 @@ export default class RestClient {
      * @returns {promise}
      */
     public deleteDocument(id: string) {
-        return this.API.documents.delete(id);
+        return this.axiosClient.delete(`document/${id}`);
     }
 
     /**
@@ -184,7 +172,7 @@ export default class RestClient {
      * @returns {promise}
      */
     public getResource(id: string): Promise<ResourceModel> {
-        return this.API.resources.find(id);
+        return this.axiosClient.get(`resource/${id}`);
     }
 
     /**
@@ -194,7 +182,7 @@ export default class RestClient {
      * @returns {promise}
      */
     public deleteResource(id: string) {
-        return this.API.resources.delete(id);
+        return this.axiosClient.delete(`resource/${id}`);
     }
 
     /**
@@ -205,6 +193,6 @@ export default class RestClient {
      * @returns {promise}
      */
     public getFileContent(documentId: string): Promise<string> {
-        return this.API.documents[documentId].content.all();
+        return this.axiosClient.get(`document/${documentId}/content/`);
     }
 }
