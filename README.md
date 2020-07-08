@@ -5,7 +5,7 @@
 # MkDocsEditor-Web
 MkDocsEditor web client.
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/dd328233-3e6d-4fd8-8cf1-ce036691592b/deploy-status)](https://app.netlify.com/sites/quizzical-mahavira-2f61ff/deploys)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/dd328233-3e6d-4fd8-8cf1-ce036691592b/deploy-status)](https://mkdocseditor.netlify.app/#/)
 
 # :warning: Work In Progress
 
