@@ -56,6 +56,7 @@ export default class RestClient {
         };
 
         if (!authEnabled || !user || !password) {
+            // @ts-ignore
             delete config.auth;
         }
 
