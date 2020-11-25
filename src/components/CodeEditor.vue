@@ -84,9 +84,9 @@
             this.$data.subfield = initiallyShow === 'both';
 
             this.retrieveFileContent().then((content: any) => {
-                this.$data.input = content;
-            }).catch(reason => {
-                this.$toasted.show('Error loading file :-(');
+              this.$data.input = content;
+            }).catch((reason) => {
+              this.$toasted.show('Error loading file :-(');
             });
         }
 

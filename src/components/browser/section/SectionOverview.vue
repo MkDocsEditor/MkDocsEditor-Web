@@ -52,7 +52,7 @@
         }
 
         public deleteSection(id: string): void {
-            this.section.subsections = this.section.subsections.filter(section => section.id != id);
+            this.section.subsections = this.section.subsections.filter((section) => section.id !== id);
             // this.$toasted.show("delete " + id)
         }
 
@@ -61,9 +61,9 @@
         }
 
         public deleteDocument(id: string): void {
-            this.section.documents = this.section.documents.filter(document => document.id != id);
-            // this.section.documents = this.section.documents.filter(document => document.id != id)
-            // this.$toasted.show("delete " + id)
+          this.section.documents = this.section.documents.filter((document) => document.id !== id);
+          // this.section.documents = this.section.documents.filter((document) => document.id !== id)
+          // this.$toasted.show("delete " + id)
         }
 
         public editResource(id: string): void {
@@ -71,7 +71,7 @@
         }
 
         public deleteResource(id: string): void {
-            this.section.resources = this.section.resources.filter(resource => resource.id != id);
+          this.section.resources = this.section.resources.filter((resource) => resource.id !== id);
             // this.$toasted.show("delete " + id)
         }
     }

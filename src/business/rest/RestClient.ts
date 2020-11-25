@@ -10,8 +10,6 @@ import ResourceModel from '@/business/rest/model/ResourceModel';
  */
 export default class RestClient {
 
-    private axiosClient: AxiosInstance;
-
     private static toSectionModel(data: any): SectionModel {
         return new SectionModel(
             data.id,
@@ -19,6 +17,15 @@ export default class RestClient {
             data.subsections.map(RestClient.toSectionModel),
             data.documents.map(RestClient.toDocumentModel),
             data.resources.map(RestClient.toResourceModel),
+        );
+    }
+
+    private static toDocumentModel(data: any): DocumentModel {
+        return new DocumentModel(
+            data.id,
+            data.name,
+            data.mod_time,
+            data.file_size,
         );
     }
 
@@ -30,6 +37,8 @@ export default class RestClient {
             data.file_size,
         );
     }
+
+    private axiosClient: AxiosInstance;
 
     public constructor(host: string, authEnabled: boolean, user: string, password: string) {
         if (!host) {
@@ -53,19 +62,10 @@ export default class RestClient {
         this.axiosClient = axios.create(config);
     }
 
-    private static toDocumentModel(data: any): DocumentModel {
-        return new DocumentModel(
-            data.id,
-            data.name,
-            data.mod_time,
-            data.file_size,
-        );
-    }
-
     public getTree(): Promise<SectionModel> {
         return this.axiosClient.get('section')
             .then((result: any) => {
-                if (result.status != 200) {
+                if (result.status !== 200) {
                     throw Error('Error loading section! :-(');
                 }
                 return result.data;
@@ -81,7 +81,7 @@ export default class RestClient {
     public getSection(id: string): Promise<SectionModel> {
         return this.axiosClient.get(`section/${id}`)
             .then((result: any) => {
-                if (result.status != 200) {
+                if (result.status !== 200) {
                     throw Error('Error loading section! :-(');
                 }
                 return result.data;
@@ -133,7 +133,7 @@ export default class RestClient {
     public getDocument(id: string): Promise<DocumentModel> {
         return this.axiosClient.get(`document/${id}`)
             .then((result: any) => {
-                if (result.status != 200) {
+                if (result.status !== 200) {
                     throw Error('Error loading document! :-(');
                 }
                 return result.data;
@@ -174,7 +174,7 @@ export default class RestClient {
     public getResource(id: string): Promise<ResourceModel> {
         return this.axiosClient.get(`resource/${id}`)
             .then((result: any) => {
-                if (result.status != 200) {
+                if (result.status !== 200) {
                     throw Error('Error loading resource');
                 }
                 return result.data;
@@ -200,8 +200,8 @@ export default class RestClient {
      */
     public getFileContent(documentId: string): Promise<string> {
         return this.axiosClient.get(`document/${documentId}/content/`)
-            .then(result => {
-                if (result.status != 200) {
+            .then((result) => {
+                if (result.status !== 200) {
                     throw Error('Error loading document content');
                 }
                 return result.data;
