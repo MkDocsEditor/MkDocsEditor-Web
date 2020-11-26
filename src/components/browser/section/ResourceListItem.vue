@@ -14,20 +14,20 @@
         </md-card>
 
         <md-dialog-prompt
-                :md-active.sync="editDialogActive"
-                md-input-maxlength="30"
-                md-input-placeholder="Type file name..."
-                md-title="Rename resource"
-                v-model="newResourceName"/>
+            v-model="newResourceName"
+            v-model:md-active="editDialogActive"
+            md-input-maxlength="30"
+            md-input-placeholder="Type file name..."
+            md-title="Rename resource"/>
 
-        <md-dialog-confirm
-                :md-active.sync="deleteDialogActive"
-                :md-content="'Do you really want to delete the resource file <b>' + resource.name + '</b> ?'"
-                @md-cancel="onDeleteCanceled"
-                @md-confirm="onDeleteConfirmed"
-                md-cancel-text="Cancel"
-                md-confirm-text="Delete"
-                md-title="Delete"/>
+      <md-dialog-confirm
+          v-model:md-active="deleteDialogActive"
+          :md-content="'Do you really want to delete the resource file <b>' + resource.name + '</b> ?'"
+          md-cancel-text="Cancel"
+          md-confirm-text="Delete"
+          md-title="Delete"
+          @md-cancel="onDeleteCanceled"
+          @md-confirm="onDeleteConfirmed"/>
     </div>
 </template>
 

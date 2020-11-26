@@ -1,11 +1,10 @@
-import Vue from 'vue';
+import Vue, {createApp} from 'vue';
 import App from './App.vue';
 // @ts-ignore: vue-material does not yet have typescript support
 // tslint:disable-next-line
 import VueMaterial from 'vue-material';
 import 'vue-material/dist/vue-material.css';
 
-import VueRouter from 'vue-router';
 import router from './router';
 
 import MavonEditor from 'mavon-editor';
@@ -20,10 +19,7 @@ import PreferenceItems from './business/persistence/preferences/PreferenceItems'
 
 import './registerServiceWorker';
 
-Vue.config.productionTip = true;
-
 Vue.use(VueMaterial);
-Vue.use(VueRouter);
 Vue.use(MavonEditor);
 Vue.use(Toasted, {
     position: 'bottom-left',
@@ -50,9 +46,4 @@ const password = preferenceManager.loadPreferenceValue(PreferenceItems.Server.Au
 
 Vue.prototype.$restClient = new RestClient(serverUrl, authEnabled, username, password);
 
-Vue.config.productionTip = false;
-
-new Vue({
-    router,
-    render: (h) => h(App),
-}).$mount('#app');
+createApp(App).use(router).mount('#app');

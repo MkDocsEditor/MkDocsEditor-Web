@@ -24,13 +24,13 @@
         </md-card>
 
         <md-dialog-confirm
-                :md-active.sync="deleteDialogActive"
-                :md-content="'Do you really want to delete the document file <b>' + document.name + '</b> ?'"
-                @md-cancel="onDeleteCanceled"
-                @md-confirm="onDeleteConfirmed"
-                md-cancel-text="Cancel"
-                md-confirm-text="Delete"
-                md-title="Delete"/>
+            v-model:md-active="deleteDialogActive"
+            :md-content="'Do you really want to delete the document file <b>' + document.name + '</b> ?'"
+            md-cancel-text="Cancel"
+            md-confirm-text="Delete"
+            md-title="Delete"
+            @md-cancel="onDeleteCanceled"
+            @md-confirm="onDeleteConfirmed"/>
     </div>
 </template>
 

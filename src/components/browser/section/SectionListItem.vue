@@ -14,20 +14,20 @@
         </md-card>
 
         <md-dialog-prompt
-                :md-active.sync="editDialogActive"
-                md-input-maxlength="30"
-                md-input-placeholder="Type folder name..."
-                md-title="Rename section"
-                v-model="newSectionName"/>
+            v-model="newSectionName"
+            v-model:md-active="editDialogActive"
+            md-input-maxlength="30"
+            md-input-placeholder="Type folder name..."
+            md-title="Rename section"/>
 
-        <md-dialog-confirm
-                :md-active.sync="deleteDialogActive"
-                :md-content="'Do you really want to delete section <b>\'' + section.name + '\'</b> and all of it`s content?'"
-                @md-cancel="onDeleteCanceled"
-                @md-confirm="onDeleteConfirmed"
-                md-cancel-text="Cancel"
-                md-confirm-text="Delete"
-                md-title="Delete"/>
+      <md-dialog-confirm
+          v-model:md-active="deleteDialogActive"
+          :md-content="'Do you really want to delete section <b>\'' + section.name + '\'</b> and all of it`s content?'"
+          md-cancel-text="Cancel"
+          md-confirm-text="Delete"
+          md-title="Delete"
+          @md-cancel="onDeleteCanceled"
+          @md-confirm="onDeleteConfirmed"/>
 
     </div>
 </template>

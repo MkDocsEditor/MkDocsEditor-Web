@@ -1,38 +1,38 @@
 <template>
     <div class="page-container">
         <md-app>
-            <md-app-toolbar class="md-primary" md-elevation="2">
-                <md-button @click="toggleMenu" class="md-icon-button menuToggle" v-if="!menuVisible">
-                    <md-icon>menu</md-icon>
+          <md-app-toolbar class="md-primary" md-elevation="2">
+            <md-button @click="toggleMenu" class="md-icon-button menuToggle" v-if="!menuVisible">
+              <md-icon>menu</md-icon>
+            </md-button>
+            <md-avatar style="margin: 0">
+              <img alt="App Logo" src="./assets/logo.png">
+            </md-avatar>
+            <span class="md-title">{{ $appName }}</span>
+          </md-app-toolbar>
+
+          <md-app-drawer v-model:md-active="menuVisible" md-persistent="mini">
+            <md-toolbar class="md-transparent" md-elevation="2">
+              <span>Navigation</span>
+
+              <div class="md-toolbar-section-end">
+                <md-button class="md-icon-button md-dense" @click="toggleMenu">
+                  <md-icon>keyboard_arrow_left</md-icon>
                 </md-button>
-                <md-avatar style="margin: 0">
-                    <img alt="App Logo" src="./assets/logo.png">
-                </md-avatar>
-                <span class="md-title">{{ $appName }}</span>
-            </md-app-toolbar>
+              </div>
+            </md-toolbar>
 
-            <md-app-drawer :md-active.sync="menuVisible" md-persistent="mini">
-                <md-toolbar class="md-transparent" md-elevation="2">
-                    <span>Navigation</span>
+            <md-list>
+              <router-link to="/file_browser">
+                <md-list-item>
+                  <md-icon>list</md-icon>
+                  <span class="md-list-item-text">File Browser</span>
+                </md-list-item>
+              </router-link>
 
-                    <div class="md-toolbar-section-end">
-                        <md-button @click="toggleMenu" class="md-icon-button md-dense">
-                            <md-icon>keyboard_arrow_left</md-icon>
-                        </md-button>
-                    </div>
-                </md-toolbar>
-
-                <md-list>
-                    <router-link to="/file_browser">
-                        <md-list-item>
-                            <md-icon>list</md-icon>
-                            <span class="md-list-item-text">File Browser</span>
-                        </md-list-item>
-                    </router-link>
-
-                    <router-link to="/settings">
-                        <md-list-item>
-                            <md-icon>settings</md-icon>
+              <router-link to="/settings">
+                <md-list-item>
+                  <md-icon>settings</md-icon>
                             <span class="md-list-item-text">Settings</span>
                         </md-list-item>
                     </router-link>
@@ -54,16 +54,17 @@
 </template>
 
 <script lang="ts">
-    import {Vue} from 'vue-property-decorator';
+import {VueDecorator} from 'vue-class-component';
+import {Vue} from "vue-class-component/dist/vue-class-component";
 
-    export default class MainAppLayout extends Vue {
-        private menuVisible = false;
+export default class MainAppLayout extends Vue {
+  private menuVisible = false;
 
-        public toggleMenu(): boolean {
-            this.menuVisible = !this.menuVisible;
-            return this.menuVisible;
-        }
-    }
+  public toggleMenu(): boolean {
+    this.menuVisible = !this.menuVisible;
+    return this.menuVisible;
+  }
+}
 </script>
 
 <style lang="scss">

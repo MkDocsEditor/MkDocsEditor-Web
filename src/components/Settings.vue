@@ -53,11 +53,12 @@
 </template>
 
 <script lang="ts">
-    import {Component, Vue, Watch} from 'vue-property-decorator';
+    import {Component, Watch} from 'vue-property-decorator';
     import PreferenceItems from '@/business/persistence/preferences/PreferenceItems';
     import PreferenceItem from '@/business/persistence/preferences/PreferenceItem';
+    import {Options, Vue} from "vue-class-component/dist/vue-class-component";
 
-    @Component({})
+    @Options({})
 
     export default class Settings extends Vue {
         private settings = {
