@@ -28,7 +28,7 @@
     "@vue/cli-plugin-eslint": "^4.5.9",
     "@vue/cli-plugin-pwa": "^4.5.9",
     "@vue/cli-plugin-typescript": "^4.5.9",
-    "@vue/cli-service": "^4.5.9",
+    "@vue/cli-service": "^5.0.8",
     "eslint": "^7",
     "eslint-plugin-vue": "^7",
     "husky": "^5.0.4",
