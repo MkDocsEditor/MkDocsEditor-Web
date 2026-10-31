@@ -62,7 +62,7 @@ test('uploads files into a folder and pasted images into a page', async ({ page 
   await expect.poll(() => documentContent(doc.id)).toContain('![image](image.png)')
   expect((await folder(name))?.resources.map((r) => r.name)).toContain('image.png')
 
-  await page.getByRole('button', { name: 'Vorschau', exact: true }).click()
+  await page.getByRole('button', { name: 'Preview', exact: true }).click()
   const image = page.getByTestId('markdown-preview').locator('img[alt="image"]')
   await expect(image).toBeVisible()
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1)

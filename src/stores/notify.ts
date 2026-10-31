@@ -9,13 +9,13 @@ export interface Notification {
   color: 'success' | 'error' | 'info' | 'warning'
 }
 
-/** Human readable German message for an error. */
+/** Human readable message for an error. */
 export function describeError(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.isNetworkError) return 'Der Server ist gerade nicht erreichbar.'
-    if (error.isUnauthorized) return 'Bitte melde dich neu an.'
-    if (error.status === 409) return `Das geht gerade nicht: ${error.message}`
-    if (error.status === 404) return 'Das gibt es nicht (mehr).'
+    if (error.isNetworkError) return 'The server is not reachable right now.'
+    if (error.isUnauthorized) return 'Please sign in again.'
+    if (error.status === 409) return `Not possible right now: ${error.message}`
+    if (error.status === 404) return 'This does not exist (any more).'
     return error.message
   }
   return error instanceof Error ? error.message : String(error)

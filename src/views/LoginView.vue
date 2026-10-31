@@ -28,9 +28,9 @@ async function submit(): Promise<void> {
     await router.replace(redirect.startsWith('/') ? redirect : '/')
   } catch (e) {
     if (e instanceof ApiError && e.isUnauthorized) {
-      error.value = 'Benutzername oder Passwort stimmt nicht.'
+      error.value = 'Wrong username or password.'
     } else if (e instanceof ApiError && e.isNetworkError) {
-      error.value = `Der Server ist nicht erreichbar (${getConfig().backendUrl}).`
+      error.value = `The server is not reachable (${getConfig().backendUrl}).`
     } else {
       error.value = e instanceof Error ? e.message : String(e)
     }
@@ -45,15 +45,15 @@ async function submit(): Promise<void> {
     <v-card width="100%" max-width="420" elevation="4" class="pa-2">
       <v-card-item class="text-center">
         <v-img src="/logo.png" width="72" height="72" class="mx-auto mb-2" alt="" />
-        <v-card-title class="text-h5">Anmelden</v-card-title>
-        <v-card-subtitle>Familien-Wiki bearbeiten</v-card-subtitle>
+        <v-card-title class="text-h5">Sign in</v-card-title>
+        <v-card-subtitle>Edit the wiki</v-card-subtitle>
       </v-card-item>
       <v-card-text>
         <v-form data-testid="login-form" @submit.prevent="submit">
           <v-text-field
             id="login-username"
             v-model="username"
-            label="Benutzername"
+            label="Username"
             name="username"
             autocomplete="username"
             autocapitalize="none"
@@ -64,7 +64,7 @@ async function submit(): Promise<void> {
           <v-text-field
             id="login-password"
             v-model="password"
-            label="Passwort"
+            label="Password"
             name="password"
             autocomplete="current-password"
             :type="showPassword ? 'text' : 'password'"
@@ -73,12 +73,7 @@ async function submit(): Promise<void> {
             :disabled="loading"
             @click:append-inner="showPassword = !showPassword"
           />
-          <v-checkbox
-            v-model="remember"
-            label="Angemeldet bleiben"
-            density="compact"
-            hide-details
-          />
+          <v-checkbox v-model="remember" label="Stay signed in" density="compact" hide-details />
           <v-alert v-if="error" type="error" variant="tonal" class="my-3" data-testid="login-error">
             {{ error }}
           </v-alert>
@@ -91,7 +86,7 @@ async function submit(): Promise<void> {
             :loading="loading"
             :disabled="!username || !password"
           >
-            Anmelden
+            Sign in
           </v-btn>
         </v-form>
       </v-card-text>

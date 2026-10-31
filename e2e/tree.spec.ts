@@ -4,10 +4,10 @@ import { login, testName } from './helpers'
 
 test('rejects a wrong password', async ({ page }) => {
   await page.goto('/')
-  await page.getByLabel('Benutzername').fill('anna')
-  await page.getByLabel('Passwort', { exact: true }).fill('falsch')
-  await page.getByRole('button', { name: 'Anmelden' }).click()
-  await expect(page.getByTestId('login-error')).toContainText('stimmt nicht')
+  await page.getByLabel('Username').fill('anna')
+  await page.getByLabel('Password', { exact: true }).fill('falsch')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByTestId('login-error')).toContainText('Wrong username or password')
 })
 
 test('logs in, loads the tree and opens a page', async ({ page }) => {
@@ -38,14 +38,14 @@ test('creates, renames and deletes a folder', async ({ page }, testInfo) => {
   const main = page.locator('main')
   await expect(main.getByText(name, { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: `Aktionen für ${name}` }).click()
-  await page.getByText('Umbenennen').click()
+  await page.getByRole('button', { name: `Actions for ${name}` }).click()
+  await page.getByText('Rename').click()
   await page.getByTestId('name-input').locator('input').fill(`${name} neu`)
   await page.getByTestId('name-confirm').click()
   await expect(main.getByText(`${name} neu`, { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: `Aktionen für ${name} neu` }).click()
-  await page.getByText('Löschen').click()
+  await page.getByRole('button', { name: `Actions for ${name} neu` }).click()
+  await page.getByText('Delete').click()
   await page.getByTestId('confirm-button').click()
   await expect(main.getByText(`${name} neu`, { exact: true })).toHaveCount(0)
 })

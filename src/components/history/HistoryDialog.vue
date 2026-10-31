@@ -78,7 +78,7 @@ async function loadDetail(): Promise<void> {
     diffLines.value = lines
     content.value = text
   } catch (error) {
-    if (token === detailToken) notify.error(error, 'Version konnte nicht geladen werden')
+    if (token === detailToken) notify.error(error, 'Could not load the version')
   } finally {
     if (token === detailToken) detailLoading.value = false
   }
@@ -95,7 +95,7 @@ const stats = computed(() => diffStats(diffLines.value))
 
 function authorLine(revision: Revision): string {
   const others = revision.coAuthors?.length ?? 0
-  return others > 0 ? `${revision.author.name} und ${others} weitere` : revision.author.name
+  return others > 0 ? `${revision.author.name} and ${others} more` : revision.author.name
 }
 
 function shortRev(revision: Revision): string {
@@ -116,19 +116,19 @@ async function restore(): Promise<void> {
   restoring.value = true
   try {
     await useApi().restoreRevision(props.documentId, revision.revision)
-    notify.success(`Version vom ${formatDate(revision.time)} wiederhergestellt`)
+    notify.success(`Restored the version of ${formatDate(revision.time)}`)
     emit('restored', revision)
     open.value = false
   } catch (error) {
-    notify.error(error, 'Wiederherstellen fehlgeschlagen')
+    notify.error(error, 'Restore failed')
   } finally {
     restoring.value = false
   }
 }
 
 const viewLabels: Record<View, string> = {
-  changes: 'Änderungen',
-  current: 'Vergleich mit jetzt',
+  changes: 'Changes',
+  current: 'Compare with now',
   content: 'Text',
 }
 </script>
@@ -140,30 +140,30 @@ const viewLabels: Record<View, string> = {
         <v-btn
           v-if="mobile && selected"
           :icon="mdiArrowLeft"
-          aria-label="Zurück zur Liste"
+          aria-label="Back to the list"
           @click="selected = null"
         />
         <v-toolbar-title>
-          <v-icon :icon="mdiHistory" size="small" class="mr-2" />Versionen
+          <v-icon :icon="mdiHistory" size="small" class="mr-2" />Versions
         </v-toolbar-title>
-        <v-btn :icon="mdiClose" aria-label="Schließen" @click="open = false" />
+        <v-btn :icon="mdiClose" aria-label="Close" @click="open = false" />
       </v-toolbar>
       <v-divider />
 
       <v-card-text class="history__body pa-0">
         <v-progress-linear v-if="loading" indeterminate color="primary" />
         <v-alert v-else-if="loadError" type="error" variant="tonal" class="ma-4">
-          Der Versionsverlauf konnte nicht geladen werden.
+          Could not load the version history.
         </v-alert>
         <v-empty-state
           v-else-if="revisions === null"
-          title="Kein Versionsverlauf"
-          text="Auf diesem Server ist der Versionsverlauf nicht eingerichtet (git ist ausgeschaltet)."
+          title="No version history"
+          text="This server has no version history (git is turned off)."
         />
         <v-empty-state
           v-else-if="revisions.length === 0"
-          title="Noch keine Versionen"
-          text="Änderungen werden ein paar Minuten nach dem Bearbeiten gespeichert und erscheinen dann hier."
+          title="No versions yet"
+          text="Changes are saved a few minutes after editing and then show up here."
         />
 
         <div v-else class="history__layout">
@@ -207,7 +207,7 @@ const viewLabels: Record<View, string> = {
                 data-testid="history-restore"
                 @click="confirmOpen = true"
               >
-                Wiederherstellen
+                Restore
               </v-btn>
             </div>
             <v-tabs v-model="view" density="compact" class="px-3">
@@ -220,11 +220,11 @@ const viewLabels: Record<View, string> = {
             }}</pre>
             <template v-else>
               <div v-if="!detailLoading" class="text-caption text-medium-emphasis px-3 py-1">
-                <template v-if="diffLines.length === 0">Keine Unterschiede</template>
+                <template v-if="diffLines.length === 0">No differences</template>
                 <template v-else>
                   <span class="history__added">+{{ stats.added }}</span>
                   <span class="history__removed ml-2">−{{ stats.removed }}</span>
-                  <template v-if="view === 'current'"> · grün ist seitdem dazugekommen</template>
+                  <template v-if="view === 'current'"> · green was added since</template>
                 </template>
               </div>
               <div class="history__diff" data-testid="history-diff">
@@ -250,13 +250,13 @@ const viewLabels: Record<View, string> = {
 
     <ConfirmDialog
       v-model="confirmOpen"
-      title="Version wiederherstellen?"
+      title="Restore this version?"
       :text="
         selected
-          ? `Der Text wird auf den Stand vom ${formatDate(selected.time)} zurückgesetzt. Das ist eine normale Änderung und lässt sich rückgängig machen.`
+          ? `The text goes back to the state of ${formatDate(selected.time)}. This is a normal change and can be undone.`
           : ''
       "
-      confirm-text="Wiederherstellen"
+      confirm-text="Restore"
       @confirm="restore"
     />
   </v-dialog>

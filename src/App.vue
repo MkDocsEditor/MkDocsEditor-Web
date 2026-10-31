@@ -83,7 +83,7 @@ window.addEventListener('keydown', onKeydown)
   <v-app>
     <v-app-bar color="primary" density="comfortable" flat>
       <template v-if="showShell" #prepend>
-        <v-app-bar-nav-icon aria-label="Menü" @click="drawer = !drawer" />
+        <v-app-bar-nav-icon aria-label="Menu" @click="drawer = !drawer" />
       </template>
       <v-app-bar-title>
         <router-link :to="{ name: 'home' }" class="app-title">MkDocsEditor</router-link>
@@ -91,21 +91,21 @@ window.addEventListener('keydown', onKeydown)
       <template v-if="showShell" #append>
         <v-btn
           :icon="mdiMagnify"
-          aria-label="Suchen"
+          aria-label="Search"
           data-testid="search-button"
           @click="searchOpen = true"
         />
         <v-menu v-if="!auth.anonymous">
           <template #activator="{ props }">
-            <v-btn v-bind="props" :icon="mdiAccountCircle" aria-label="Konto" />
+            <v-btn v-bind="props" :icon="mdiAccountCircle" aria-label="Account" />
           </template>
           <v-list density="compact">
             <v-list-item
               :title="auth.displayName || auth.username"
-              :subtitle="auth.role ? `angemeldet (${auth.role})` : 'angemeldet'"
+              :subtitle="auth.role ? `signed in (${auth.role})` : 'signed in'"
             />
             <v-divider />
-            <v-list-item :prepend-icon="mdiLogout" title="Abmelden" @click="logout" />
+            <v-list-item :prepend-icon="mdiLogout" title="Sign out" @click="logout" />
           </v-list>
         </v-menu>
       </template>
@@ -148,7 +148,7 @@ window.addEventListener('keydown', onKeydown)
         :text="describeError(tree.error)"
       >
         <template #append>
-          <v-btn :prepend-icon="mdiRefresh" variant="text" @click="loadTree">Nochmal</v-btn>
+          <v-btn :prepend-icon="mdiRefresh" variant="text" @click="loadTree">Retry</v-btn>
         </template>
       </v-alert>
       <router-view v-if="!showShell || tree.root" />

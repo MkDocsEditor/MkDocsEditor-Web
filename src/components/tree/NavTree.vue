@@ -34,7 +34,7 @@ const indent = computed(() => ({ paddingInlineStart: `${8 + props.depth * 16}px`
           :icon="opened.has(sub.id) ? mdiChevronDown : mdiChevronRight"
           variant="text"
           size="x-small"
-          :aria-label="opened.has(sub.id) ? 'Zuklappen' : 'Aufklappen'"
+          :aria-label="opened.has(sub.id) ? 'Collapse' : 'Expand'"
           @click.stop.prevent="emit('toggle', sub.id)"
         />
         <v-icon :icon="iconFor(sub)" size="small" class="me-2" />

@@ -14,7 +14,7 @@ function confirm(): void {
     <v-card :title="title" :text="text">
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" @click="open = false">Abbrechen</v-btn>
+        <v-btn variant="text" @click="open = false">Cancel</v-btn>
         <v-btn
           :color="danger ? 'error' : 'primary'"
           variant="flat"

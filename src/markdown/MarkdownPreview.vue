@@ -71,7 +71,7 @@ async function onClick(event: MouseEvent): Promise<void> {
   if (item?.type === 'document') await router.push({ name: 'document', params: { id: item.id } })
   else if (item?.type === 'section') await router.push({ name: 'section', params: { id: item.id } })
   else if (item?.type === 'resource') openResource(item.id).catch((e: unknown) => notify.error(e))
-  else notify.push(`Link-Ziel nicht gefunden: ${href}`, 'warning')
+  else notify.push(`Link target not found: ${href}`, 'warning')
 }
 
 watch(

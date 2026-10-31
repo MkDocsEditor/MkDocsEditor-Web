@@ -8,8 +8,8 @@ type User = { username: string; password: string }
 export async function login(page: Page, user: User = E2E_USER): Promise<void> {
   await page.goto('/')
   await expect(page).toHaveURL(/\/login/)
-  const username = page.getByLabel('Benutzername')
-  const password = page.getByLabel('Passwort', { exact: true })
+  const username = page.getByLabel('Username')
+  const password = page.getByLabel('Password', { exact: true })
   // The username field focuses itself after mounting. On a slow machine that can happen during
   // a fill and send the text to the wrong field, so check both values and fill again if needed.
   await expect(async () => {
@@ -18,7 +18,7 @@ export async function login(page: Page, user: User = E2E_USER): Promise<void> {
     await expect(username).toHaveValue(user.username, { timeout: 500 })
     await expect(password).toHaveValue(user.password, { timeout: 500 })
   }).toPass({ timeout: 15_000 })
-  await page.getByRole('button', { name: 'Anmelden' }).click()
+  await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByTestId('section-title')).toHaveText('Wiki')
 }
 
@@ -71,9 +71,9 @@ export async function documentContent(id: string): Promise<string> {
 /** Opens a document in edit mode and waits until the editor is connected. */
 export async function openEditor(page: Page, id: string): Promise<void> {
   await page.goto(`/document/${id}`)
-  await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await expect(page.locator('.cm-content')).toBeVisible()
-  await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Gespeichert')
+  await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
 }
 
 export function editorText(page: Page): Promise<string> {

@@ -11,9 +11,7 @@ const props = withDefaults(defineProps<{ users: OnlineUser[]; max?: number; size
 
 const shown = computed(() => props.users.slice(0, props.max))
 const more = computed(() => props.users.length - shown.value.length)
-const label = computed(
-  () => `Gerade geöffnet von ${props.users.map((u) => u.displayName).join(', ')}`,
-)
+const label = computed(() => `Open now by ${props.users.map((u) => u.displayName).join(', ')}`)
 </script>
 
 <template>

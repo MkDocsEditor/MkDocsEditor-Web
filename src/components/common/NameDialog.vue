@@ -43,7 +43,7 @@ function submit(): void {
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="open = false">Abbrechen</v-btn>
+          <v-btn variant="text" @click="open = false">Cancel</v-btn>
           <v-btn
             type="submit"
             color="primary"
@@ -51,7 +51,7 @@ function submit(): void {
             :disabled="validateName(name) !== true"
             data-testid="name-confirm"
           >
-            {{ confirmText ?? 'Speichern' }}
+            {{ confirmText ?? 'Save' }}
           </v-btn>
         </v-card-actions>
       </v-form>

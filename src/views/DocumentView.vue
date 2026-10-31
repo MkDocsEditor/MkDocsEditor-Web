@@ -73,7 +73,7 @@ async function upload(files: File[]): Promise<string[]> {
     const created = await tree.uploadFiles(folder, files)
     return created.map((r) => markdownFor(r.name, isImage(r.name)))
   } catch (error) {
-    notify.error(error, 'Hochladen fehlgeschlagen')
+    notify.error(error, 'Upload failed')
     throw error
   } finally {
     uploading.value--
@@ -134,20 +134,20 @@ const connection = computed(() => {
   switch (s.connection) {
     case 'online':
       return s.unsynced
-        ? { icon: mdiCloudSyncOutline, color: 'info', text: 'Speichert …' }
-        : { icon: mdiCloudCheckOutline, color: 'success', text: 'Gespeichert' }
+        ? { icon: mdiCloudSyncOutline, color: 'info', text: 'Saving …' }
+        : { icon: mdiCloudCheckOutline, color: 'success', text: 'Saved' }
     case 'connecting':
-      return { icon: mdiCloudSyncOutline, color: 'info', text: 'Verbinde …' }
+      return { icon: mdiCloudSyncOutline, color: 'info', text: 'Connecting …' }
     case 'offline':
       return {
         icon: mdiCloudOffOutline,
         color: 'warning',
-        text: s.unsynced ? 'Offline – Änderungen bleiben hier' : 'Offline',
+        text: s.unsynced ? 'Offline – changes stay here' : 'Offline',
       }
     case 'snapshot':
-      return { icon: mdiLockOutline, color: 'default', text: 'Nur lesen' }
+      return { icon: mdiLockOutline, color: 'default', text: 'Read only' }
     case 'closed':
-      return { icon: mdiCloudOffOutline, color: 'error', text: 'Getrennt' }
+      return { icon: mdiCloudOffOutline, color: 'error', text: 'Disconnected' }
   }
   return null
 })
@@ -197,37 +197,37 @@ const connection = computed(() => {
           divided
           color="primary"
         >
-          <v-btn value="edit" :icon="mdiFileDocumentEditOutline" aria-label="Bearbeiten" />
+          <v-btn value="edit" :icon="mdiFileDocumentEditOutline" aria-label="Edit" />
           <v-btn
             v-if="!mobile"
             value="split"
             :icon="mdiViewSplitVertical"
-            aria-label="Bearbeiten und Vorschau"
+            aria-label="Edit and preview"
           />
-          <v-btn value="preview" :icon="mdiEyeOutline" aria-label="Vorschau" />
+          <v-btn value="preview" :icon="mdiEyeOutline" aria-label="Preview" />
         </v-btn-toggle>
 
         <v-menu>
           <template #activator="{ props: menu }">
-            <v-btn v-bind="menu" :icon="mdiDotsVertical" variant="text" aria-label="Mehr" />
+            <v-btn v-bind="menu" :icon="mdiDotsVertical" variant="text" aria-label="More" />
           </template>
           <v-list density="compact">
             <v-list-item
               :prepend-icon="mdiAccountEdit"
-              :title="showAuthorship ? 'Autoren ausblenden' : 'Wer hat was geschrieben?'"
+              :title="showAuthorship ? 'Hide authors' : 'Who wrote what?'"
               :disabled="!session || session.authorship.value.length === 0"
               @click="showAuthorship = !showAuthorship"
             />
             <v-list-item
               :prepend-icon="mdiHistory"
-              title="Versionen"
+              title="Versions"
               data-testid="open-history"
               @click="historyOpen = true"
             />
             <v-list-item
               v-if="wikiUrl"
               :prepend-icon="mdiOpenInNew"
-              title="Im Wiki ansehen"
+              title="View in the wiki"
               :href="wikiUrl"
               target="_blank"
               rel="noopener"
@@ -252,7 +252,7 @@ const connection = computed(() => {
       v-if="uploading > 0"
       indeterminate
       color="primary"
-      aria-label="Datei wird hochgeladen"
+      aria-label="Uploading a file"
       data-testid="upload-progress"
     />
 

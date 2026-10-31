@@ -31,10 +31,10 @@ describe('icons and sizes', () => {
     const img = iconFor({ type: 'resource', id: '', name: 'a.png', filesize: 0, modtime: '' })
     expect(doc).not.toBe(img)
   })
-  it('formats sizes in German', () => {
+  it('formats sizes', () => {
     expect(formatSize(500)).toBe('500 B')
     expect(formatSize(2048)).toBe('2 KB')
-    expect(formatSize(1.5 * 1024 * 1024)).toBe('1,5 MB')
+    expect(formatSize(1.5 * 1024 * 1024)).toBe('1.5 MB')
   })
 })
 

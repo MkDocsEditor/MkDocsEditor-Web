@@ -46,16 +46,16 @@ export function diffStats(lines: readonly DiffLine[]): { added: number; removed:
   return { added, removed }
 }
 
-const relative = new Intl.RelativeTimeFormat('de', { numeric: 'auto' })
-const absolute = new Intl.DateTimeFormat('de', { dateStyle: 'medium', timeStyle: 'short' })
+const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+const absolute = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' })
 
-/** "vor 5 Minuten", "gestern", … up to a week, then the date. */
+/** "5 minutes ago", "yesterday", … up to a week, then the date. */
 export function formatWhen(iso: string, now = Date.now()): string {
   const time = new Date(iso).getTime()
   if (Number.isNaN(time)) return iso
   const seconds = Math.round((time - now) / 1000)
   const abs = Math.abs(seconds)
-  if (abs < 60) return 'gerade eben'
+  if (abs < 60) return 'just now'
   if (abs < 3600) return relative.format(Math.round(seconds / 60), 'minute')
   if (abs < 86400) return relative.format(Math.round(seconds / 3600), 'hour')
   if (abs < 7 * 86400) return relative.format(Math.round(seconds / 86400), 'day')
