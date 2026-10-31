@@ -1,0 +1,9 @@
+dist
+coverage
+node_modules
+package-lock.json
+playwright-report
+test-results
+public
+.github/ISSUE_TEMPLATE
+.github/*.yml
