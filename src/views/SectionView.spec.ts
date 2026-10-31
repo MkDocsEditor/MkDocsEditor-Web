@@ -2,6 +2,7 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import { useLiveStore } from '@/stores/live'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { createFetchMock, json } from '@/test/fetchMock'
@@ -103,6 +104,18 @@ describe('SectionView', () => {
     await vi.waitFor(() =>
       expect(requests.some((r) => r.url.includes('/resource/s-urlaub/Plan.pdf'))).toBe(true),
     )
+    wrapper.unmount()
+  })
+
+  it('shows who has a page open', async () => {
+    const { wrapper } = await setup()
+    useLiveStore().online = new Map([
+      ['d-index', [{ username: 'anna', displayName: 'Anna Müller', color: '#1971c2' }]],
+    ])
+    await flushPromises()
+    const avatars = wrapper.find('[data-testid="online-avatars"]')
+    expect(avatars.text()).toBe('AM')
+    expect(avatars.attributes('title')).toBe('Gerade geöffnet von Anna Müller')
     wrapper.unmount()
   })
 })

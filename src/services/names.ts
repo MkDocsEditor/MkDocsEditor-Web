@@ -15,3 +15,14 @@ export function validateName(name: string): true | string {
 export function stripMarkdownExtension(name: string): string {
   return name.trim().replace(/\.md$/i, '')
 }
+
+/** Up to two initials for an avatar: "Anna Müller" gives "AM". */
+export function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => [...p][0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}

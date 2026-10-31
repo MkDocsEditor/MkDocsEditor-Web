@@ -19,6 +19,7 @@ import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { isImage } from '@/services/icons'
+import { initials } from '@/services/names'
 import { local, readJson, writeJson } from '@/services/storage'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
@@ -147,15 +148,6 @@ const connection = computed(() => {
   }
   return null
 })
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-}
 </script>
 
 <template>
