@@ -34,3 +34,8 @@ if (!window.matchMedia) {
 }
 
 document.createRange ??= () => new Range()
+
+// CodeMirror measures text through ranges, which jsdom does not lay out.
+const emptyRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList
+Range.prototype.getClientRects ??= emptyRects
+Range.prototype.getBoundingClientRect ??= () => new DOMRect()
