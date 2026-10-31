@@ -24,7 +24,8 @@ export default defineConfig({
     { name: 'phone', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: `npx vite --port ${WEB_PORT} --strictPort`,
+    // A production build: the dev server re-optimizes dependencies on first use and reloads.
+    command: `npx vite build --outDir dist-e2e && npx vite preview --outDir dist-e2e --port ${WEB_PORT} --strictPort`,
     url: `http://localhost:${WEB_PORT}`,
     reuseExistingServer: !process.env.CI,
     env: { VITE_BACKEND_URL: `http://127.0.0.1:${BACKEND_PORT}` },

@@ -7,3 +7,4 @@ test-results
 public
 .github/ISSUE_TEMPLATE
 .github/*.yml
+dist-e2e
