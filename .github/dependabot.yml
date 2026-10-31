@@ -7,6 +7,10 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # The app runs on Node 22 LTS (.nvmrc, Dockerfile); the types follow that major version.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -15,3 +19,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Build on Node 22 LTS; moving to a new major is a deliberate change.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+      # Serve with the nginx stable branch (even minor, 1.30.x). Odd minors are mainline.
+      - dependency-name: nginxinc/nginx-unprivileged
+        update-types: [version-update:semver-minor]
