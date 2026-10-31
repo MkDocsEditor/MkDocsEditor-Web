@@ -9,7 +9,7 @@ describe('upload helpers', () => {
     expect(sanitizeFileName('a/b\\c:d?.jpg')).toBe('a-b-c-d-.jpg')
     expect(sanitizeFileName('  Foto   vom  Strand.jpg ')).toBe('Foto vom Strand.jpg')
     expect(sanitizeFileName('.versteckt')).toBe('versteckt')
-    expect(sanitizeFileName('...')).toBe('datei')
+    expect(sanitizeFileName('...')).toBe('file')
   })
 
   it('finds a free name in the folder', () => {

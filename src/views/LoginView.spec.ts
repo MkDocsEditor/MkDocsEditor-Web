@@ -54,7 +54,9 @@ describe('LoginView', () => {
       initialPath: '/login',
     })
     await fillAndSubmit(wrapper)
-    expect(wrapper.find('[data-testid="login-error"]').text()).toContain('stimmt nicht')
+    expect(wrapper.find('[data-testid="login-error"]').text()).toContain(
+      'Wrong username or password',
+    )
     expect(router.currentRoute.value.path).toBe('/login')
     wrapper.unmount()
   })

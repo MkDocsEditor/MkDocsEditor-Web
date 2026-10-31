@@ -67,7 +67,7 @@ describe('HistoryDialog', () => {
     })
     const entries = qa('[data-testid="history-entry"]')
     expect(entries).toHaveLength(2)
-    expect(entries[1]!.textContent).toContain('Oma Erna und 1 weitere')
+    expect(entries[1]!.textContent).toContain('Oma Erna and 1 more')
     expect(entries[1]!.textContent).not.toContain('Co-authored-by')
     // the newest is the current state and cannot be restored
     ;(entries[0] as HTMLElement).click()
@@ -75,7 +75,7 @@ describe('HistoryDialog', () => {
     expect(q('[data-testid="history-detail"]')).not.toBeNull()
     expect(q('[data-testid="history-restore"]')).toBeNull()
     // back to the list (on narrow screens list and detail take turns)
-    ;(q('[aria-label="Zurück zur Liste"]') as HTMLElement).click()
+    ;(q('[aria-label="Back to the list"]') as HTMLElement).click()
     await flushPromises()
 
     ;(entries[1] as HTMLElement).click()
@@ -108,7 +108,7 @@ describe('HistoryDialog', () => {
 
   it('explains when the server has no history', async () => {
     const { wrapper } = await setup({})
-    expect(document.body.textContent).toContain('Kein Versionsverlauf')
+    expect(document.body.textContent).toContain('No version history')
     wrapper.unmount()
   })
 

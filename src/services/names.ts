@@ -4,10 +4,10 @@ const FORBIDDEN = /[/\\:*?"<>|]/
 
 export function validateName(name: string): true | string {
   const trimmed = name.trim()
-  if (trimmed === '') return 'Bitte einen Namen eingeben.'
-  if (trimmed === '.' || trimmed === '..') return 'Dieser Name ist nicht erlaubt.'
-  if (trimmed.startsWith('.')) return 'Der Name darf nicht mit einem Punkt anfangen.'
-  if (FORBIDDEN.test(trimmed)) return 'Diese Zeichen sind nicht erlaubt: / \\ : * ? " < > |'
+  if (trimmed === '') return 'Please enter a name.'
+  if (trimmed === '.' || trimmed === '..') return 'This name is not allowed.'
+  if (trimmed.startsWith('.')) return 'The name must not start with a dot.'
+  if (FORBIDDEN.test(trimmed)) return 'These characters are not allowed: / \\ : * ? " < > |'
   return true
 }
 

@@ -50,8 +50,8 @@ test('offline edits survive a server that lost its state (new epoch)', async ({
     const page = await context.newPage()
     await login(page, USERS.alice)
     await page.goto(`/document/${docId}`)
-    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click()
-    await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Gespeichert')
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
     await typeAt(page, 'end', 'Vor dem Absturz.')
     await expect.poll(content).toContain('Vor dem Absturz.')
 
@@ -71,7 +71,7 @@ test('offline edits survive a server that lost its state (new epoch)', async ({
     await context.setOffline(false)
     // the editor shows the offline text before the reconnect, so wait for the merge
     await expect.poll(() => editorText(page), { timeout: 40_000 }).toContain('Von Git.')
-    await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Gespeichert')
+    await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
     const text = await editorText(page)
     expect(text).toContain('Vor dem Absturz. Offline geschrieben.')
     await expect.poll(content).toBe(text)

@@ -48,12 +48,12 @@ const entries = computed<TreeItem[]>(() =>
     : [],
 )
 
-const typeLabel = { section: 'Ordner', document: 'Seite', resource: 'Datei' } as const
+const typeLabel = { section: 'Folder', document: 'Page', resource: 'File' } as const
 
 function subtitle(item: TreeItem): string {
   if (item.type === 'section') {
     const count = item.documents.length + item.subsections.length
-    return count === 1 ? '1 Eintrag' : `${count} Einträge`
+    return count === 1 ? '1 item' : `${count} items`
   }
   if (item.type === 'resource') return formatSize(item.filesize)
   return ''
@@ -70,7 +70,7 @@ async function open(item: TreeItem): Promise<void> {
   try {
     await openResource(item.id)
   } catch (error) {
-    notify.error(error, 'Datei konnte nicht geöffnet werden')
+    notify.error(error, 'Could not open the file')
   }
 }
 
@@ -104,13 +104,13 @@ async function create(name: string): Promise<void> {
   try {
     if (kind === 'section') {
       await tree.createSection(parent.id, name)
-      notify.success(`Ordner „${name}“ angelegt`)
+      notify.success(`Created folder “${name}”`)
     } else {
       const doc = await tree.createDocument(parent.id, stripMarkdownExtension(name))
       await router.push({ name: 'document', params: { id: doc.id } })
     }
   } catch (error) {
-    notify.error(error, 'Anlegen fehlgeschlagen')
+    notify.error(error, 'Create failed')
   }
 }
 
@@ -124,7 +124,7 @@ async function rename(name: string): Promise<void> {
     else await tree.renameResource(item.id, name)
     notify.success('Umbenannt')
   } catch (error) {
-    notify.error(error, 'Umbenennen fehlgeschlagen')
+    notify.error(error, 'Rename failed')
   }
 }
 
@@ -143,10 +143,10 @@ async function remove(item = deleteTarget.value, force = false): Promise<void> {
     if (item.type === 'section') await tree.deleteSection(item.id, force)
     else if (item.type === 'document') await tree.deleteDocument(item.id, force)
     else await tree.deleteResource(item.id)
-    notify.success(`„${item.name}“ gelöscht`)
+    notify.success(`Deleted “${item.name}”`)
   } catch (error) {
     if (!force && error instanceof ApiError && error.status === 409) forceTarget.value = item
-    else notify.error(error, 'Löschen fehlgeschlagen')
+    else notify.error(error, 'Delete failed')
   }
 }
 
@@ -163,12 +163,10 @@ async function upload(files: File[]): Promise<void> {
   try {
     const created = await tree.uploadFiles(target.id, files)
     notify.success(
-      created.length === 1
-        ? `„${created[0]!.name}“ hochgeladen`
-        : `${created.length} Dateien hochgeladen`,
+      created.length === 1 ? `Uploaded “${created[0]!.name}”` : `Uploaded ${created.length} files`,
     )
   } catch (error) {
-    notify.error(error, 'Hochladen fehlgeschlagen')
+    notify.error(error, 'Upload failed')
   } finally {
     uploading.value = false
   }
@@ -206,9 +204,8 @@ function onDrop(event: DragEvent): void {
 const deleteText = computed(() => {
   const item = deleteTarget.value
   if (!item) return ''
-  if (item.type === 'section')
-    return `Der Ordner „${item.name}“ wird mit allem, was darin liegt, gelöscht.`
-  return `„${item.name}“ wird gelöscht.`
+  if (item.type === 'section') return `The folder “${item.name}” is deleted with everything in it.`
+  return `“${item.name}” will be deleted.`
 })
 </script>
 
@@ -230,11 +227,11 @@ const deleteText = computed(() => {
         indeterminate
         color="primary"
         class="mb-2"
-        aria-label="Dateien werden hochgeladen"
+        aria-label="Uploading files"
         data-testid="upload-progress"
       />
       <div v-if="dragging" class="section-view__drop text-body-1 mb-2" data-testid="drop-zone">
-        Dateien hier ablegen, um sie in diesen Ordner hochzuladen
+        Drop files here to upload them into this folder
       </div>
 
       <v-list v-if="entries.length > 0" lines="one" class="rounded-lg" border>
@@ -261,19 +258,19 @@ const deleteText = computed(() => {
                   :icon="mdiDotsVertical"
                   variant="text"
                   size="small"
-                  :aria-label="`Aktionen für ${item.name}`"
+                  :aria-label="`Actions for ${item.name}`"
                   @click.stop.prevent
                 />
               </template>
               <v-list density="compact">
                 <v-list-item
                   :prepend-icon="mdiPencil"
-                  title="Umbenennen"
+                  title="Rename"
                   @click="renameTarget = item"
                 />
                 <v-list-item
                   :prepend-icon="mdiDelete"
-                  title="Löschen"
+                  title="Delete"
                   base-color="error"
                   @click="deleteTarget = item"
                 />
@@ -284,8 +281,8 @@ const deleteText = computed(() => {
       </v-list>
       <v-empty-state
         v-else
-        title="Hier ist noch nichts"
-        text="Lege mit dem Plus-Knopf eine Seite oder einen Ordner an, oder lade Dateien hoch."
+        title="Nothing here yet"
+        text="Use the plus button to create a page or a folder, or upload files."
       />
 
       <v-menu location="top end">
@@ -296,26 +293,26 @@ const deleteText = computed(() => {
             color="primary"
             class="section-view__fab"
             size="large"
-            aria-label="Neu"
+            aria-label="New"
             data-testid="create-fab"
           />
         </template>
         <v-list>
           <v-list-item
             :prepend-icon="mdiFileDocumentPlusOutline"
-            title="Neue Seite"
+            title="New page"
             data-testid="create-document"
             @click="createKind = 'document'"
           />
           <v-list-item
             :prepend-icon="mdiFolderPlusOutline"
-            title="Neuer Ordner"
+            title="New folder"
             data-testid="create-section"
             @click="createKind = 'section'"
           />
           <v-list-item
             :prepend-icon="mdiUpload"
-            title="Dateien hochladen"
+            title="Upload files"
             data-testid="upload-files"
             @click="fileInput?.click()"
           />
@@ -333,41 +330,41 @@ const deleteText = computed(() => {
 
     <v-empty-state
       v-else-if="!tree.loading && tree.root"
-      title="Nicht gefunden"
-      text="Diesen Ordner gibt es nicht (mehr)."
+      title="Not found"
+      text="This folder does not exist (any more)."
     >
       <template #actions>
-        <v-btn color="primary" :to="{ name: 'home' }">Zur Startseite</v-btn>
+        <v-btn color="primary" :to="{ name: 'home' }">To the start page</v-btn>
       </template>
     </v-empty-state>
 
     <NameDialog
       v-model="createOpen"
-      :title="createKind === 'section' ? 'Neuer Ordner' : 'Neue Seite'"
+      :title="createKind === 'section' ? 'New folder' : 'New page'"
       label="Name"
       confirm-text="Anlegen"
       @confirm="create"
     />
     <NameDialog
       v-model="renameOpen"
-      :title="renameTarget ? `${typeLabel[renameTarget.type]} umbenennen` : ''"
-      label="Neuer Name"
+      :title="renameTarget ? `Rename ${typeLabel[renameTarget.type].toLowerCase()}` : ''"
+      label="New name"
       :initial="renameTarget?.name"
       @confirm="rename"
     />
     <ConfirmDialog
       v-model="deleteOpen"
-      title="Wirklich löschen?"
+      title="Delete?"
       :text="deleteText"
-      confirm-text="Löschen"
+      confirm-text="Delete"
       danger
       @confirm="remove()"
     />
     <ConfirmDialog
       v-model="forceOpen"
-      title="Wird gerade bearbeitet"
-      text="Jemand hat das gerade geöffnet. Wenn du trotzdem löschst, bekommt diese Person einen Hinweis und kann ihren Text noch kopieren."
-      confirm-text="Trotzdem löschen"
+      title="Being edited right now"
+      text="Someone has this open right now. If you delete it anyway, they get a notice and can still copy their text."
+      confirm-text="Delete anyway"
       danger
       @confirm="remove(forceTarget, true)"
     />

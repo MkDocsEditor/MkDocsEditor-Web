@@ -2,7 +2,7 @@ import 'vuetify/styles'
 
 import { createVuetify } from 'vuetify'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
-import { de, en } from 'vuetify/locale'
+import { en } from 'vuetify/locale'
 
 export default createVuetify({
   icons: {
@@ -11,9 +11,8 @@ export default createVuetify({
     sets: { mdi },
   },
   locale: {
-    locale: 'de',
-    fallback: 'en',
-    messages: { de, en },
+    locale: 'en',
+    messages: { en },
   },
   theme: {
     defaultTheme: 'system',

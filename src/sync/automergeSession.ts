@@ -438,7 +438,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       ticket = await options.api.wsTicket()
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        fail('Bitte melde dich neu an, um weiter zu bearbeiten.')
+        fail('Please sign in again to keep editing.')
         return
       }
       scheduleReconnect()
@@ -502,15 +502,13 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (closed) return
     switch (code) {
       case 4003:
-        fail('Der Server hat diese Verbindung abgelehnt.')
+        fail('The server refused this connection.')
         return
       case 4004:
-        fail(
-          'Diese Seite wurde gelöscht. Dein Text ist noch hier – kopiere ihn, wenn du ihn behalten willst.',
-        )
+        fail('This page was deleted. Your text is still here – copy it if you want to keep it.')
         return
       case 4400:
-        fail('Verbindungsfehler (Protokoll). Bitte lade die Seite neu.')
+        fail('Connection error (protocol). Please reload the page.')
         return
       case 4009:
         attempt = 0
@@ -636,7 +634,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     setStatus({
       connection: 'online',
       readOnly,
-      message: readOnly ? 'Du darfst diese Seite nur lesen.' : undefined,
+      message: readOnly ? 'You can only read this page.' : undefined,
     })
     updateUnsynced()
     markReady()
@@ -710,7 +708,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     try {
       A = await options.automerge
     } catch (error) {
-      fail('Der Editor konnte nicht geladen werden.')
+      fail('Could not load the editor.')
       console.error(error)
       return
     }

@@ -21,7 +21,7 @@ together, in real time, from a phone or a desktop browser. It talks to the
 - Editing works offline. Changes are kept in the browser and merged after the reconnect, even
   when the server lost its state meanwhile. The connection state is always visible, and text
   is never thrown away silently.
-- "Wer hat was geschrieben?" highlights who wrote which part of a page.
+- "Who wrote what?" highlights who wrote which part of a page.
 - Version history (when the backend has git enabled): see what each version changed, compare
   it with the current text, and restore it.
 - Preview close to MkDocs Material: admonitions, task lists, footnotes, tables, definition
@@ -30,7 +30,7 @@ together, in real time, from a phone or a desktop browser. It talks to the
 - The file browser updates live when pages change elsewhere, and shows who has which page
   open.
 - Link to the published wiki page (optional).
-- Works on phones and desktops, light and dark mode.
+- Works on phones and desktops, light and dark mode. The interface is in English.
 
 ## Backend
 
@@ -54,10 +54,10 @@ The app reads `config.json` next to `index.html` at start:
 }
 ```
 
-| Key          | Docker variable            | Meaning                                                                   |
-| ------------ | -------------------------- | ------------------------------------------------------------------------- |
-| `backendUrl` | `MKDOCSEDITOR_BACKEND_URL` | Base URL of the backend                                                   |
-| `wikiUrl`    | `MKDOCSEDITOR_WIKI_URL`    | Base URL of the published wiki, for the "Im Wiki ansehen" link (optional) |
+| Key          | Docker variable            | Meaning                                                                    |
+| ------------ | -------------------------- | -------------------------------------------------------------------------- |
+| `backendUrl` | `MKDOCSEDITOR_BACKEND_URL` | Base URL of the backend                                                    |
+| `wikiUrl`    | `MKDOCSEDITOR_WIKI_URL`    | Base URL of the published wiki, for the "View in the wiki" link (optional) |
 
 For local development, copy `public/config.example.json` to `public/config.json` (ignored by
 git), or set `VITE_BACKEND_URL` and `VITE_WIKI_URL`.

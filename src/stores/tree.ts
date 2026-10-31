@@ -49,7 +49,7 @@ export interface SearchHit {
 }
 
 function normalize(text: string): string {
-  return text.toLocaleLowerCase('de').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return text.toLocaleLowerCase('en').normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
 /** Finds items whose name contains every word of the query (case and accent insensitive). */
@@ -70,7 +70,7 @@ export function searchTree(index: TreeIndex, query: string, limit = 50): SearchH
     })
   }
   hits.sort(
-    (a, b) => rank[a.item.type] - rank[b.item.type] || a.item.name.localeCompare(b.item.name, 'de'),
+    (a, b) => rank[a.item.type] - rank[b.item.type] || a.item.name.localeCompare(b.item.name, 'en'),
   )
   return hits.slice(0, limit)
 }
@@ -133,7 +133,7 @@ export function resolveRelative(
 }
 
 export function sortByName<T extends { name: string }>(items: readonly T[]): T[] {
-  return [...items].sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))
+  return [...items].sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }))
 }
 
 /** The section/document/resource tree of the wiki. */
@@ -218,7 +218,7 @@ export const useTreeStore = defineStore('tree', () => {
     try {
       for (const file of files) {
         const current = section(sectionId)
-        if (!current) throw new Error('Ordner nicht gefunden')
+        if (!current) throw new Error('Folder not found')
         const name = uniqueName(
           { ...current, resources: [...current.resources, ...created] },
           sanitizeFileName(file.name),

@@ -10,7 +10,7 @@ export function sanitizeFileName(name: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^\.+/, '')
-  return cleaned === '' ? 'datei' : cleaned
+  return cleaned === '' ? 'file' : cleaned
 }
 
 /** A name that does not exist in the section yet: `Foto.jpg`, `Foto (2).jpg`, … */

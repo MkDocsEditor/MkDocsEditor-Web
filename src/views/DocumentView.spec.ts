@@ -65,7 +65,7 @@ describe('DocumentView', () => {
     await flushPromises()
     expect(wrapper.findAll('[data-testid="online-users"] .v-avatar')).toHaveLength(1)
     expect(wrapper.find('[data-testid="online-users"]').text()).toBe('AM')
-    expect(wrapper.find('[data-testid="connection-state"]').attributes('title')).toBe('Gespeichert')
+    expect(wrapper.find('[data-testid="connection-state"]').attributes('title')).toBe('Saved')
     wrapper.unmount()
   })
 

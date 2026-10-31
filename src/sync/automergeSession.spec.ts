@@ -261,7 +261,7 @@ describe('Automerge session', () => {
     const ticketsBefore = server.ticketsIssued
     server.disconnectAll(4004)
     await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('closed'))
-    expect(anna.session.status.value.message).toContain('gelöscht')
+    expect(anna.session.status.value.message).toContain('deleted')
     expect(anna.session.getText()).toBe('weg')
     await new Promise((r) => setTimeout(r, 50))
     expect(server.ticketsIssued).toBe(ticketsBefore)

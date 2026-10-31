@@ -105,7 +105,7 @@ export class ApiClient {
       response = await this.fetchFn(this.url(path), { method, headers, body })
     } catch (error) {
       throw new ApiError(
-        `Server nicht erreichbar (${error instanceof Error ? error.message : String(error)})`,
+        `Server unreachable (${error instanceof Error ? error.message : String(error)})`,
         0,
       )
     }

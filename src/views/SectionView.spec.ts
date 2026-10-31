@@ -46,7 +46,7 @@ describe('SectionView', () => {
 
   it('shows "not found" for unknown sections', async () => {
     const { wrapper } = await setup('nope')
-    expect(wrapper.text()).toContain('Nicht gefunden')
+    expect(wrapper.text()).toContain('Not found')
     wrapper.unmount()
   })
 
@@ -86,7 +86,7 @@ describe('SectionView', () => {
       expect(requests.some((r) => r.method === 'POST' && r.url.includes('/resource/'))).toBe(true),
     )
     await flushPromises()
-    expect(useNotifyStore().queue.map((n) => n.text)).toContain('„Strand.jpg“ hochgeladen')
+    expect(useNotifyStore().queue.map((n) => n.text)).toContain('Uploaded “Strand.jpg”')
     wrapper.unmount()
   })
 
@@ -115,7 +115,7 @@ describe('SectionView', () => {
     await flushPromises()
     const avatars = wrapper.find('[data-testid="online-avatars"]')
     expect(avatars.text()).toBe('AM')
-    expect(avatars.attributes('title')).toBe('Gerade geöffnet von Anna Müller')
+    expect(avatars.attributes('title')).toBe('Open now by Anna Müller')
     wrapper.unmount()
   })
 })

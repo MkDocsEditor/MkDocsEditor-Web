@@ -42,7 +42,7 @@ function chooseFirst(): void {
         <v-text-field
           v-model="query"
           :prepend-inner-icon="mdiMagnify"
-          placeholder="Seite oder Ordner suchen…"
+          placeholder="Search pages and folders…"
           variant="solo-filled"
           flat
           autofocus
@@ -63,11 +63,11 @@ function chooseFirst(): void {
             @click="choose(hit)"
           />
         </v-list>
-        <p v-else-if="query" class="text-medium-emphasis pa-4">Nichts gefunden.</p>
+        <p v-else-if="query" class="text-medium-emphasis pa-4">Nothing found.</p>
       </v-card-text>
       <v-card-actions v-if="$vuetify.display.xs">
         <v-spacer />
-        <v-btn @click="open = false">Schließen</v-btn>
+        <v-btn @click="open = false">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

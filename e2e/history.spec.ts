@@ -22,7 +22,7 @@ test('shows the versions of a page and restores an old one', async ({ page }, te
   await openEditor(page, id)
   await expect.poll(() => editorText(page)).toContain('Version zwei')
 
-  await page.getByRole('button', { name: 'Mehr' }).click()
+  await page.getByRole('button', { name: 'More' }).click()
   await page.getByTestId('open-history').click()
   const dialog = page.getByTestId('history-dialog')
   const entries = dialog.getByTestId('history-entry')
@@ -35,7 +35,7 @@ test('shows the versions of a page and restores an old one', async ({ page }, te
   await entries.nth(1).click()
   const diff = dialog.getByTestId('history-diff')
   await expect(diff.locator('.history__line--add')).toContainText(['Version eins'])
-  await dialog.getByRole('tab', { name: 'Vergleich mit jetzt' }).click()
+  await dialog.getByRole('tab', { name: 'Compare with now' }).click()
   await expect(diff.locator('.history__line--del')).toContainText(['Version eins'])
   await expect(diff.locator('.history__line--add')).toContainText(['Version zwei'])
   await dialog.getByRole('tab', { name: 'Text' }).click()
@@ -49,7 +49,7 @@ test('shows the versions of a page and restores an old one', async ({ page }, te
   await expect.poll(() => documentContent(id)).toBe('# Rezept\n\nVersion eins\n')
 
   // and is committed right away
-  await page.getByRole('button', { name: 'Mehr' }).click()
+  await page.getByRole('button', { name: 'More' }).click()
   await page.getByTestId('open-history').click()
   await expect(entries).toHaveCount(4)
   await expect(entries.nth(0)).toContainText('Restore')
