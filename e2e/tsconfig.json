@@ -7,6 +7,7 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["node"],
+    "lib": ["ES2024", "DOM"],
     "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.e2e.tsbuildinfo"
   }
 }
