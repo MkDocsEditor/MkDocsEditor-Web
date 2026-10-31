@@ -74,6 +74,63 @@ export function searchTree(index: TreeIndex, query: string, limit = 50): SearchH
   return hits.slice(0, limit)
 }
 
+/**
+ * Resolves a relative link from a page in `section` (as written in markdown) to a tree item.
+ * Handles `./`, `../`, URL encoding, `#fragments`, `.md` files, and MkDocs directory URLs
+ * (`../Other/` for `Other.md` or `Other/index.md`). Returns undefined for absolute URLs.
+ */
+export function resolveRelative(
+  index: TreeIndex,
+  section: SectionModel,
+  href: string,
+): TreeItem | undefined {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//') || href.startsWith('#')) {
+    return undefined
+  }
+  const path = href.split(/[?#]/)[0] ?? ''
+  if (path === '') return undefined
+  let segments: string[]
+  try {
+    segments = path.split('/').map((s) => decodeURIComponent(s))
+  } catch {
+    return undefined
+  }
+  let current: SectionModel | undefined = section
+  if (path.startsWith('/')) {
+    current = ancestorsOf(index, section.id)[0] ?? section
+    segments = segments.slice(1)
+  }
+  const directoryUrl = segments.at(-1) === ''
+  if (directoryUrl) segments.pop()
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i]!
+    const last = i === segments.length - 1
+    if (segment === '.' || segment === '') continue
+    if (segment === '..') {
+      const parentId = index.parents.get(current.id)
+      const parent = parentId === undefined ? undefined : index.items.get(parentId)
+      if (parent?.type !== 'section') return undefined
+      current = parent
+      continue
+    }
+    if (last && !directoryUrl) {
+      const doc = current.documents.find((d) => `${d.name}.md` === segment)
+      if (doc) return doc
+      const resource = current.resources.find((r) => r.name === segment)
+      if (resource) return resource
+    }
+    const sub: SectionModel | undefined = current.subsections.find((s) => s.name === segment)
+    if (sub) {
+      current = sub
+      continue
+    }
+    if (last && directoryUrl) return current.documents.find((d) => d.name === segment)
+    return undefined
+  }
+  if (directoryUrl) return current.documents.find((d) => d.name === 'index') ?? current
+  return current
+}
+
 export function sortByName<T extends { name: string }>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))
 }
@@ -134,6 +191,11 @@ export const useTreeStore = defineStore('tree', () => {
     return ancestorsOf(index.value, id)
   }
 
+  function resolve(fromSectionId: string, href: string): TreeItem | undefined {
+    const from = section(fromSectionId)
+    return from ? resolveRelative(index.value, from, href) : undefined
+  }
+
   function search(query: string): SearchHit[] {
     return searchTree(index.value, query)
   }
@@ -163,6 +225,7 @@ export const useTreeStore = defineStore('tree', () => {
     parentOf,
     ancestors,
     search,
+    resolve,
     reset,
     createSection: (parentId: string, name: string) =>
       mutate(() => api().createSection(parentId, name)),

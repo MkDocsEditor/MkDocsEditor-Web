@@ -5,7 +5,14 @@ import { ApiClient, setApiClient } from '@/api'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
 
-import { ancestorsOf, indexTree, searchTree, sortByName, useTreeStore } from './tree'
+import {
+  ancestorsOf,
+  indexTree,
+  resolveRelative,
+  searchTree,
+  sortByName,
+  useTreeStore,
+} from './tree'
 
 describe('tree helpers', () => {
   const index = indexTree(sampleTree())
@@ -106,5 +113,36 @@ describe('tree store', () => {
     await expect(store.load()).rejects.toBeDefined()
     expect(store.error).toBeDefined()
     expect(store.loading).toBe(false)
+  })
+})
+
+describe('resolveRelative', () => {
+  const root = sampleTree()
+  const index = indexTree(root)
+  const rezepte = root.subsections[0]!
+  const kuchen = rezepte.subsections[0]!
+  const id = (href: string, from = kuchen) => resolveRelative(index, from, href)?.id
+
+  it('resolves pages, folders and files relative to the page folder', () => {
+    expect(id('Apfelkuchen.md')).toBe('d-apfel')
+    expect(id('./Apfelkuchen.md#zutaten')).toBe('d-apfel')
+    expect(id('../K%C3%BCrbissuppe.md')).toBe('d-suppe')
+    expect(id('../../logo.png')).toBe('r-logo')
+    expect(id('/logo.png')).toBe('r-logo')
+    expect(id('../../Urlaub')).toBe('s-urlaub')
+  })
+
+  it('understands MkDocs directory URLs', () => {
+    expect(id('../Kürbissuppe/')).toBe('d-suppe')
+    expect(id('Apfelkuchen/')).toBe('d-apfel')
+    expect(id('../', rezepte)).toBe('d-index')
+  })
+
+  it('ignores absolute and unknown links', () => {
+    expect(id('https://example.com/x.md')).toBeUndefined()
+    expect(id('mailto:a@b.de')).toBeUndefined()
+    expect(id('#anchor')).toBeUndefined()
+    expect(id('Nope.md')).toBeUndefined()
+    expect(id('../../../../x.png')).toBeUndefined()
   })
 })

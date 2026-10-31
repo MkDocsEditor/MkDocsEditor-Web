@@ -21,7 +21,7 @@ test('logs in, loads the tree and opens a page', async ({ page }) => {
   await main.getByText('Kuchen').click()
   await main.getByText('Apfelkuchen').click()
   await expect(page.getByTestId('document-title')).toHaveText('Apfelkuchen')
-  await expect(page.getByTestId('document-content')).toContainText('Äpfel schälen')
+  await expect(page.getByTestId('markdown-preview')).toContainText('Äpfel schälen')
 
   // a reload keeps the session and the route
   await page.reload()
@@ -55,5 +55,22 @@ test('finds pages with the search', async ({ page }) => {
   await page.getByTestId('search-button').click()
   await page.getByTestId('search-input').locator('input').fill('kurbis')
   await page.getByText('Kürbissuppe').click()
+  await expect(page.getByTestId('document-title')).toHaveText('Kürbissuppe')
+})
+
+test('renders the preview like the wiki, with images and links', async ({ page }) => {
+  await login(page)
+  await page.getByTestId('search-button').click()
+  await page.getByTestId('search-input').locator('input').fill('apfelkuchen')
+  await page.keyboard.press('Enter')
+  const preview = page.getByTestId('markdown-preview')
+  await expect(preview.locator('.admonition.tip .admonition-title')).toHaveText('Tipp')
+  await expect(preview.locator('input[type=checkbox]')).toHaveCount(2)
+  // the image is a resource that needs auth: it is loaded as a blob
+  const image = preview.locator('img[alt="Foto"]')
+  await expect(image).toHaveAttribute('src', /^blob:/)
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1)
+  // links to other pages stay in the app
+  await preview.getByRole('link', { name: 'Kürbissuppe' }).click()
   await expect(page.getByTestId('document-title')).toHaveText('Kürbissuppe')
 })

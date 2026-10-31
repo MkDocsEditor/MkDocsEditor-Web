@@ -41,7 +41,28 @@ function createWiki(root: string): void {
   writeFileSync(path.join(docs, 'index.md'), '# Willkommen\n\nDas ist das Test-Wiki.\n')
   writeFileSync(
     path.join(docs, 'Rezepte', 'Kuchen', 'Apfelkuchen.md'),
-    '# Apfelkuchen\n\n- [ ] Äpfel schälen\n- [x] Mehl kaufen\n',
+    [
+      '# Apfelkuchen',
+      '',
+      'Siehe auch [Kürbissuppe](../Kürbissuppe.md).',
+      '',
+      '![Foto](apfel.png)',
+      '',
+      '!!! tip "Tipp"',
+      '    Die Äpfel **dünn** schneiden.',
+      '',
+      '- [ ] Äpfel schälen',
+      '- [x] Mehl kaufen',
+      '',
+    ].join('\n'),
+  )
+  // a 1x1 PNG
+  writeFileSync(
+    path.join(docs, 'Rezepte', 'Kuchen', 'apfel.png'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
   )
   writeFileSync(path.join(docs, 'Rezepte', 'Kürbissuppe.md'), '# Kürbissuppe\n')
 }
