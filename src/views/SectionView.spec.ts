@@ -13,9 +13,7 @@ import SectionView from './SectionView.vue'
 
 async function setup(id?: string, extraRoutes: Parameters<typeof createFetchMock>[0] = {}) {
   const mock = createFetchMock({ 'GET /section/': () => json(sampleTree()), ...extraRoutes })
-  setApiClient(
-    new ApiClient({ baseUrl: 'http://b', getCredentials: () => null, fetchFn: mock.fetchFn }),
-  )
+  setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
   const result = await mountWithPlugins(SectionView, { props: id ? { id } : {} })
   await useTreeStore().load()
   await flushPromises()

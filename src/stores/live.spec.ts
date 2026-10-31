@@ -21,9 +21,7 @@ describe('live store', () => {
         return json(sampleTree())
       },
     })
-    setApiClient(
-      new ApiClient({ baseUrl: 'http://b', getCredentials: () => null, fetchFn: mock.fetchFn }),
-    )
+    setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
     const live = useLiveStore()
     const first = live.reloadTree()
     await Promise.resolve()

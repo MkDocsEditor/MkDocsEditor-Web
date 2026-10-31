@@ -22,9 +22,7 @@ const { default: DocumentView } = await import('./DocumentView.vue')
 async function setup() {
   localStorage.setItem('mkdocseditor.documentMode', JSON.stringify('split'))
   const mock = createFetchMock({ 'GET /section/': () => json(sampleTree()) })
-  setApiClient(
-    new ApiClient({ baseUrl: 'http://b', getCredentials: () => null, fetchFn: mock.fetchFn }),
-  )
+  setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
   const result = await mountWithPlugins(DocumentView, { props: { id: 'd-apfel' } })
   await useTreeStore().load()
   await flushPromises()

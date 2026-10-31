@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { ApiError } from '@/api'
+import { describeAuthError } from '@/services/authErrors'
 
 export interface Notification {
   id: number
@@ -12,6 +13,8 @@ export interface Notification {
 /** Human readable message for an error. */
 export function describeError(error: unknown): string {
   if (error instanceof ApiError) {
+    const known = describeAuthError(error)
+    if (known) return known
     if (error.isNetworkError) return 'The server is not reachable right now.'
     if (error.isUnauthorized) return 'Please sign in again.'
     if (error.status === 409) return `Not possible right now: ${error.message}`

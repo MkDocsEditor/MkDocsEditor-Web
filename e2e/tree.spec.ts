@@ -6,7 +6,7 @@ test('rejects a wrong password', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('Username').fill('anna')
   await page.getByLabel('Password', { exact: true }).fill('falsch')
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByTestId('login-error')).toContainText('Wrong username or password')
 })
 

@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { mdiAccountCircle, mdiLogout, mdiMagnify, mdiRefresh } from '@mdi/js'
+import {
+  mdiAccountCircle,
+  mdiAccountCog,
+  mdiLogout,
+  mdiMagnify,
+  mdiRefresh,
+  mdiShieldAccount,
+} from '@mdi/js'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
 import { ApiError } from '@/api'
+import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
 import NavTree from '@/components/tree/NavTree.vue'
 import SearchDialog from '@/components/tree/SearchDialog.vue'
+import { roleLabel } from '@/services/accountRules'
 import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
 import { describeError } from '@/stores/notify'
@@ -20,6 +29,8 @@ const router = useRouter()
 const { mobile } = useDisplay()
 
 const showShell = computed(() => auth.isLoggedIn && !route.meta.public)
+/** The wiki needs a full session: a restricted one (2FA setup pending) only sees its account. */
+const showWiki = computed(() => showShell.value && !auth.secondFactorSetupRequired)
 const drawer = ref<boolean | null>(null)
 const searchOpen = ref(false)
 const opened = reactive(new Set<string>())
@@ -46,32 +57,52 @@ async function loadTree(): Promise<void> {
   try {
     await tree.load()
   } catch (error) {
-    if (error instanceof ApiError && error.isUnauthorized) await logout()
+    if (error instanceof ApiError && error.isUnauthorized) auth.endSession()
   }
 }
 
 // Live updates (tree changes, who is editing what) while logged in.
 const live = useLiveStore()
 watch(
-  showShell,
+  showWiki,
   (show) => {
     if (show && !tree.root) void loadTree()
-    if (show) live.start({ onUnauthorized: () => void logout() })
+    if (show) live.start({ onUnauthorized: () => auth.endSession() })
     else live.stop()
   },
   { immediate: true },
 )
 onBeforeUnmount(() => live.stop())
 
+// The session ended (expired, revoked elsewhere, account disabled): back to the login, then
+// back here. Unsaved edits stay in the offline store and sync after the next sign-in.
+watch(
+  () => auth.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) return
+    live.stop()
+    tree.reset()
+    if (!route.meta.public && !loggingOut) {
+      void router.push({ name: 'login', query: { redirect: route.fullPath } })
+    }
+  },
+)
+
+let loggingOut = false
 async function logout(): Promise<void> {
+  loggingOut = true
   live.stop()
-  auth.logout()
-  tree.reset()
-  await router.push({ name: 'login', query: { redirect: route.fullPath } })
+  try {
+    await auth.logout()
+    tree.reset()
+    await router.push({ name: 'login' })
+  } finally {
+    loggingOut = false
+  }
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && showShell.value) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && showWiki.value) {
     event.preventDefault()
     searchOpen.value = true
   }
@@ -82,7 +113,7 @@ window.addEventListener('keydown', onKeydown)
 <template>
   <v-app>
     <v-app-bar color="primary" density="comfortable" flat>
-      <template v-if="showShell" #prepend>
+      <template v-if="showWiki" #prepend>
         <v-app-bar-nav-icon aria-label="Menu" @click="drawer = !drawer" />
       </template>
       <v-app-bar-title>
@@ -90,6 +121,7 @@ window.addEventListener('keydown', onKeydown)
       </v-app-bar-title>
       <template v-if="showShell" #append>
         <v-btn
+          v-if="showWiki"
           :icon="mdiMagnify"
           aria-label="Search"
           data-testid="search-button"
@@ -97,22 +129,45 @@ window.addEventListener('keydown', onKeydown)
         />
         <v-menu v-if="!auth.anonymous">
           <template #activator="{ props }">
-            <v-btn v-bind="props" :icon="mdiAccountCircle" aria-label="Account" />
+            <v-btn
+              v-bind="props"
+              :icon="mdiAccountCircle"
+              aria-label="Account"
+              data-testid="account-menu"
+            />
           </template>
           <v-list density="compact">
             <v-list-item
               :title="auth.displayName || auth.username"
-              :subtitle="auth.role ? `signed in (${auth.role})` : 'signed in'"
+              :subtitle="auth.role ? `signed in (${roleLabel(auth.role)})` : 'signed in'"
             />
             <v-divider />
-            <v-list-item :prepend-icon="mdiLogout" title="Sign out" @click="logout" />
+            <v-list-item
+              :prepend-icon="mdiAccountCog"
+              title="Account"
+              :to="{ name: 'account' }"
+              data-testid="menu-account"
+            />
+            <v-list-item
+              v-if="auth.isAdmin"
+              :prepend-icon="mdiShieldAccount"
+              title="Admin"
+              :to="{ name: 'admin' }"
+              data-testid="menu-admin"
+            />
+            <v-list-item
+              :prepend-icon="mdiLogout"
+              title="Sign out"
+              data-testid="menu-logout"
+              @click="logout"
+            />
           </v-list>
         </v-menu>
       </template>
     </v-app-bar>
 
     <v-navigation-drawer
-      v-if="showShell"
+      v-if="showWiki"
       v-model="drawer"
       :temporary="mobile"
       width="300"
@@ -141,7 +196,7 @@ window.addEventListener('keydown', onKeydown)
     <v-main>
       <v-progress-linear v-if="tree.loading" indeterminate color="secondary" absolute />
       <v-alert
-        v-if="showShell && tree.error && !tree.root"
+        v-if="showWiki && tree.error && !tree.root && !route.meta.standalone"
         type="error"
         variant="tonal"
         class="ma-4"
@@ -151,10 +206,11 @@ window.addEventListener('keydown', onKeydown)
           <v-btn :prepend-icon="mdiRefresh" variant="text" @click="loadTree">Retry</v-btn>
         </template>
       </v-alert>
-      <router-view v-if="!showShell || tree.root" />
+      <router-view v-if="!showWiki || tree.root || route.meta.standalone" />
     </v-main>
 
-    <SearchDialog v-if="showShell" v-model="searchOpen" />
+    <SearchDialog v-if="showWiki" v-model="searchOpen" />
+    <ReauthDialog v-if="showShell" />
     <NotificationHost />
   </v-app>
 </template>

@@ -10,7 +10,15 @@ together, in real time, from a phone or a desktop browser. It talks to the
 
 ## Features
 
-- Sign in with the users configured in the backend (readers, editors, admins).
+- Accounts with roles (readers, editors, admins): sign in with a password, optionally with a
+  code from an authenticator app (TOTP) and recovery codes, or with a passkey. Works with
+  password managers such as Bitwarden (passwords, passkeys and TOTP codes).
+- New accounts by invite link only; the first admin comes from a one-time setup link. A
+  forgotten password is reset with a single-use link from an admin. No email needed.
+- Account page: profile and colour, password, authenticator app, recovery codes, passkeys,
+  and the signed-in devices (sign out one or all others).
+- Admin pages: users (role, disable, delete, reset link), invites with QR code, audit log, and
+  "second factor required" for everyone.
 - Browse the wiki as a folder tree, search pages and folders (Ctrl+K), create, rename and
   delete pages and folders.
 - Upload files into a folder (menu or drag and drop). Paste or drop an image into the editor
@@ -35,13 +43,63 @@ together, in real time, from a phone or a desktop browser. It talks to the
 ## Backend
 
 The client needs the [MkDocsEditor backend](https://github.com/MkDocsEditor/MkDocsEditor-Backend)
-with sync protocol v1 (see its `docs/sync-protocol.md`). Configure users in the backend
-(`server.auth.users`, passwords from `mkdocsrest hash-password`). For the version history,
-set `git.enabled: true` and keep the wiki in a git repository.
+with sync protocol v1 (see its `docs/sync-protocol.md`) and the account system of its
+`docs/auth.md`. For the version history, set `git.enabled: true` and keep the wiki in a git
+repository.
 
 The browser talks to the backend directly, so the backend URL must be reachable from the
 users' browsers. A reverse proxy in front of the backend must pass websocket upgrades for
 `/document/{id}/ws/` and `/events/ws/`.
+
+### Sessions, CORS and passkeys
+
+The web client signs in with a session cookie of the backend (HttpOnly, SameSite=Lax). It
+never sees the session token and stores no password or token in the browser. For the cookie
+to work:
+
+- The web client and the backend must be **same-site**, for example
+  `https://edit.wiki.example.com` and `https://backend.wiki.example.com` (or `localhost` with
+  two ports for development). An IP address and `localhost` are different sites.
+- The backend must list the web client's origin in `server.cors.allowedOrigins`.
+
+Backend settings that matter for the web client:
+
+```yaml
+server:
+  cors:
+    allowedOrigins: ['https://edit.wiki.example.com']
+  trustedProxies: ['10.42.0.0/16'] # the reverse proxy, for client IPs and HTTPS detection
+  auth:
+    # The web client: setup, invite and reset links point here.
+    clientUrl: 'https://edit.wiki.example.com'
+    webauthn:
+      # Passkeys are bound to this domain for good: the client's host or a parent domain.
+      rpId: 'wiki.example.com'
+```
+
+The client serves the link pages `/setup`, `/invite` and `/reset`; the token is in the URL
+fragment (`#mdl_…`), so it never reaches a web server log.
+
+### First start
+
+1. Start the backend with an empty state directory and no `server.auth.users`. It prints a
+   one-time setup link (valid 24 hours):
+
+   ```
+   setup link: https://edit.wiki.example.com/setup#mdl_…
+   setup token: mdl_…
+   ```
+
+   `mkdocsrest setup-link --config …` prints a fresh one while the server runs.
+
+2. Open the link, choose a username and a password (or a passkey). This is the first admin.
+3. Under **Account → Security**, add a passkey or an authenticator app.
+4. Under **Admin → Invites**, create invite links for the others (with role and
+   expiry) and hand them over, for example as QR code.
+
+Upgrading from a backend with `server.auth.users`: the backend imports those users with
+their passwords on the first start; they sign in as before. See the backend's `docs/auth.md`
+section 14.
 
 ## Configuration
 
@@ -101,19 +159,22 @@ Automerge, markdown-it.
 
 | Path                            | Contents                                                                         |
 | ------------------------------- | -------------------------------------------------------------------------------- |
-| `src/api/`                      | REST client and types                                                            |
-| `src/stores/`                   | Pinia stores: auth, tree, live updates, notifications                            |
+| `src/api/`                      | REST client and types, account and admin endpoints                               |
+| `src/stores/`                   | Pinia stores: auth, step-up, tree, live updates, notifications                   |
 | `src/sync/`                     | Automerge session: sync protocol, offline copy (IndexedDB), presence, authorship |
 | `src/editor/`                   | CodeMirror editor, its binding to the session, remote cursors, uploads           |
 | `src/markdown/`                 | Preview rendering (markdown-it with MkDocs extensions)                           |
-| `src/views/`, `src/components/` | Pages and UI components                                                          |
+| `src/views/`, `src/components/` | Pages and UI components (`auth/`, `account/`, `admin/` for the account system)   |
 | `e2e/`                          | Playwright tests and the test backend setup                                      |
 
 ### End-to-end tests
 
 `npm run test:e2e` builds the app, builds the backend, starts it with a small German test
 wiki (a git repository) and three users (admin, editor, reader), and runs the tests in a
-desktop and a phone browser. Run `npx playwright install chromium` once.
+desktop and a phone browser. Run `npx playwright install chromium` once. The account tests
+start extra backends (setup mode, strict rate limits) and use Chrome's virtual authenticator
+for passkeys. The app reaches the test backend as `http://localhost:17414` (same site as the
+app on `http://localhost:4174`).
 
 | Variable           | Default            | Meaning                                                     |
 | ------------------ | ------------------ | ----------------------------------------------------------- |

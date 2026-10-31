@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-import { BACKEND_PORT, WEB_PORT } from './e2e/ports'
+import { BROWSER_BACKEND_URL, WEB_PORT } from './e2e/ports'
 
 /**
  * End-to-end tests against a real MkDocsEditor backend. `e2e/global-setup.ts` builds and starts
@@ -28,7 +28,7 @@ export default defineConfig({
     command: `npx vite build --outDir dist-e2e && npx vite preview --outDir dist-e2e --port ${WEB_PORT} --strictPort`,
     url: `http://localhost:${WEB_PORT}`,
     reuseExistingServer: !process.env.CI,
-    env: { VITE_BACKEND_URL: `http://127.0.0.1:${BACKEND_PORT}` },
+    env: { VITE_BACKEND_URL: BROWSER_BACKEND_URL },
     timeout: 120_000,
   },
 })

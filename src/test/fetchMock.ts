@@ -5,6 +5,7 @@ export interface RecordedRequest {
   url: string
   headers: Headers
   body: unknown
+  credentials: RequestCredentials | undefined
 }
 
 type Handler = (request: RecordedRequest) => Response | Promise<Response>
@@ -20,6 +21,7 @@ export function createFetchMock(routes: Record<string, Handler>) {
       url,
       headers: new Headers(init?.headers),
       body: init?.body,
+      credentials: init?.credentials,
     }
     requests.push(request)
     const path = new URL(url).pathname
