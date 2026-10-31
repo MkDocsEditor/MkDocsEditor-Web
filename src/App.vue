@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { mdiAccountCircle, mdiLogout, mdiMagnify, mdiRefresh } from '@mdi/js'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
@@ -9,6 +9,7 @@ import NotificationHost from '@/components/common/NotificationHost.vue'
 import NavTree from '@/components/tree/NavTree.vue'
 import SearchDialog from '@/components/tree/SearchDialog.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useLiveStore } from '@/stores/live'
 import { describeError } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
@@ -49,15 +50,21 @@ async function loadTree(): Promise<void> {
   }
 }
 
+// Live updates (tree changes, who is editing what) while logged in.
+const live = useLiveStore()
 watch(
   showShell,
   (show) => {
     if (show && !tree.root) void loadTree()
+    if (show) live.start({ onUnauthorized: () => void logout() })
+    else live.stop()
   },
   { immediate: true },
 )
+onBeforeUnmount(() => live.stop())
 
 async function logout(): Promise<void> {
+  live.stop()
   auth.logout()
   tree.reset()
   await router.push({ name: 'login', query: { redirect: route.fullPath } })

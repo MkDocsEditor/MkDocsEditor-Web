@@ -14,17 +14,20 @@ import { useRouter } from 'vue-router'
 import { ApiError } from '@/api'
 import type { TreeItem } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import { formatSize, iconFor } from '@/services/icons'
 import { stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
+import { useLiveStore } from '@/stores/live'
 import { useNotifyStore } from '@/stores/notify'
 import { sortByName, useTreeStore } from '@/stores/tree'
 
 const props = defineProps<{ id?: string }>()
 
 const tree = useTreeStore()
+const live = useLiveStore()
 const notify = useNotifyStore()
 const router = useRouter()
 
@@ -246,6 +249,11 @@ const deleteText = computed(() => {
           @click="open(item)"
         >
           <template #append>
+            <OnlineAvatars
+              v-if="item.type === 'document'"
+              :users="live.usersOf(item.id)"
+              class="mr-1"
+            />
             <v-menu>
               <template #activator="{ props: menuProps }">
                 <v-btn
