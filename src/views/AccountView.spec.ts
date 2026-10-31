@@ -93,6 +93,50 @@ async function confirmReauth(password = 'my password!'): Promise<void> {
 }
 
 describe('AccountView', () => {
+  it('reminds of a put-off passkey at most every few days', async () => {
+    localStorage.clear()
+    // not shown before "Later" was ever chosen
+    const fresh = await mount('profile')
+    expect(document.querySelector('[data-testid="passkey-reminder"]')).toBeNull()
+    fresh.wrapper.unmount()
+
+    localStorage.setItem(
+      'mkdocseditor.passkeyReminder',
+      JSON.stringify({ anna: '2000-01-01T00:00:00Z' }),
+    )
+    const { wrapper } = await mount('profile')
+    const reminder = byTestId('passkey-reminder')
+    expect(reminder.textContent).toContain('no passkey yet')
+    ;(reminder.querySelector('button[aria-label="Remind me later"]') as HTMLElement).click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="passkey-reminder"]')).toBeNull()
+    const until = JSON.parse(localStorage.getItem('mkdocseditor.passkeyReminder') ?? '{}') as {
+      anna: string
+    }
+    expect(Date.parse(until.anna)).toBeGreaterThan(Date.now() + 2 * 24 * 60 * 60 * 1000)
+    wrapper.unmount()
+  })
+
+  it('creates a passkey from the reminder and stops reminding', async () => {
+    localStorage.setItem(
+      'mkdocseditor.passkeyReminder',
+      JSON.stringify({ anna: '2000-01-01T00:00:00Z' }),
+    )
+    const { wrapper, mock } = await mount('profile', {
+      'POST /account/passkeys/begin/': () => json({ ceremonyId: 'c9', publicKey: { c: 9 } }),
+      'POST /account/passkeys/finish/': () => {
+        current = { ...current, passkeyCount: 1 }
+        return json({ id: 'p9', name: 'Passkey', createdAt: '2026-11-01T10:00:00Z' })
+      },
+    })
+    byTestId('passkey-reminder-create').click()
+    await flushPromises()
+    expect(mock.requests.some((r) => r.url.endsWith('/passkeys/finish/'))).toBe(true)
+    expect(document.querySelector('[data-testid="passkey-reminder"]')).toBeNull()
+    expect(localStorage.getItem('mkdocseditor.passkeyReminder')).toBe('{}')
+    wrapper.unmount()
+  })
+
   beforeEach(() => {
     localStorage.clear()
     passkeys.createPasskey.mockClear()

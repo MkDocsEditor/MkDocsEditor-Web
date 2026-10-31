@@ -2,6 +2,7 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import { snoozePasskeyReminder } from '@/services/passkeyReminder'
 import { useAuthStore } from '@/stores/auth'
 import { createFetchMock, json } from '@/test/fetchMock'
 import type { RecordedRequest } from '@/test/fetchMock'
@@ -92,6 +93,29 @@ describe('LoginView', () => {
     expect(login?.credentials).toBe('include')
     expect(useAuthStore().isLoggedIn).toBe(true)
     expect(router.currentRoute.value.fullPath).toBe('/document/d1')
+    wrapper.unmount()
+  })
+
+  it('suggests a passkey after a login without one, unless put off recently', async () => {
+    backend({ 'POST /auth/login/': () => json(sessionResponse({ passkeyCount: 0 })) })
+    const first = await mount('/login?redirect=/document/d1')
+    await fillAndSubmit(first.wrapper)
+    expect(first.router.currentRoute.value.name).toBe('passkey-step')
+    expect(first.router.currentRoute.value.query.redirect).toBe('/document/d1')
+    first.wrapper.unmount()
+
+    snoozePasskeyReminder('anna')
+    const second = await mount('/login?redirect=/document/d1')
+    await fillAndSubmit(second.wrapper)
+    expect(second.router.currentRoute.value.fullPath).toBe('/document/d1')
+    second.wrapper.unmount()
+  })
+
+  it('does not suggest a passkey when the account has one', async () => {
+    backend({ 'POST /auth/login/': () => json(sessionResponse({ passkeyCount: 2 })) })
+    const { wrapper, router } = await mount()
+    await fillAndSubmit(wrapper)
+    expect(router.currentRoute.value.fullPath).toBe('/')
     wrapper.unmount()
   })
 

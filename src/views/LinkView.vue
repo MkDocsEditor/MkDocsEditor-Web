@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthApi } from '@/api'
 import type { LinkInspection, LinkKind, SessionResponse } from '@/api'
 import AuthCard from '@/components/auth/AuthCard.vue'
+import PasskeyStep from '@/components/auth/PasskeyStep.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import {
   displayNameRule,
@@ -145,25 +146,19 @@ function signIn(response: SessionResponse): void {
   finished.value = response
 }
 
-/** Right after creating the account: the fresh login counts as step-up. */
-async function addPasskey(): Promise<void> {
-  busy.value = true
-  error.value = ''
-  try {
-    const ceremony = await api.passkeyAddBegin()
-    const credential = await createPasskey(ceremony.publicKey)
-    await api.passkeyAddFinish(
-      ceremony.ceremonyId,
-      credential,
-      passkeyName.value.trim() || undefined,
-    )
-    addedPasskey.value = true
-    await auth.refresh()
-  } catch (e) {
-    if (!isPasskeyCancel(e)) error.value = describeAuthError(e) ?? describePasskeyError(e)
-  } finally {
-    busy.value = false
-  }
+const passkeySkipped = ref(false)
+/** Right after the account exists: suggest a passkey, unless it was made with one. */
+const showPasskeyStep = computed(
+  () =>
+    canUsePasskeys.value &&
+    !addedPasskey.value &&
+    !passkeySkipped.value &&
+    (finished.value?.user.passkeyCount ?? 0) === 0,
+)
+
+async function passkeyCreated(): Promise<void> {
+  addedPasskey.value = true
+  await auth.refresh()
 }
 
 async function goOn(): Promise<void> {
@@ -250,21 +245,18 @@ watch(
           Welcome, {{ finished.user.displayName }}! Your account is ready.
         </template>
       </v-alert>
-      <p class="mb-3">Make your account safer (also possible later under “Account”):</p>
+      <v-card v-if="showPasskeyStep" variant="outlined" class="pa-4 mb-4">
+        <PasskeyStep
+          :username="finished.user.username"
+          @created="passkeyCreated"
+          @later="passkeySkipped = true"
+        />
+      </v-card>
+      <v-alert v-if="addedPasskey" type="success" variant="tonal" density="compact" class="mb-4">
+        Passkey created. Next time, pick it when you sign in.
+      </v-alert>
+      <p class="mb-3">Also possible later under “Account”:</p>
       <div class="d-flex flex-column ga-2">
-        <v-btn
-          v-if="canUsePasskeys && !addedPasskey"
-          :prepend-icon="mdiFingerprint"
-          variant="tonal"
-          :loading="busy"
-          data-testid="done-add-passkey"
-          @click="addPasskey"
-        >
-          Add a passkey
-        </v-btn>
-        <v-alert v-if="addedPasskey" type="success" variant="tonal" density="compact">
-          Passkey added.
-        </v-alert>
         <v-btn
           :prepend-icon="mdiShieldKey"
           variant="tonal"

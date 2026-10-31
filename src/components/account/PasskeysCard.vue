@@ -6,13 +6,9 @@ import { useAuthApi } from '@/api'
 import type { AccountInfo, Passkey } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { formatTime } from '@/services/accountRules'
+import { addPasskey } from '@/services/addPasskey'
 import { describeAuthError } from '@/services/authErrors'
-import {
-  createPasskey,
-  describePasskeyError,
-  isPasskeyCancel,
-  passkeysSupported,
-} from '@/services/passkeys'
+import { describePasskeyError, isPasskeyCancel, passkeysSupported } from '@/services/passkeys'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
@@ -47,9 +43,7 @@ async function load(): Promise<void> {
 async function add(): Promise<void> {
   busy.value = true
   try {
-    const ceremony = await reauth.run(() => api.passkeyAddBegin())
-    const credential = await createPasskey(ceremony.publicKey)
-    await api.passkeyAddFinish(ceremony.ceremonyId, credential)
+    await addPasskey()
     notify.success('Passkey added')
     await load()
     emit('changed')

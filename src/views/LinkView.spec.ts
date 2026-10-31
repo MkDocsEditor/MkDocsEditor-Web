@@ -2,6 +2,7 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import { passkeyReminderDue } from '@/services/passkeyReminder'
 import { useAuthStore } from '@/stores/auth'
 import { createFetchMock, json } from '@/test/fetchMock'
 import type { RecordedRequest } from '@/test/fetchMock'
@@ -113,6 +114,58 @@ describe('LinkView', () => {
     })
     expect(useAuthStore().username).toBe('anna2')
     expect(wrapper.find('[data-testid="link-done"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('suggests a passkey right after the account is created', async () => {
+    const mock = backend({
+      'POST /auth/link/inspect/': () => json(invite),
+      'POST /auth/link/redeem/': () =>
+        json(sessionResponse({ username: 'anna2', role: 'editor', passkeyCount: 0 })),
+      'POST /account/passkeys/begin/': () => json({ ceremonyId: 'c1', publicKey: { a: 1 } }),
+      'POST /account/passkeys/finish/': () =>
+        json({ id: 'p1', name: 'Passkey', createdAt: '2026-11-01T10:00:00Z' }),
+      'GET /auth/whoami/': () => json({ ...sessionResponse().user, username: 'anna2' }),
+    })
+    const { wrapper } = await mount('/invite#mdl_token1')
+    await wrapper.find('input[name="username"]').setValue('anna2')
+    const passwords = wrapper.findAll('input[type="password"]')
+    await passwords[0]?.setValue('a long password')
+    await passwords[1]?.setValue('a long password')
+    await flushPromises()
+    await wrapper.find('[data-testid="link-form"]').trigger('submit')
+    await flushPromises()
+    const step = wrapper.find('[data-testid="passkey-step"]')
+    expect(step.text()).toContain('Sign in with a passkey next time')
+    expect(step.text()).toContain('Bitwarden')
+    await step.find('[data-testid="passkey-step-create"]').trigger('click')
+    await flushPromises()
+    expect(passkeys.createPasskey).toHaveBeenCalledWith({ a: 1 })
+    expect(mock.requests.some((r) => r.url.endsWith('/account/passkeys/finish/'))).toBe(true)
+    // no step-up: the new session may add a passkey right away
+    expect(mock.requests.some((r) => r.url.includes('/auth/reauth/'))).toBe(false)
+    expect(wrapper.find('[data-testid="passkey-step"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="link-done"]').text()).toContain('Passkey created')
+    wrapper.unmount()
+  })
+
+  it('puts the passkey off with "Later"', async () => {
+    backend({
+      'POST /auth/link/inspect/': () => json(invite),
+      'POST /auth/link/redeem/': () =>
+        json(sessionResponse({ username: 'anna2', role: 'editor', passkeyCount: 0 })),
+    })
+    const { wrapper } = await mount('/invite#mdl_token1')
+    await wrapper.find('input[name="username"]').setValue('anna2')
+    const passwords = wrapper.findAll('input[type="password"]')
+    await passwords[0]?.setValue('a long password')
+    await passwords[1]?.setValue('a long password')
+    await flushPromises()
+    await wrapper.find('[data-testid="link-form"]').trigger('submit')
+    await flushPromises()
+    await wrapper.find('[data-testid="passkey-step-later"]').trigger('click')
+    expect(wrapper.find('[data-testid="passkey-step"]').exists()).toBe(false)
+    expect(passkeyReminderDue('anna2')).toBe(false)
     wrapper.unmount()
   })
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiAccount, mdiDevices, mdiShieldLock } from '@mdi/js'
+import { mdiAccount, mdiDevices, mdiFingerprint, mdiShieldLock } from '@mdi/js'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -10,8 +10,17 @@ import PasswordCard from '@/components/account/PasswordCard.vue'
 import ProfileCard from '@/components/account/ProfileCard.vue'
 import SessionsCard from '@/components/account/SessionsCard.vue'
 import TotpCard from '@/components/account/TotpCard.vue'
+import { addPasskey } from '@/services/addPasskey'
+import { describeAuthError } from '@/services/authErrors'
+import {
+  passkeyReminderDue,
+  passkeyReminderSkipped,
+  snoozePasskeyReminder,
+} from '@/services/passkeyReminder'
+import { describePasskeyError, isPasskeyCancel, passkeysSupported } from '@/services/passkeys'
 import { useAuthStore } from '@/stores/auth'
-import { describeError } from '@/stores/notify'
+import { describeError, useNotifyStore } from '@/stores/notify'
+import { ReauthCancelled } from '@/stores/reauth'
 
 const props = defineProps<{ tab?: string }>()
 
@@ -38,6 +47,42 @@ async function load(): Promise<void> {
   }
 }
 
+/**
+ * After "Later" on the passkey step: a reminder here, at most every few days. Closing it
+ * pauses it again.
+ */
+const reminderHidden = ref(false)
+const reminderBusy = ref(false)
+const showPasskeyReminder = computed(
+  () =>
+    !reminderHidden.value &&
+    account.value?.passkeyCount === 0 &&
+    auth.passkeysEnabled &&
+    passkeysSupported() &&
+    passkeyReminderSkipped(account.value.username) &&
+    passkeyReminderDue(account.value.username),
+)
+
+function dismissReminder(): void {
+  if (account.value) snoozePasskeyReminder(account.value.username)
+  reminderHidden.value = true
+}
+
+async function createFromReminder(): Promise<void> {
+  reminderBusy.value = true
+  try {
+    await addPasskey()
+    reminderHidden.value = true
+    useNotifyStore().success('Passkey created. Next time, pick it when you sign in.')
+    await load()
+  } catch (e) {
+    if (e instanceof ReauthCancelled || isPasskeyCancel(e)) return
+    useNotifyStore().error(describeAuthError(e) ?? describePasskeyError(e))
+  } finally {
+    reminderBusy.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -55,6 +100,33 @@ onMounted(load)
       continue to the wiki.
     </v-alert>
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
+    <v-alert
+      v-if="showPasskeyReminder"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+      :icon="mdiFingerprint"
+      title="Sign in with a passkey next time"
+      closable
+      close-label="Remind me later"
+      data-testid="passkey-reminder"
+      @click:close="dismissReminder"
+    >
+      You have no passkey yet. With one, you confirm with your fingerprint, face or screen lock
+      instead of typing the password. Password managers like Bitwarden can store it.
+      <div class="mt-3">
+        <v-btn
+          color="primary"
+          variant="flat"
+          size="small"
+          :loading="reminderBusy"
+          data-testid="passkey-reminder-create"
+          @click="createFromReminder"
+        >
+          Create passkey
+        </v-btn>
+      </div>
+    </v-alert>
 
     <v-tabs v-model="current" show-arrows class="mb-4" aria-label="Account sections">
       <v-tab value="profile" :prepend-icon="mdiAccount" :disabled="auth.secondFactorSetupRequired">

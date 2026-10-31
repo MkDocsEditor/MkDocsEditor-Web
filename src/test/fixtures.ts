@@ -88,7 +88,7 @@ export function sessionResponse(overrides: Partial<UserInfo> = {}): SessionRespo
     session: {
       id: 'sess-1',
       type: 'cookie',
-      deviceName: 'Firefox auf Linux',
+      deviceName: 'Firefox on Linux',
       createdAt: '2026-10-31T10:00:00Z',
       expiresAt: '2027-01-29T10:00:00Z',
       idleExpiresAt: '2026-11-30T10:00:00Z',
