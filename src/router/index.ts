@@ -59,6 +59,12 @@ export function buildRouter(history: RouterHistory): Router {
         meta: { standalone: true },
       },
       {
+        path: '/welcome/passkey',
+        name: 'passkey-step',
+        component: () => import('@/views/PasskeyStepView.vue'),
+        meta: { standalone: true },
+      },
+      {
         path: '/admin/:tab(users|invites|audit|settings)?',
         name: 'admin',
         component: () => import('@/views/AdminView.vue'),

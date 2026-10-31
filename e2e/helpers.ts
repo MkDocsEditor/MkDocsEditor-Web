@@ -19,7 +19,19 @@ export async function login(page: Page, user: User = E2E_USER): Promise<void> {
     await expect(password).toHaveValue(user.password, { timeout: 500 })
   }).toPass({ timeout: 15_000 })
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+  await skipPasskeyStep(page)
+}
+
+/**
+ * After a password login, accounts without a passkey see the passkey step first. Tests that
+ * are not about it choose "Later" and go on to the wiki.
+ */
+export async function skipPasskeyStep(page: Page): Promise<void> {
+  const title = page.getByTestId('section-title')
+  const step = page.getByTestId('passkey-step')
+  await expect(title.or(step).first()).toBeVisible()
+  if (await step.isVisible()) await page.getByTestId('passkey-step-later').click()
+  await expect(title).toHaveText('Wiki')
 }
 
 /** A logged-in page in its own browser context (own storage, like another device). */

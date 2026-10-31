@@ -9,6 +9,7 @@ import AuthCard from '@/components/auth/AuthCard.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import { describeAuthError } from '@/services/authErrors'
 import { vFocusOnce } from '@/services/focusOnce'
+import { passkeyReminderDue } from '@/services/passkeyReminder'
 import { getConfig } from '@/services/config'
 import {
   cancelPasskeyRequest,
@@ -49,9 +50,24 @@ async function done(response: SessionResponse): Promise<void> {
   auth.signedIn(response.user)
   if (response.user.secondFactorSetupRequired) {
     await router.replace({ name: 'account', params: { tab: 'security' } })
+  } else if (offerPasskey(response)) {
+    const target = redirectTarget()
+    await router.replace({
+      name: 'passkey-step',
+      query: target !== '/' ? { redirect: target } : {},
+    })
   } else {
     await router.replace(redirectTarget())
   }
+}
+
+/** After a login without a passkey: suggest one, unless "Later" was chosen recently. */
+function offerPasskey(response: SessionResponse): boolean {
+  return (
+    canUsePasskeys.value &&
+    response.user.passkeyCount === 0 &&
+    passkeyReminderDue(response.user.username)
+  )
 }
 
 function showError(e: unknown): void {

@@ -16,7 +16,7 @@ import {
 } from './accounts'
 import { addVirtualAuthenticator, totp } from './authenticators'
 import { backendBinary, createWiki, startBackend, TMP, waitForLog, writeConfig } from './backend'
-import { login } from './helpers'
+import { backendRequest, login, skipPasskeyStep } from './helpers'
 import { BACKEND_URL } from './ports'
 
 test.describe('accounts', () => {
@@ -161,7 +161,7 @@ test.describe('accounts', () => {
     // the next time step: the current one was used for the enrollment
     await otp.fill(totp(secret, Date.now() + 30_000))
     await page.getByRole('button', { name: 'Confirm', exact: true }).click()
-    await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+    await skipPasskeyStep(page)
 
     await logout(page)
     await expect(page.getByLabel('Username')).toBeFocused()
@@ -171,7 +171,7 @@ test.describe('accounts', () => {
     await page.getByRole('button', { name: 'Use a recovery code' }).click()
     await page.getByTestId('recovery-input').locator('input').fill(codes[0]!.toUpperCase())
     await page.getByRole('button', { name: 'Confirm', exact: true }).click()
-    await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+    await skipPasskeyStep(page)
     await accountMenu(page, 'menu-account')
     await page.getByRole('tab', { name: 'Security' }).click()
     await expect(page.getByTestId('recovery-left')).toContainText('9 of 10')
@@ -205,6 +205,76 @@ test.describe('accounts', () => {
     await page.getByTestId('passkey-login').click()
     await authenticator.setPresence(true)
     await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+  })
+
+  test('the passkey step after an invite, and the reminder after "Later"', async ({
+    browser,
+  }, testInfo) => {
+    await requireEndpoints('/account/', '/account/passkeys/')
+    // the invite: the done page offers the passkey right away
+    const invite = await backendRequest('POST', '/admin/invites/', {
+      role: 'editor',
+      expiresInHours: 1,
+    })
+    const { token } = (await invite.json()) as { token: string }
+    const page = await devicePage(browser, testInfo)
+    const authenticator = await addVirtualAuthenticator(page)
+    await page.goto(`/invite#${token}`)
+    const username = uniqueUsername('stepper', testInfo)
+    const password = 'lemonade in the shade 7'
+    const form = page.getByTestId('link-form')
+    await expect(form.getByLabel('Username')).toBeFocused()
+    await form.getByLabel('Username').fill(username)
+    await form.getByLabel('New password', { exact: true }).fill(password)
+    await form.getByLabel('Repeat the password').fill(password)
+    await page.getByRole('button', { name: 'Create account' }).click()
+    const step = page.getByTestId('passkey-step')
+    await expect(step).toContainText('Sign in with a passkey next time')
+    await expect(step).toContainText('Bitwarden')
+    await step.getByTestId('passkey-step-create').click()
+    await confirmIfAsked(page, page.getByTestId('link-done').getByText('Passkey created'), password)
+    expect(await authenticator.credentialCount()).toBe(1)
+
+    // a second account without a passkey: "Later" after the login, then the reminder
+    const other = await createAccount(uniqueUsername('later', testInfo))
+    const probe = await fetch(`${BACKEND_URL}/auth/login/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ ...other, sessionType: 'bearer' }),
+    })
+    const { user } = (await probe.json()) as { user: { passkeyCount?: number } }
+    test.skip(user.passkeyCount === undefined, 'the backend does not send passkeyCount yet')
+
+    const laptop = await devicePage(browser, testInfo)
+    await laptop.goto('/login')
+    await expect(laptop.getByLabel('Username')).toBeFocused()
+    await laptop.getByLabel('Username').fill(other.username)
+    await laptop.getByLabel('Password', { exact: true }).fill(other.password)
+    await laptop.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await expect(laptop).toHaveURL(/\/welcome\/passkey/)
+    await laptop.getByTestId('passkey-step-later').click()
+    await expect(laptop.getByTestId('section-title')).toHaveText('Wiki')
+    await accountMenu(laptop, 'menu-account')
+    await expect(laptop.getByRole('heading', { name: 'Account' })).toBeVisible()
+    await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
+
+    // a few days later
+    await laptop.evaluate((name) => {
+      localStorage.setItem(
+        'mkdocseditor.passkeyReminder',
+        JSON.stringify({ [name.toLowerCase()]: '2000-01-01T00:00:00Z' }),
+      )
+    }, other.username)
+    await laptop.reload()
+    await expect(laptop.getByTestId('passkey-reminder')).toBeVisible()
+    await laptop
+      .getByTestId('passkey-reminder')
+      .getByRole('button', { name: 'Remind me later' })
+      .click()
+    await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
+    await laptop.reload()
+    await expect(laptop.getByRole('heading', { name: 'Account' })).toBeVisible()
+    await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
   })
 
   test('a reset link sets a new password and signs out the old sessions', async ({

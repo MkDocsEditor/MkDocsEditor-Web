@@ -19,6 +19,8 @@ export interface UserInfo {
   role: Role
   color: string
   secondFactorSetupRequired?: boolean
+  /** Number of passkeys, for the passkey step after a sign-in. Missing on older backends. */
+  passkeyCount?: number
 }
 
 export interface SessionInfo {
