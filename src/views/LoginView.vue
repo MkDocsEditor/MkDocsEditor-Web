@@ -51,6 +51,7 @@ async function submit(): Promise<void> {
       <v-card-text>
         <v-form data-testid="login-form" @submit.prevent="submit">
           <v-text-field
+            id="login-username"
             v-model="username"
             label="Benutzername"
             name="username"
@@ -61,6 +62,7 @@ async function submit(): Promise<void> {
             autofocus
           />
           <v-text-field
+            id="login-password"
             v-model="password"
             label="Passwort"
             name="password"

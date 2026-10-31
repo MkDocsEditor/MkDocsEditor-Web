@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { backendRequest, documentContent, editorText, login, openEditor } from './helpers'
+import { backendRequest, documentContent, editorText, login, openEditor, testName } from './helpers'
 
 // a 1x1 PNG
 const PNG = Buffer.from(
@@ -21,7 +21,7 @@ async function folder(name: string): Promise<Section | undefined> {
 }
 
 test('uploads files into a folder and pasted images into a page', async ({ page }, testInfo) => {
-  const name = `Fotos ${testInfo.project.name}`
+  const name = testName('Fotos', testInfo)
   const root = (await (await backendRequest('GET', '/section/')).json()) as Section
   const created = await backendRequest('POST', '/section/', { parent: root.id, name })
   expect(created.ok).toBe(true)
