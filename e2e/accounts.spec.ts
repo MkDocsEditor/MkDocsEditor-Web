@@ -251,9 +251,8 @@ test.describe('accounts', () => {
     await laptop.getByLabel('Username').fill(other.username)
     await laptop.getByLabel('Password', { exact: true }).fill(other.password)
     await laptop.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await expect(laptop).toHaveURL(/\/welcome\/passkey/)
-    await laptop.getByTestId('passkey-step-later').click()
-    await expect(laptop.getByTestId('section-title')).toHaveText('Wiki')
+    await expect(laptop).toHaveURL(/\/welcome\?passkey=1/)
+    await skipPasskeyStep(laptop)
     await accountMenu(laptop, 'menu-account')
     await expect(laptop.getByRole('heading', { name: 'Account' })).toBeVisible()
     await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
@@ -275,6 +274,75 @@ test.describe('accounts', () => {
     await laptop.reload()
     await expect(laptop.getByRole('heading', { name: 'Account' })).toBeVisible()
     await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
+  })
+
+  test('a connect link for the Android app', async ({ browser }, testInfo) => {
+    await requireEndpoints('/account/device-links/')
+    const user = await createAccount(uniqueUsername('android', testInfo))
+    const page = await devicePage(browser, testInfo, user)
+    await accountMenu(page, 'menu-account')
+    await page.getByRole('tab', { name: 'Devices' }).click()
+    const card = page.getByTestId('connect-app')
+    await expect(card.getByRole('link', { name: 'Obtainium' })).toHaveAttribute(
+      'href',
+      'https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/MkDocsEditor/MkDocsEditor-Android',
+    )
+    await card.getByTestId('connect-create').click()
+    await confirmIfAsked(page, card.getByTestId('qr-code'), user.password)
+    await expect(card.getByTestId('connect-countdown')).toContainText(/Valid for [45]:\d\d/)
+    const connectUrl = await card.getByTestId('connect-open').getAttribute('href')
+    expect(connectUrl).toMatch(/^http:\/\/localhost:4174\/connect#[A-Za-z0-9_-]+$/)
+
+    // the page the link opens when the app is not installed: no request carries the payload
+    const fragment = connectUrl!.split('#')[1]!
+    const phone = await devicePage(browser, testInfo)
+    const requests: string[] = []
+    phone.on('request', (request) => requests.push(request.url()))
+    await phone.goto(connectUrl!)
+    await expect(phone.getByTestId('connect-info')).toContainText(user.username)
+    await expect(phone.getByTestId('connect-open-app')).toHaveAttribute(
+      'href',
+      `mkdocseditor://connect#${fragment}`,
+    )
+    await expect(phone.getByTestId('connect-install')).toContainText('Obtainium')
+    expect(requests.some((url) => url.includes(fragment))).toBe(false)
+
+    // the app redeems it; the account page shows the device
+    const payload = JSON.parse(Buffer.from(fragment, 'base64url').toString('utf8')) as {
+      token: string
+      username: string
+    }
+    const redeemed = await fetch(`${BACKEND_URL}/auth/device-link/redeem/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({
+        token: payload.token,
+        username: payload.username,
+        deviceName: 'Pixel 8',
+      }),
+    })
+    expect(redeemed.ok, await redeemed.clone().text()).toBe(true)
+    await expect(card.getByTestId('connect-done')).toContainText('Pixel 8')
+  })
+
+  test('on a phone, the first login offers the Android app', async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'phone-sized screens only')
+    await requireEndpoints('/account/device-links/')
+    const user = await createAccount(uniqueUsername('mobile', testInfo))
+    const page = await devicePage(browser, testInfo)
+    await page.goto('/login')
+    await expect(page.getByLabel('Username')).toBeFocused()
+    await page.getByLabel('Username').fill(user.username)
+    await page.getByLabel('Password', { exact: true }).fill(user.password)
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+    const hint = page.getByTestId('android-hint')
+    await expect(hint).toContainText('Use the Android app')
+    // the passkey step comes first on the same page; put it off
+    await page.getByTestId('passkey-step-later').click()
+    await hint.getByTestId('android-hint-open').click()
+    // without the app, the link opens the connect page on this phone
+    await expect(page).toHaveURL(/\/connect#[A-Za-z0-9_-]+$/)
+    await expect(page.getByTestId('connect-info')).toContainText(user.username)
   })
 
   test('a reset link sets a new password and signs out the old sessions', async ({

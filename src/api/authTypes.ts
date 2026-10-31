@@ -185,3 +185,41 @@ export interface AuditQuery {
   type?: string
   account?: string
 }
+
+export type DeviceLinkStatus = 'pending' | 'redeemed' | 'expired' | 'revoked'
+
+/** A pairing link for the Android app (`docs/auth.md`, device pairing). */
+export interface DeviceLink {
+  id: string
+  status: DeviceLinkStatus
+  deviceName: string | null
+  createdAt: string
+  expiresAt: string
+  redeemedAt?: string | null
+  redeemedDeviceName?: string | null
+  sessionId?: string | null
+  revokedAt?: string | null
+}
+
+export interface CreatedDeviceLink {
+  deviceLink: DeviceLink
+  token: string
+  expiresAt: string
+  /** `{clientUrl}/connect#<payload>`, null when the backend has no `clientUrl`. */
+  connectUrl: string | null
+}
+
+/** `GET /server-info/`: public facts for onboarding screens. */
+export interface ServerInfo {
+  name: string
+  version: string
+  protocolVersion: number
+  backendUrl: string | null
+  wikiUrl: string | null
+  webClientUrl: string | null
+  setupRequired: boolean
+  authDisabled: boolean
+  passkeys: { enabled: boolean; rpId?: string }
+  loginMethods: string[]
+  require2FA: boolean
+}

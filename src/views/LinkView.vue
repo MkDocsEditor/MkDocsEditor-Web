@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthApi } from '@/api'
 import type { LinkInspection, LinkKind, SessionResponse } from '@/api'
 import AuthCard from '@/components/auth/AuthCard.vue'
+import AndroidAppHint from '@/components/auth/AndroidAppHint.vue'
 import PasskeyStep from '@/components/auth/PasskeyStep.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import {
@@ -16,6 +17,7 @@ import {
   sameAsRule,
   usernameRule,
 } from '@/services/accountRules'
+import { useAndroidHint } from '@/services/androidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { describeAuthError } from '@/services/authErrors'
 import {
@@ -147,6 +149,13 @@ function signIn(response: SessionResponse): void {
 }
 
 const passkeySkipped = ref(false)
+const androidHintWanted = useAndroidHint()
+/** Decided when the page opens, because showing the hint marks it as seen. */
+const appHintOffered = !isReset.value && androidHintWanted()
+const appHintDismissed = ref(false)
+const showAppHint = computed(
+  () => appHintOffered && !appHintDismissed.value && finished.value !== null && !isReset.value,
+)
 /** Right after the account exists: suggest a passkey, unless it was made with one. */
 const showPasskeyStep = computed(
   () =>
@@ -255,6 +264,9 @@ watch(
       <v-alert v-if="addedPasskey" type="success" variant="tonal" density="compact" class="mb-4">
         Passkey created. Next time, pick it when you sign in.
       </v-alert>
+      <v-card v-if="showAppHint" variant="outlined" class="pa-4 mb-4">
+        <AndroidAppHint @dismissed="appHintDismissed = true" />
+      </v-card>
       <p class="mb-3">Also possible later under “Account”:</p>
       <div class="d-flex flex-column ga-2">
         <v-btn

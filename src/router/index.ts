@@ -43,6 +43,12 @@ export function buildRouter(history: RouterHistory): Router {
         props: { kind: 'reset' },
         meta: { public: true },
       },
+      {
+        path: '/connect',
+        name: 'connect',
+        component: () => import('@/views/ConnectView.vue'),
+        meta: { public: true },
+      },
       { path: '/', name: 'home', component: SectionView },
       { path: '/section/:id', name: 'section', component: SectionView, props: true },
       {
@@ -59,9 +65,9 @@ export function buildRouter(history: RouterHistory): Router {
         meta: { standalone: true },
       },
       {
-        path: '/welcome/passkey',
-        name: 'passkey-step',
-        component: () => import('@/views/PasskeyStepView.vue'),
+        path: '/welcome',
+        name: 'welcome',
+        component: () => import('@/views/WelcomeView.vue'),
         meta: { standalone: true },
       },
       {

@@ -8,6 +8,7 @@ import type { SecondFactorMethod, SessionResponse } from '@/api'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import { describeAuthError } from '@/services/authErrors'
+import { useAndroidHint } from '@/services/androidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { passkeyReminderDue } from '@/services/passkeyReminder'
 import { getConfig } from '@/services/config'
@@ -25,6 +26,8 @@ const auth = useAuthStore()
 const api = useAuthApi()
 const route = useRoute()
 const router = useRouter()
+/** On a phone, the first login in this browser also suggests the Android app. */
+const androidHintWanted = useAndroidHint()
 
 const username = ref(auth.username)
 const password = ref('')
@@ -50,11 +53,15 @@ async function done(response: SessionResponse): Promise<void> {
   auth.signedIn(response.user)
   if (response.user.secondFactorSetupRequired) {
     await router.replace({ name: 'account', params: { tab: 'security' } })
-  } else if (offerPasskey(response)) {
+  } else if (offerPasskey(response) || androidHintWanted()) {
     const target = redirectTarget()
     await router.replace({
-      name: 'passkey-step',
-      query: target !== '/' ? { redirect: target } : {},
+      name: 'welcome',
+      query: {
+        ...(offerPasskey(response) ? { passkey: '1' } : {}),
+        ...(androidHintWanted() ? { app: '1' } : {}),
+        ...(target !== '/' ? { redirect: target } : {}),
+      },
     })
   } else {
     await router.replace(redirectTarget())

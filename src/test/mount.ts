@@ -35,7 +35,8 @@ export function stubRoutes(): RouteRecordRaw[] {
       props: true,
       meta: { standalone: true },
     },
-    { path: '/welcome/passkey', name: 'passkey-step', component: Stub, meta: { standalone: true } },
+    { path: '/welcome', name: 'welcome', component: Stub, meta: { standalone: true } },
+    { path: '/connect', name: 'connect', component: Stub, meta: { public: true } },
     {
       path: '/admin/:tab?',
       name: 'admin',

@@ -93,6 +93,84 @@ async function confirmReauth(password = 'my password!'): Promise<void> {
 }
 
 describe('AccountView', () => {
+  it('creates a connect link for the Android app after a step-up and follows it', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+    vi.setSystemTime(new Date('2026-11-01T12:00:00Z'))
+    let status = 'pending'
+    const deviceLink = () => ({
+      id: 'dl1',
+      status,
+      deviceName: null,
+      createdAt: '2026-11-01T12:00:00Z',
+      expiresAt: '2026-11-01T12:05:00Z',
+      redeemedDeviceName: status === 'redeemed' ? 'Pixel 8' : null,
+    })
+    const { wrapper, mock } = await mount('sessions', {
+      ...stepUpOnce('POST /account/device-links/', () =>
+        json({
+          deviceLink: deviceLink(),
+          token: 'mdd_x',
+          expiresAt: '2026-11-01T12:05:00Z',
+          connectUrl: 'https://edit.example.com/connect#payload1',
+        }),
+      ),
+      'GET /account/device-links/dl1/': () => json(deviceLink()),
+    })
+    const card = () => wrapper.find('[data-testid="connect-app"]')
+    expect(card().text()).toContain('Obtainium')
+    expect(card().find('a').attributes('href')).toBe(
+      'https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/MkDocsEditor/MkDocsEditor-Android',
+    )
+    await card().find('[data-testid="connect-create"]').trigger('click')
+    await flushPromises()
+    await confirmReauth()
+    expect(card().find('[data-testid="qr-code"]').exists()).toBe(true)
+    expect(card().find('[data-testid="connect-open"]').attributes('href')).toBe(
+      'https://edit.example.com/connect#payload1',
+    )
+    expect(card().find('[data-testid="connect-countdown"]').text()).toContain('5:00')
+    vi.advanceTimersByTime(61_000)
+    await flushPromises()
+    expect(card().find('[data-testid="connect-countdown"]').text()).toContain('3:59')
+
+    status = 'redeemed'
+    vi.advanceTimersByTime(2_000)
+    await flushPromises()
+    expect(card().find('[data-testid="connect-done"]').text()).toContain('Pixel 8')
+    // the device list reloads to show the new session
+    expect(mock.requests.filter((r) => r.url.endsWith('/account/sessions/')).length).toBe(2)
+    vi.useRealTimers()
+    wrapper.unmount()
+  })
+
+  it('cancels a connect link', async () => {
+    const { wrapper, mock } = await mount('sessions', {
+      'POST /account/device-links/': () =>
+        json({
+          deviceLink: {
+            id: 'dl2',
+            status: 'pending',
+            deviceName: null,
+            createdAt: '',
+            expiresAt: '2099-01-01T00:00:00Z',
+          },
+          token: 'mdd_y',
+          expiresAt: '2099-01-01T00:00:00Z',
+          connectUrl: null,
+        }),
+      'DELETE /account/device-links/dl2/': () => new Response(null, { status: 204 }),
+    })
+    await wrapper.find('[data-testid="connect-create"]').trigger('click')
+    await flushPromises()
+    // without clientUrl the client builds the link itself
+    expect(wrapper.find('[data-testid="connect-open"]').attributes('href')).toMatch(/\/connect#/)
+    await wrapper.find('[data-testid="connect-revoke"]').trigger('click')
+    await flushPromises()
+    expect(mock.requests.some((r) => r.method === 'DELETE' && r.url.endsWith('/dl2/'))).toBe(true)
+    expect(wrapper.find('[data-testid="connect-create"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('reminds of a put-off passkey at most every few days', async () => {
     localStorage.clear()
     // not shown before "Later" was ever chosen

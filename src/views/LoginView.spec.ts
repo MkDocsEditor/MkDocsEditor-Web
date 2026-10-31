@@ -66,6 +66,8 @@ const bad =
 describe('LoginView', () => {
   beforeEach(() => {
     localStorage.clear()
+    // the Android app hint has its own test
+    localStorage.setItem('mkdocseditor.androidHintShown', '1')
     passkeys.getPasskey.mockClear()
     passkeys.autofill = false
   })
@@ -100,8 +102,11 @@ describe('LoginView', () => {
     backend({ 'POST /auth/login/': () => json(sessionResponse({ passkeyCount: 0 })) })
     const first = await mount('/login?redirect=/document/d1')
     await fillAndSubmit(first.wrapper)
-    expect(first.router.currentRoute.value.name).toBe('passkey-step')
-    expect(first.router.currentRoute.value.query.redirect).toBe('/document/d1')
+    expect(first.router.currentRoute.value.name).toBe('welcome')
+    expect(first.router.currentRoute.value.query).toEqual({
+      passkey: '1',
+      redirect: '/document/d1',
+    })
     first.wrapper.unmount()
 
     snoozePasskeyReminder('anna')
@@ -116,6 +121,17 @@ describe('LoginView', () => {
     const { wrapper, router } = await mount()
     await fillAndSubmit(wrapper)
     expect(router.currentRoute.value.fullPath).toBe('/')
+    wrapper.unmount()
+  })
+
+  it('suggests the Android app after the first login on a phone', async () => {
+    localStorage.removeItem('mkdocseditor.androidHintShown')
+    backend({ 'POST /auth/login/': () => json(sessionResponse({ passkeyCount: 1 })) })
+    const { wrapper, router } = await mount()
+    await fillAndSubmit(wrapper)
+    // jsdom has no layout, so Vuetify treats it as a small screen
+    expect(router.currentRoute.value.name).toBe('welcome')
+    expect(router.currentRoute.value.query).toEqual({ app: '1' })
     wrapper.unmount()
   })
 

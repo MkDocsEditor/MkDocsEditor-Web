@@ -6,7 +6,9 @@ import type {
   AuditPage,
   AuditQuery,
   AuthStatus,
+  CreatedDeviceLink,
   CreatedLink,
+  DeviceLink,
   InstanceSettings,
   LinkInfo,
   LinkInspection,
@@ -15,6 +17,7 @@ import type {
   PasskeyCeremony,
   Role,
   SessionInfo,
+  ServerInfo,
   SessionResponse,
   TotpEnrollment,
 } from './authTypes'
@@ -47,6 +50,10 @@ export class AuthApi {
 
   status(): Promise<AuthStatus> {
     return this.get('/auth/status', true)
+  }
+
+  serverInfo(): Promise<ServerInfo> {
+    return this.get('/server-info', true)
   }
 
   login(username: string, password: string): Promise<LoginResponse> {
@@ -175,6 +182,20 @@ export class AuthApi {
 
   deletePasskey(id: string): Promise<void> {
     return this.del(`/account/passkeys/${encodeURIComponent(id)}`)
+  }
+
+  // device pairing (the Android app)
+
+  createDeviceLink(deviceName?: string): Promise<CreatedDeviceLink> {
+    return this.send('POST', '/account/device-links', deviceName ? { deviceName } : {})
+  }
+
+  deviceLink(id: string): Promise<DeviceLink> {
+    return this.get(`/account/device-links/${encodeURIComponent(id)}`)
+  }
+
+  revokeDeviceLink(id: string): Promise<void> {
+    return this.del(`/account/device-links/${encodeURIComponent(id)}`)
   }
 
   sessions(): Promise<SessionInfo[]> {
