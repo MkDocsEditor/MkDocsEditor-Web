@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.git
+.github
+e2e/.tmp
+test-results
+playwright-report
+public/config.json

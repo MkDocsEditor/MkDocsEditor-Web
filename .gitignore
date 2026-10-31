@@ -1,27 +1,16 @@
+node_modules
+dist
+coverage
+*.local
+*.log
+*.tsbuildinfo
+.eslintcache
 .DS_Store
-
-node_modules/*
-!node_modules/bin
-node_modules/bin/*
-!node_modules/bin/vue-cli-service
-!node_modules/bin/vue-cli-service.cmd
-
-/dist
-
-# local env files
-.env.local
-.env.*.local
-
-# Log files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Editor directories and files
 .idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw*
+.vscode/*
+!.vscode/extensions.json
+test-results/
+playwright-report/
+e2e/.tmp/
+# runtime config for local development, see public/config.example.json
+public/config.json

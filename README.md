@@ -1,51 +1,57 @@
-<p align="center" style="font-size: xx-large;">
-  <img alt="Logo" src="src/assets/logo.png" width="144"/> </br>
+<p align="center">
+  <img alt="Logo" src="public/logo.png" width="144"/>
 </p>
 
 # MkDocsEditor-Web
-MkDocsEditor web client.
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/dd328233-3e6d-4fd8-8cf1-ce036691592b/deploy-status)](https://mkdocseditor.netlify.app/#/)
+Web client for [MkDocsEditor](https://github.com/MkDocsEditor): browse and edit an MkDocs wiki
+together, in real time, from a phone or a desktop browser. It talks to the
+[MkDocsEditor backend](https://github.com/MkDocsEditor/MkDocsEditor-Backend).
 
-# :warning: Work In Progress
+> The client is being rewritten with Vue 3. This README grows with it.
 
-This project is still a work in progress and is **not yet ready for production**.
+## Development
 
+Requirements: Node.js 22.
 
-# Developer Instructions
-
-## Project setup
-```
-npm install -g @vue/cli
-npm install -g @vue/cli-service-global
-```
-
-### Compiles and hot-reloads for development
-```
-npm run serve
-```
-
-User friendly debugging in chrome:
-```
-https://github.com/vuejs/vue-devtools#vue-devtools
+```bash
+npm install
+npm run dev          # dev server on http://localhost:5173
+npm run lint         # ESLint
+npm run format:check # Prettier
+npm run type-check   # vue-tsc
+npm run test:unit    # Vitest
+npm run build        # type-check and production build into dist/
 ```
 
-### Compiles and minifies for production
-```
-npm run build
+## Configuration
+
+The app reads `config.json` next to `index.html` at start:
+
+```json
+{
+  "backendUrl": "http://localhost:7413",
+  "wikiUrl": "https://wiki.example.com"
+}
 ```
 
-### Lints and fixes files
-```
-npm run lint
+For local development, copy `public/config.example.json` to `public/config.json` (ignored by
+git), or set `VITE_BACKEND_URL` / `VITE_WIKI_URL`.
+
+## Docker
+
+```bash
+docker build -t mkdocseditor-web .
+docker run -p 8080:8080 \
+  -e MKDOCSEDITOR_BACKEND_URL=https://mkdocs-api.example.com \
+  -e MKDOCSEDITOR_WIKI_URL=https://wiki.example.com \
+  mkdocseditor-web
 ```
 
-# Contributing
-GitHub is for social coding: if you want to write code, I encourage
-contributions through pull requests from forks of this repository.
-Create GitHub tickets for bugs and new features and comment on the ones
-that you are interested in.
+The image is based on `nginx-unprivileged`, runs as uid 101, listens on port 8080 and writes
+`config.json` from the environment at start. Pushes to `master` publish
+`mkdocseditor/mkdocseditor-web:latest` on Docker Hub.
 
 # License
 
-**AGPLv3+**
+AGPLv3+
