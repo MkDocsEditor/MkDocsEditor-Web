@@ -190,6 +190,22 @@ describe('Automerge session', () => {
     expect(anna.mirror).toBe(anna.session.getText())
   })
 
+  it('keeps file changes after the insert position in a new epoch', async () => {
+    const server = new FakeSyncServer(A, 'Zeile 1')
+    const anna = client(server, 'anna')
+    await online(anna)
+    server.offline = true
+    server.restartWithNewEpoch('Zeile 1\nvon Git\n')
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('offline'))
+    anna.insert(7, ' offline')
+    server.offline = false
+    await vi.waitFor(() => {
+      expect(server.text).toBe('Zeile 1 offline\nvon Git\n')
+      expect(anna.session.getText()).toBe(server.text)
+    })
+    expect(anna.mirror).toBe(anna.session.getText())
+  })
+
   it('shares cursors as Automerge cursors that follow concurrent edits', async () => {
     const server = new FakeSyncServer(A, 'Hallo Welt')
     const anna = client(server, 'anna')
@@ -274,5 +290,42 @@ describe('rebaseChanges', () => {
   it('never drops inserted text', () => {
     const changes = rebaseChanges('abc', [{ from: 1, to: 1, insert: 'X' }], 'völlig anders')
     expect(applyChanges('völlig anders', changes)).toContain('X')
+  })
+
+  it('keeps text the server added after the insert position', () => {
+    const base = 'Titel\nVor dem Absturz.'
+    const unsynced = [{ from: base.length, to: base.length, insert: ' Offline.' }]
+    const target = 'Titel\nVor dem Absturz.\nVon Git.\n'
+    expect(applyChanges(target, rebaseChanges(base, unsynced, target))).toBe(
+      'Titel\nVor dem Absturz. Offline.\nVon Git.\n',
+    )
+  })
+
+  it('keeps text the server added before the insert position', () => {
+    const base = 'eins\nzwei\n'
+    const unsynced = [{ from: 0, to: 0, insert: 'null\n' }]
+    const target = 'eins\nneu\nzwei\n'
+    expect(applyChanges(target, rebaseChanges(base, unsynced, target))).toBe(
+      'null\neins\nneu\nzwei\n',
+    )
+  })
+
+  it('places a middle edit by its local context when both ends changed', () => {
+    const base = 'Anfang\nApfel und Birne\nEnde'
+    const from = base.indexOf('Birne')
+    const unsynced = [{ from, to: from + 5, insert: 'Kirsche' }]
+    const target = 'Neuer Anfang\nApfel und Birne\nNeues Ende'
+    expect(applyChanges(target, rebaseChanges(base, unsynced, target))).toBe(
+      'Neuer Anfang\nApfel und Kirsche\nNeues Ende',
+    )
+  })
+
+  it('does not replace text that differs from what was removed', () => {
+    const base = 'a b c'
+    const unsynced = [{ from: 2, to: 3, insert: 'X' }]
+    const target = 'a B c'
+    const result = applyChanges(target, rebaseChanges(base, unsynced, target))
+    expect(result).toContain('B')
+    expect(result).toContain('X')
   })
 })
