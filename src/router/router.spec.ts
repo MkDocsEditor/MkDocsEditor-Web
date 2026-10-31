@@ -27,9 +27,9 @@ describe('router guard', () => {
   it('sends logged-out users to the login page and keeps the target', async () => {
     backend(401)
     const router = buildRouter(createMemoryHistory())
-    await router.push('/?view=1')
+    await router.push('/document/d1')
     expect(router.currentRoute.value.name).toBe('login')
-    expect(router.currentRoute.value.query.redirect).toBe('/?view=1')
+    expect(router.currentRoute.value.query.redirect).toBe('/document/d1')
   })
 
   it('lets users in when the backend needs no login', async () => {

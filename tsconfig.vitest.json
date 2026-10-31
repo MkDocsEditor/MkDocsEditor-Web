@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.app.json",
-  "include": ["src/**/__tests__/*", "src/**/*.spec.ts", "env.d.ts"],
+  "include": ["src/**/__tests__/*", "src/**/*.spec.ts", "src/test/**/*", "env.d.ts"],
   "exclude": [],
   "compilerOptions": {
     "lib": [],

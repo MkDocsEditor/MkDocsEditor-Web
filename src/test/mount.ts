@@ -16,13 +16,25 @@ export interface MountOptions {
   pinia?: Pinia
 }
 
+const Stub = { render: () => null }
+
+/** The app's named routes with empty components. */
+export function stubRoutes(): RouteRecordRaw[] {
+  return [
+    { path: '/login', name: 'login', component: Stub, meta: { public: true } },
+    { path: '/', name: 'home', component: Stub },
+    { path: '/section/:id', name: 'section', component: Stub, props: true },
+    { path: '/document/:id', name: 'document', component: Stub, props: true },
+  ]
+}
+
 /** Mounts a component inside VApp with Vuetify, Pinia and a memory router. */
 export async function mountWithPlugins(component: Component, options: MountOptions = {}) {
   const pinia = options.pinia ?? createPinia()
   setActivePinia(pinia)
   const router: Router = createRouter({
     history: createMemoryHistory(),
-    routes: options.routes ?? [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
+    routes: options.routes ?? stubRoutes(),
   })
   await router.push(options.initialPath ?? '/')
   await router.isReady()
