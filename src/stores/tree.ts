@@ -3,6 +3,7 @@ import { computed, ref, shallowRef } from 'vue'
 
 import { useApi } from '@/api'
 import type { DocumentModel, ResourceModel, SectionModel, TreeItem } from '@/api'
+import { sanitizeFileName, shrinkImage, uniqueName } from '@/services/upload'
 
 export interface TreeIndex {
   items: Map<string, TreeItem>
@@ -208,6 +209,28 @@ export const useTreeStore = defineStore('tree', () => {
 
   const api = () => useApi()
 
+  /**
+   * Uploads files into a section under unique, safe names (large photos are scaled down).
+   * Returns the created resources in order. Reloads the tree once at the end.
+   */
+  async function uploadFiles(sectionId: string, files: readonly File[]): Promise<ResourceModel[]> {
+    const created: ResourceModel[] = []
+    try {
+      for (const file of files) {
+        const current = section(sectionId)
+        if (!current) throw new Error('Ordner nicht gefunden')
+        const name = uniqueName(
+          { ...current, resources: [...current.resources, ...created] },
+          sanitizeFileName(file.name),
+        )
+        created.push(await api().uploadResource(sectionId, name, await shrinkImage(file)))
+      }
+    } finally {
+      await load()
+    }
+    return created
+  }
+
   function reset(): void {
     root.value = null
     error.value = null
@@ -227,6 +250,7 @@ export const useTreeStore = defineStore('tree', () => {
     search,
     resolve,
     reset,
+    uploadFiles,
     createSection: (parentId: string, name: string) =>
       mutate(() => api().createSection(parentId, name)),
     renameSection: (id: string, name: string) => mutate(() => api().renameSection(id, name)),

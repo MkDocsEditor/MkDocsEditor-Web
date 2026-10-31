@@ -18,8 +18,11 @@ import { useDisplay } from 'vuetify'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
+import { isImage } from '@/services/icons'
 import { local, readJson, writeJson } from '@/services/storage'
+import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
+import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { createDocumentSession } from '@/sync'
 import type { DocumentSession } from '@/sync'
@@ -27,6 +30,7 @@ import type { DocumentSession } from '@/sync'
 const props = defineProps<{ id: string }>()
 
 const tree = useTreeStore()
+const notify = useNotifyStore()
 const router = useRouter()
 const { mobile } = useDisplay()
 
@@ -54,6 +58,23 @@ const session = shallowRef<DocumentSession | null>(null)
 const text = ref('')
 const ready = ref(false)
 const topLine = ref(0)
+
+/** Pasted or dropped files go into the folder of the page. */
+const uploading = ref(0)
+async function upload(files: File[]): Promise<string[]> {
+  const folder = parentId.value
+  if (!folder) return []
+  uploading.value++
+  try {
+    const created = await tree.uploadFiles(folder, files)
+    return created.map((r) => markdownFor(r.name, isImage(r.name)))
+  } catch (error) {
+    notify.error(error, 'Hochladen fehlgeschlagen')
+    throw error
+  } finally {
+    uploading.value--
+  }
+}
 
 /** Set while following a server-side rename: the session already moved to the new id. */
 let renamedTo: string | null = null
@@ -226,6 +247,13 @@ function initials(name: string): string {
     </div>
 
     <v-divider />
+    <v-progress-linear
+      v-if="uploading > 0"
+      indeterminate
+      color="primary"
+      aria-label="Datei wird hochgeladen"
+      data-testid="upload-progress"
+    />
 
     <div v-if="session" class="document-view__panes" :class="`document-view__panes--${mode}`">
       <div v-show="mode !== 'preview'" class="document-view__pane">
@@ -235,6 +263,7 @@ function initials(name: string): string {
           :key="id"
           :session="session"
           :show-authorship="showAuthorship"
+          :upload="upload"
           @change="(t: string) => (text = t)"
           @top-line="(l: number) => (topLine = l)"
         />

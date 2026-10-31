@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { login } from './helpers'
+import { login, testName } from './helpers'
 
 test('rejects a wrong password', async ({ page }) => {
   await page.goto('/')
@@ -30,7 +30,7 @@ test('logs in, loads the tree and opens a page', async ({ page }) => {
 
 test('creates, renames and deletes a folder', async ({ page }, testInfo) => {
   await login(page)
-  const name = `Ordner ${testInfo.project.name}`
+  const name = testName('Ordner', testInfo)
   await page.getByTestId('create-fab').click()
   await page.getByTestId('create-section').click()
   await page.getByTestId('name-input').locator('input').fill(name)

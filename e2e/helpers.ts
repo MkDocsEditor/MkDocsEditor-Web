@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test'
-import type { Browser, Page } from '@playwright/test'
+import type { Browser, Page, TestInfo } from '@playwright/test'
 
 import { BACKEND_PORT, E2E_USER } from './ports'
 
@@ -8,8 +8,16 @@ type User = { username: string; password: string }
 export async function login(page: Page, user: User = E2E_USER): Promise<void> {
   await page.goto('/')
   await expect(page).toHaveURL(/\/login/)
-  await page.getByLabel('Benutzername').fill(user.username)
-  await page.getByLabel('Passwort', { exact: true }).fill(user.password)
+  const username = page.getByLabel('Benutzername')
+  const password = page.getByLabel('Passwort', { exact: true })
+  // The username field focuses itself after mounting. On a slow machine that can happen during
+  // a fill and send the text to the wrong field, so check both values and fill again if needed.
+  await expect(async () => {
+    await username.fill(user.username)
+    await password.fill(user.password)
+    await expect(username).toHaveValue(user.username, { timeout: 500 })
+    await expect(password).toHaveValue(user.password, { timeout: 500 })
+  }).toPass({ timeout: 15_000 })
   await page.getByRole('button', { name: 'Anmelden' }).click()
   await expect(page.getByTestId('section-title')).toHaveText('Wiki')
 }
@@ -37,6 +45,14 @@ export async function backendRequest(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+}
+
+/**
+ * A name that is unique per browser project and attempt, so a retry does not collide with what
+ * the failed attempt left in the shared test wiki.
+ */
+export function testName(base: string, testInfo: TestInfo): string {
+  return `${base} ${testInfo.project.name}${testInfo.retry > 0 ? ` ${testInfo.retry}` : ''}`
 }
 
 /** Creates a page in the root folder over REST and returns its id. */

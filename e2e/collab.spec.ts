@@ -5,6 +5,7 @@ import {
   documentContent,
   editorText,
   openEditor,
+  testName,
   typeAt,
   userPage,
 } from './helpers'
@@ -12,7 +13,7 @@ import { USERS } from './ports'
 
 test.describe('live collaboration', () => {
   test('two users editing the same page converge', async ({ browser }, testInfo) => {
-    const id = await createDocument(`Gemeinsam ${testInfo.project.name}`)
+    const id = await createDocument(testName('Gemeinsam', testInfo))
     const alice = await userPage(browser, USERS.alice, testInfo.project.use)
     const bob = await userPage(browser, USERS.bob, testInfo.project.use)
     await openEditor(alice, id)
@@ -36,7 +37,7 @@ test.describe('live collaboration', () => {
   })
 
   test('edits made offline are merged after the reconnect', async ({ browser }, testInfo) => {
-    const id = await createDocument(`Offline ${testInfo.project.name}`)
+    const id = await createDocument(testName('Offline', testInfo))
     const alice = await userPage(browser, USERS.alice, testInfo.project.use)
     const bob = await userPage(browser, USERS.bob, testInfo.project.use)
     await openEditor(alice, id)
@@ -59,7 +60,7 @@ test.describe('live collaboration', () => {
   })
 
   test('readers can watch but not edit', async ({ browser }, testInfo) => {
-    const id = await createDocument(`Lesen ${testInfo.project.name}`)
+    const id = await createDocument(testName('Lesen', testInfo))
     const alice = await userPage(browser, USERS.alice, testInfo.project.use)
     const carol = await userPage(browser, USERS.carol, testInfo.project.use)
     await openEditor(alice, id)
