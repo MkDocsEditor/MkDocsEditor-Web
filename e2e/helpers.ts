@@ -1,9 +1,9 @@
 import { expect } from '@playwright/test'
 import type { Browser, Page, TestInfo } from '@playwright/test'
 
-import { BACKEND_PORT, E2E_USER } from './ports'
+import { BACKEND_URL, E2E_USER } from './ports'
 
-type User = { username: string; password: string }
+export type User = { username: string; password: string }
 
 export async function login(page: Page, user: User = E2E_USER): Promise<void> {
   await page.goto('/')
@@ -18,7 +18,7 @@ export async function login(page: Page, user: User = E2E_USER): Promise<void> {
     await expect(username).toHaveValue(user.username, { timeout: 500 })
     await expect(password).toHaveValue(user.password, { timeout: 500 })
   }).toPass({ timeout: 15_000 })
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByTestId('section-title')).toHaveText('Wiki')
 }
 
@@ -30,18 +30,47 @@ export async function userPage(browser: Browser, user: User, options = {}): Prom
   return page
 }
 
+const bearerTokens = new Map<string, string>()
+
+/** A bearer session for REST calls from the tests, like a native client gets. */
+export async function bearerToken(user: User, baseUrl = BACKEND_URL): Promise<string> {
+  const key = `${baseUrl} ${user.username}`
+  const cached = bearerTokens.get(key)
+  if (cached) return cached
+  const response = await fetch(`${baseUrl}/auth/login/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify({
+      username: user.username,
+      password: user.password,
+      sessionType: 'bearer',
+      deviceName: 'e2e',
+    }),
+  })
+  const body = (await response.json()) as { token?: string; status?: string }
+  if (!response.ok || !body.token)
+    throw new Error(`bearer login of ${user.username} failed: ${JSON.stringify(body)}`)
+  bearerTokens.set(key, body.token)
+  return body.token
+}
+
+/** Forgets a cached bearer session (after its sessions were revoked). */
+export function forgetBearer(user: User, baseUrl = BACKEND_URL): void {
+  bearerTokens.delete(`${baseUrl} ${user.username}`)
+}
+
 export async function backendRequest(
   method: string,
   path: string,
   body?: unknown,
   user: User = E2E_USER,
+  baseUrl = BACKEND_URL,
 ): Promise<Response> {
-  return fetch(`http://127.0.0.1:${BACKEND_PORT}${path}`, {
+  return fetch(`${baseUrl}${path}`, {
     method,
     headers: {
-      Authorization: `Basic ${Buffer.from(`${user.username}:${user.password}`).toString('base64')}`,
+      Authorization: `Bearer ${await bearerToken(user, baseUrl)}`,
       'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })

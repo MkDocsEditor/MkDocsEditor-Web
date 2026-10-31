@@ -2,16 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { createFetchMock, json } from '@/test/fetchMock'
 
-import { ApiClient, ApiError, basicAuthHeader } from './client'
+import { ApiClient, ApiError } from './client'
 
-const credentials = { username: 'anna', password: 'Grüße!' }
-
-function client(routes: Parameters<typeof createFetchMock>[0], creds = credentials) {
+function client(routes: Parameters<typeof createFetchMock>[0], onSessionEnded?: () => void) {
   const mock = createFetchMock(routes)
   const api = new ApiClient({
     baseUrl: 'http://backend:7413/',
-    getCredentials: () => creds,
     fetchFn: mock.fetchFn,
+    onSessionEnded,
   })
   return { api, ...mock }
 }
@@ -27,15 +25,6 @@ const tree = {
   resources: [],
 }
 
-describe('basicAuthHeader', () => {
-  it('encodes UTF-8 credentials', () => {
-    expect(basicAuthHeader({ username: 'a', password: 'b' })).toBe('Basic YTpi')
-    const decoded = atob(basicAuthHeader(credentials).slice(6))
-    const bytes = Uint8Array.from(decoded, (c) => c.charCodeAt(0))
-    expect(new TextDecoder().decode(bytes)).toBe('anna:Grüße!')
-  })
-})
-
 describe('ApiClient', () => {
   it('builds URLs with trailing slashes and websocket URLs', () => {
     const { api } = client({})
@@ -43,18 +32,19 @@ describe('ApiClient', () => {
     expect(api.wsUrl('/document/d1/ws', { token: 't' })).toBe(
       'ws://backend:7413/document/d1/ws/?token=t',
     )
-    const secure = new ApiClient({ baseUrl: 'https://x.example', getCredentials: () => null })
+    const secure = new ApiClient({ baseUrl: 'https://x.example' })
     expect(secure.wsUrl('/events/ws')).toBe('wss://x.example/events/ws/')
   })
 
-  it('loads and normalizes the tree with basic auth', async () => {
+  it('loads and normalizes the tree with the session cookie', async () => {
     const { api, requests } = client({ 'GET /section/': () => json(tree) })
     const root = await api.getTree()
     expect(root.type).toBe('section')
     expect(root.subsections[0]?.type).toBe('section')
     expect(root.subsections[0]?.subsections).toEqual([])
     expect(root.documents[0]?.type).toBe('document')
-    expect(requests[0]?.headers.get('Authorization')).toBe(basicAuthHeader(credentials))
+    expect(requests[0]?.credentials).toBe('include')
+    expect(requests[0]?.headers.has('Authorization')).toBe(false)
   })
 
   it('sends JSON bodies for create and rename', async () => {
@@ -96,37 +86,61 @@ describe('ApiClient', () => {
   it('reports network failures with status 0', async () => {
     const api = new ApiClient({
       baseUrl: 'http://backend',
-      getCredentials: () => null,
       fetchFn: () => Promise.reject(new TypeError('Failed to fetch')),
     })
     const error = (await api.getTree().catch((e: unknown) => e)) as ApiError
     expect(error.isNetworkError).toBe(true)
   })
 
-  it('whoami uses the given credentials and falls back to the tree on old backends', async () => {
-    const { api, requests } = client({ 'GET /section/': () => json(tree) })
-    const who = await api.whoami({ username: 'ben', password: 'x' })
-    expect(who.username).toBe('ben')
-    expect(requests.map((r) => r.url)).toEqual([
-      'http://backend:7413/auth/whoami/',
-      'http://backend:7413/section/',
-    ])
-    expect(requests[1]?.headers.get('Authorization')).toBe(
-      basicAuthHeader({ username: 'ben', password: 'x' }),
+  it('reports an ended session once, but not for quiet requests', async () => {
+    let ended = 0
+    const { api } = client(
+      {
+        'GET /section/': () => json({ code: 'unauthenticated', message: 'no session' }, 401),
+        'GET /auth/whoami/': () => json({ code: 'unauthenticated', message: 'no session' }, 401),
+        'POST /auth/login/': () =>
+          json({ code: 'invalid-credentials', message: 'invalid username or password' }, 401),
+      },
+      () => ended++,
     )
+    await expect(api.getTree()).rejects.toMatchObject({ status: 401, code: 'unauthenticated' })
+    expect(ended).toBe(1)
+    await expect(api.whoami({ quiet401: true })).rejects.toMatchObject({ status: 401 })
+    expect(ended).toBe(1)
+    // a wrong password is not an ended session
+    await expect(api.json('POST', '/auth/login', { json: {} })).rejects.toMatchObject({
+      code: 'invalid-credentials',
+      isSessionEnded: false,
+    })
+    expect(ended).toBe(1)
   })
 
-  it('whoami without credentials sends no auth header', async () => {
-    const { api, requests } = client({ 'GET /auth/whoami/': () => json({ username: '' }) })
-    await api.whoami(null)
-    expect(requests[0]?.headers.has('Authorization')).toBe(false)
+  it('reads error codes, details and Retry-After', async () => {
+    const { api } = client({
+      'POST /auth/login/': () =>
+        new Response(
+          JSON.stringify({
+            code: 'rate-limited',
+            message: 'slow down',
+            details: { retryAfter: 7 },
+          }),
+          { status: 429, headers: { 'Retry-After': '12' } },
+        ),
+      'POST /auth/link/redeem/': () =>
+        json({ code: 'weak-password', message: 'weak', details: { reason: 'common' } }, 400),
+    })
+    const limited = (await api.json('POST', '/auth/login').catch((e: unknown) => e)) as ApiError
+    expect(limited.isRateLimited).toBe(true)
+    expect(limited.retryAfter).toBe(12)
+    expect(limited.message).toBe('slow down')
+    const weak = (await api.json('POST', '/auth/link/redeem').catch((e: unknown) => e)) as ApiError
+    expect(weak.code).toBe('weak-password')
+    expect(weak.details).toEqual({ reason: 'common' })
   })
 
-  it('token returns null when the backend has no token endpoint', async () => {
-    const { api } = client({})
-    expect(await api.token()).toBeNull()
-    const { api: api2 } = client({ 'POST /auth/token/': () => json({ token: 'abc' }) })
-    expect(await api2.token()).toEqual({ token: 'abc' })
+  it('returns undefined for 204 responses', async () => {
+    const { api } = client({ 'POST /auth/logout/': () => new Response(null, { status: 204 }) })
+    expect(await api.json('POST', '/auth/logout')).toBeUndefined()
   })
 })
 

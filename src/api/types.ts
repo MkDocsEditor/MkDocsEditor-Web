@@ -32,16 +32,16 @@ export interface SectionModel {
 export type TreeItem = SectionModel | DocumentModel | ResourceModel
 export type ItemType = TreeItem['type']
 
-export interface Credentials {
-  username: string
-  password: string
-}
-
+/** `GET /auth/whoami/` */
 export interface WhoAmI {
+  id?: string
   username: string
   displayName?: string
   role?: 'admin' | 'editor' | 'reader'
   color?: string
+  authMethod?: 'session' | 'app-token' | 'basic' | 'anonymous'
+  secondFactorSetupRequired?: boolean
+  sessionId?: string
 }
 
 /** A websocket ticket: single use, valid for 60 seconds. */
@@ -64,11 +64,6 @@ export interface AuthorshipResponse {
   runs: { start: number; end: number; actorId: string; username: string }[]
 }
 
-export interface TokenResponse {
-  token: string
-  expiresAt?: string
-}
-
 export interface RevisionAuthor {
   name: string
   email: string
@@ -87,3 +82,5 @@ export interface Revision {
   /** The file's path in that commit (history follows renames). */
   path: string
 }
+
+export type * from './authTypes'

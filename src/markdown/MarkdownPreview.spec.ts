@@ -14,9 +14,7 @@ async function setup(text: string) {
     'GET /section/': () => json(sampleTree()),
     'GET /resource/r-logo/content/': () => new Response('png', { status: 200 }),
   })
-  setApiClient(
-    new ApiClient({ baseUrl: 'http://b', getCredentials: () => null, fetchFn: mock.fetchFn }),
-  )
+  setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
   URL.createObjectURL = vi.fn(() => 'blob:logo')
   const result = await mountWithPlugins(MarkdownPreview, {
     props: { text, sectionId: 's-kuchen' },

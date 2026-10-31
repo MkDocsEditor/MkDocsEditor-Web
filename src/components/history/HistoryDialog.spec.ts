@@ -29,9 +29,7 @@ const revisions = [
 
 async function setup(routes: Parameters<typeof createFetchMock>[0], readOnly = false) {
   const mock = createFetchMock(routes)
-  setApiClient(
-    new ApiClient({ baseUrl: 'http://b', getCredentials: () => null, fetchFn: mock.fetchFn }),
-  )
+  setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
   const open = ref(false)
   const Host = defineComponent({
     setup: () => () =>

@@ -93,9 +93,7 @@ describe('tree store', () => {
         return new Response(null, { status: 200 })
       },
     })
-    setApiClient(
-      new ApiClient({ baseUrl: 'http://b', getCredentials: () => null, fetchFn: mock.fetchFn }),
-    )
+    setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
     return mock
   }
 
@@ -138,7 +136,7 @@ describe('tree store', () => {
     setApiClient(
       new ApiClient({
         baseUrl: 'http://b',
-        getCredentials: () => null,
+
         fetchFn: () => Promise.reject(new Error('offline')),
       }),
     )

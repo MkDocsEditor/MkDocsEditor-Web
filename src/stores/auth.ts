@@ -1,83 +1,174 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { ApiError, setCredentialsProvider, useApi } from '@/api'
-import type { Credentials } from '@/api'
+import { ApiError, setSessionEndedHandler, useApi, useAuthApi } from '@/api'
+import type { AuthStatus, UserInfo, WhoAmI } from '@/api'
+import { clearResourceUrls } from '@/services/resourceUrls'
 import { local, readJson, remove, session, writeJson } from '@/services/storage'
 
-const STORAGE_KEY = 'mkdocseditor.credentials'
+/** The last signed-in user, so the app also starts while the server is unreachable. */
+const USER_KEY = 'mkdocseditor.user'
+/** Where older versions kept the Basic auth password. Removed on start. */
+const LEGACY_CREDENTIALS_KEY = 'mkdocseditor.credentials'
+
+export type SignedInUser = Pick<UserInfo, 'username' | 'displayName' | 'role' | 'color'> & {
+  id?: string
+  secondFactorSetupRequired?: boolean
+}
+
+function fromWhoAmI(who: WhoAmI | UserInfo): SignedInUser {
+  return {
+    id: who.id,
+    username: who.username,
+    displayName: who.displayName || who.username,
+    role: who.role ?? 'reader',
+    color: who.color ?? '',
+    secondFactorSetupRequired: who.secondFactorSetupRequired ?? false,
+  }
+}
 
 /**
- * Login state. The backend uses HTTP Basic auth, so the credentials are kept for every request:
- * in localStorage with "remember me", otherwise in sessionStorage (gone when the tab closes).
+ * Sign-in state. The session itself is an HttpOnly cookie of the backend, so the client only
+ * keeps who is signed in. A request that finds the session ended (401) signs out locally;
+ * unsaved edits stay in the offline store and sync after the next sign-in.
  */
 export const useAuthStore = defineStore('auth', () => {
-  const credentials = ref<Credentials | null>(
-    readJson<Credentials>(local(), STORAGE_KEY) ?? readJson<Credentials>(session(), STORAGE_KEY),
-  )
-  /** True when the backend needs no login at all. */
+  remove(local(), LEGACY_CREDENTIALS_KEY)
+  remove(session(), LEGACY_CREDENTIALS_KEY)
+
+  const user = ref<SignedInUser | null>(readJson<SignedInUser>(local(), USER_KEY))
+  const status = ref<AuthStatus | null>(null)
+  /** True when the backend runs without authentication (`server.auth.disabled`). */
   const anonymous = ref(false)
-  const username = ref<string>(credentials.value?.username ?? '')
-  const displayName = ref<string>('')
-  const role = ref<string>('')
+  /** The last check could not reach the server; the stored user is trusted until it can. */
+  const offline = ref(false)
+  /** Set when the session ended on its own (expired or revoked), for a hint on the login page. */
+  const sessionEnded = ref(false)
   const checked = ref(false)
 
-  setCredentialsProvider(() => credentials.value)
+  const isLoggedIn = computed(() => anonymous.value || user.value !== null)
+  const username = computed(() => user.value?.username ?? '')
+  const displayName = computed(() => user.value?.displayName ?? '')
+  const role = computed(() => user.value?.role ?? (anonymous.value ? 'admin' : ''))
+  const isAdmin = computed(() => role.value === 'admin')
+  const setupRequired = computed(() => status.value?.setupRequired === true)
+  const passkeysEnabled = computed(() => status.value?.passkeys.enabled === true)
+  const passwordPolicy = computed(
+    () => status.value?.passwordPolicy ?? { minLength: 10, maxLength: 256 },
+  )
+  /** The instance requires 2FA and this account has none yet: only the setup is reachable. */
+  const secondFactorSetupRequired = computed(() => user.value?.secondFactorSetupRequired === true)
 
-  const isLoggedIn = computed(() => anonymous.value || credentials.value !== null)
-
-  async function login(user: string, password: string, remember: boolean): Promise<void> {
-    const candidate = { username: user.trim(), password }
-    const who = await useApi().whoami(candidate)
-    credentials.value = candidate
-    username.value = who.username || candidate.username
-    displayName.value = who.displayName ?? ''
-    role.value = who.role ?? ''
-    anonymous.value = false
-    checked.value = true
-    remove(local(), STORAGE_KEY)
-    remove(session(), STORAGE_KEY)
-    writeJson(remember ? local() : session(), STORAGE_KEY, candidate)
+  function setUser(next: WhoAmI | UserInfo | null): void {
+    user.value = next ? fromWhoAmI(next) : null
+    if (user.value) writeJson(local(), USER_KEY, user.value)
+    else remove(local(), USER_KEY)
   }
 
-  function logout(): void {
-    credentials.value = null
+  /** After a login, a link redemption or a passkey login. */
+  function signedIn(next: UserInfo): void {
+    setUser(next)
     anonymous.value = false
-    username.value = ''
-    checked.value = false
-    remove(local(), STORAGE_KEY)
-    remove(session(), STORAGE_KEY)
+    offline.value = false
+    sessionEnded.value = false
+    checked.value = true
+    if (status.value) status.value = { ...status.value, setupRequired: false }
+  }
+
+  function clearLocal(): void {
+    setUser(null)
+    clearResourceUrls()
+  }
+
+  /** The backend said the session is gone (expired, revoked, account disabled). */
+  function endSession(): void {
+    if (!user.value) return
+    clearLocal()
+    sessionEnded.value = true
+  }
+
+  setSessionEndedHandler(endSession)
+
+  async function loadStatus(): Promise<AuthStatus | null> {
+    try {
+      status.value = await useAuthApi().status()
+    } catch (error) {
+      if (!(error instanceof ApiError)) throw error
+      // An older backend without /auth/status/ or an unreachable one: keep going.
+      if (error.isNetworkError) throw error
+    }
+    return status.value
   }
 
   /**
-   * Called once before the first protected route. Without stored credentials it checks whether
-   * the backend is open (no auth configured). Stored credentials are trusted until a request
-   * fails with 401, so the app also starts while the server is unreachable.
+   * Called before the first protected route: reads the instance status and who is signed in.
+   * While the server is unreachable, the last signed-in user is trusted, so editing offline
+   * keeps working; the next request that reaches the server corrects it.
    */
   async function ensureChecked(): Promise<void> {
-    if (checked.value || credentials.value) {
-      checked.value = true
-      return
-    }
+    if (checked.value) return
     try {
-      const who = await useApi().whoami(null)
-      anonymous.value = true
-      username.value = who.username
+      const current = await loadStatus()
+      if (current?.authDisabled) {
+        anonymous.value = true
+        setUser(null)
+      } else {
+        try {
+          setUser(await useApi().whoami({ quiet401: true }))
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.isNetworkError) throw error
+          if (error.isUnauthorized) setUser(null)
+          else throw error
+        }
+      }
+      offline.value = false
     } catch (error) {
-      if (!(error instanceof ApiError)) throw error
+      if (!(error instanceof ApiError && error.isNetworkError)) throw error
+      offline.value = true
     }
     checked.value = true
   }
 
+  /** Reloads the signed-in user, for example after the profile or the second factor changed. */
+  async function refresh(): Promise<void> {
+    setUser(await useApi().whoami())
+  }
+
+  /** Ends the session on the server and forgets the user locally. */
+  async function logout(): Promise<void> {
+    try {
+      await useAuthApi().logout()
+    } catch {
+      // offline or already signed out: forget it locally anyway
+    }
+    clearLocal()
+    anonymous.value = false
+    sessionEnded.value = false
+    checked.value = false
+  }
+
   return {
-    credentials,
+    user,
+    status,
     anonymous,
+    offline,
+    sessionEnded,
+    checked,
+    isLoggedIn,
     username,
     displayName,
     role,
-    isLoggedIn,
-    login,
-    logout,
+    isAdmin,
+    setupRequired,
+    passkeysEnabled,
+    passwordPolicy,
+    secondFactorSetupRequired,
+    loadStatus,
     ensureChecked,
+    signedIn,
+    setUser,
+    endSession,
+    refresh,
+    logout,
   }
 })

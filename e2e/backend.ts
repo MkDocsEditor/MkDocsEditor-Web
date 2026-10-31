@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { USERS } from './ports'
+import { USERS, WEB_PORT } from './ports'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const TMP = path.join(here, '.tmp')
@@ -91,8 +91,25 @@ export function createWiki(root: string): void {
 
 const hashes = new Map<string, string>()
 
-/** Writes a backend config with the test users for a wiki and returns its path. */
-export function writeConfig(bin: string, workDir: string, wiki: string, port: number): string {
+export interface ConfigOptions {
+  /** Import the three test users (default). Without them the backend starts in setup mode. */
+  users?: boolean
+  /** Real rate limits with this per-IP burst; by default they are off for the tests. */
+  perIpBurst?: number
+}
+
+/**
+ * Writes a backend config for a wiki and returns its path. The web client under test runs on
+ * `http://localhost:WEB_PORT` and reaches the backend on `http://localhost:port`: same site, so
+ * the session cookie works over plain HTTP, and `localhost` is a valid passkey RP ID.
+ */
+export function writeConfig(
+  bin: string,
+  workDir: string,
+  wiki: string,
+  port: number,
+  options: ConfigOptions = {},
+): string {
   const hash = (password: string) => {
     let value = hashes.get(password)
     if (!value) {
@@ -101,7 +118,8 @@ export function writeConfig(bin: string, workDir: string, wiki: string, port: nu
     }
     return value
   }
-  const users = Object.values(USERS).flatMap((user) => [
+  const webOrigin = `http://localhost:${WEB_PORT}`
+  const users = (options.users === false ? [] : Object.values(USERS)).flatMap((user) => [
     `      - username: "${user.username}"`,
     `        passwordHash: "${hash(user.password)}"`,
     `        role: ${user.role}`,
@@ -113,9 +131,18 @@ export function writeConfig(bin: string, workDir: string, wiki: string, port: nu
       'server:',
       '  host: "127.0.0.1"',
       `  port: ${port}`,
+      '  cors:',
+      `    allowedOrigins: ["${webOrigin}"]`,
       '  auth:',
-      '    users:',
-      ...users,
+      `    clientUrl: "${webOrigin}"`,
+      '    webauthn:',
+      '      rpId: "localhost"',
+      // many logins from one address in a test run
+      '    rateLimits:',
+      ...(options.perIpBurst
+        ? [`      perIpBurst: ${options.perIpBurst}`, '      perIpRefill: "10m"']
+        : ['      disabled: true']),
+      ...(users.length ? ['    users:', ...users] : ['    users: []']),
       'git:',
       '  enabled: true',
       'mkdocs:',
@@ -167,4 +194,19 @@ export async function startBackend(
   }
   await stop()
   throw new Error(`backend did not start within 30 s:\n${log.join('')}`)
+}
+
+/** Waits for a line of the backend log that matches and returns the first group. */
+export async function waitForLog(
+  backend: RunningBackend,
+  pattern: RegExp,
+  timeout = 10_000,
+): Promise<string> {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    const match = pattern.exec(backend.log.join(''))
+    if (match) return match[1] ?? match[0]
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`no ${pattern} in the backend log:\n${backend.log.join('')}`)
 }
