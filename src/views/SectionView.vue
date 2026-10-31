@@ -6,6 +6,7 @@ import {
   mdiFolderPlusOutline,
   mdiPencil,
   mdiPlus,
+  mdiUpload,
 } from '@mdi/js'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -146,6 +147,59 @@ async function remove(item = deleteTarget.value, force = false): Promise<void> {
   }
 }
 
+// uploads: from the menu or by dropping files onto the list
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+const dragging = ref(false)
+let dragDepth = 0
+
+async function upload(files: File[]): Promise<void> {
+  const target = section.value
+  if (!target || files.length === 0) return
+  uploading.value = true
+  try {
+    const created = await tree.uploadFiles(target.id, files)
+    notify.success(
+      created.length === 1
+        ? `„${created[0]!.name}“ hochgeladen`
+        : `${created.length} Dateien hochgeladen`,
+    )
+  } catch (error) {
+    notify.error(error, 'Hochladen fehlgeschlagen')
+  } finally {
+    uploading.value = false
+  }
+}
+
+function onFilesChosen(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  void upload(files)
+}
+
+function hasFiles(event: DragEvent): boolean {
+  return event.dataTransfer?.types.includes('Files') ?? false
+}
+
+function onDragEnter(event: DragEvent): void {
+  if (!hasFiles(event)) return
+  dragDepth++
+  dragging.value = true
+}
+
+function onDragLeave(event: DragEvent): void {
+  if (!hasFiles(event)) return
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (dragDepth === 0) dragging.value = false
+}
+
+function onDrop(event: DragEvent): void {
+  dragDepth = 0
+  dragging.value = false
+  void upload(Array.from(event.dataTransfer?.files ?? []))
+}
+
 const deleteText = computed(() => {
   const item = deleteTarget.value
   if (!item) return ''
@@ -156,10 +210,29 @@ const deleteText = computed(() => {
 </script>
 
 <template>
-  <v-container class="section-view pb-16" max-width="960">
+  <v-container
+    class="section-view pb-16"
+    :class="{ 'section-view--dragging': dragging }"
+    max-width="960"
+    @dragenter="onDragEnter"
+    @dragleave="onDragLeave"
+    @dragover.prevent
+    @drop.prevent="onDrop"
+  >
     <template v-if="section">
       <ItemBreadcrumbs v-if="!isRoot" :ancestors="ancestors" />
       <h1 class="text-h5 mb-2" data-testid="section-title">{{ title }}</h1>
+      <v-progress-linear
+        v-if="uploading"
+        indeterminate
+        color="primary"
+        class="mb-2"
+        aria-label="Dateien werden hochgeladen"
+        data-testid="upload-progress"
+      />
+      <div v-if="dragging" class="section-view__drop text-body-1 mb-2" data-testid="drop-zone">
+        Dateien hier ablegen, um sie in diesen Ordner hochzuladen
+      </div>
 
       <v-list v-if="entries.length > 0" lines="one" class="rounded-lg" border>
         <v-list-item
@@ -204,7 +277,7 @@ const deleteText = computed(() => {
       <v-empty-state
         v-else
         title="Hier ist noch nichts"
-        text="Lege mit dem Plus-Knopf eine Seite oder einen Ordner an."
+        text="Lege mit dem Plus-Knopf eine Seite oder einen Ordner an, oder lade Dateien hoch."
       />
 
       <v-menu location="top end">
@@ -232,8 +305,22 @@ const deleteText = computed(() => {
             data-testid="create-section"
             @click="createKind = 'section'"
           />
+          <v-list-item
+            :prepend-icon="mdiUpload"
+            title="Dateien hochladen"
+            data-testid="upload-files"
+            @click="fileInput?.click()"
+          />
         </v-list>
       </v-menu>
+      <input
+        ref="fileInput"
+        type="file"
+        multiple
+        hidden
+        data-testid="file-input"
+        @change="onFilesChosen"
+      />
     </template>
 
     <v-empty-state
@@ -280,6 +367,16 @@ const deleteText = computed(() => {
 </template>
 
 <style scoped>
+.section-view__drop {
+  border: 2px dashed rgb(var(--v-theme-primary));
+  border-radius: 8px;
+  padding: 24px 16px;
+  text-align: center;
+  color: rgb(var(--v-theme-primary));
+}
+.section-view--dragging {
+  min-height: 60vh;
+}
 .section-view__fab {
   position: fixed;
   right: calc(16px + env(safe-area-inset-right));

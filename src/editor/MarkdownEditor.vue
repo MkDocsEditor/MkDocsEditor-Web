@@ -19,10 +19,14 @@ import type { DocumentSession } from '@/sync/session'
 import { authorship, setAuthorship } from './authorship'
 import { sessionBinding } from './binding'
 import { remoteCursors, setPeers } from './remoteCursors'
+import { fileUpload } from './upload'
+import type { UploadFiles } from './upload'
 
 const props = defineProps<{
   session: DocumentSession
   showAuthorship?: boolean
+  /** Uploads pasted or dropped files and returns their markdown; no uploads without it. */
+  upload?: UploadFiles
 }>()
 const emit = defineEmits<{
   /** The first visible source line (0-based), for scrolling the preview along. */
@@ -86,6 +90,7 @@ onMounted(() => {
       remoteCursors(),
       authorship(),
       sessionBinding(props.session),
+      props.upload ? fileUpload(props.upload) : [],
       EditorView.updateListener.of((update) => {
         if (update.docChanged) emit('change', update.state.doc.toString())
       }),

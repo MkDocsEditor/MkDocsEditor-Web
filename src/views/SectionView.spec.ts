@@ -2,6 +2,7 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
@@ -66,6 +67,42 @@ describe('SectionView', () => {
     const post = requests.find((r) => r.method === 'POST')
     expect(JSON.parse(post?.body as string)).toEqual({ parent: 's-urlaub', name: 'Italien' })
     await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/document/d-new'))
+    wrapper.unmount()
+  })
+
+  it('uploads chosen files into the folder', async () => {
+    const { wrapper, requests } = await setup('s-urlaub', {
+      'POST /resource/s-urlaub/Strand.jpg/': () =>
+        json({ type: 'resource', id: 'r-strand', name: 'Strand.jpg', filesize: 3, modtime: '' }),
+    })
+    const input = wrapper.find('[data-testid="file-input"]').element as HTMLInputElement
+    Object.defineProperty(input, 'files', {
+      value: [new File(['abc'], 'Strand.jpg', { type: 'image/jpeg' })],
+      configurable: true,
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() =>
+      expect(requests.some((r) => r.method === 'POST' && r.url.includes('/resource/'))).toBe(true),
+    )
+    await flushPromises()
+    expect(useNotifyStore().queue.map((n) => n.text)).toContain('„Strand.jpg“ hochgeladen')
+    wrapper.unmount()
+  })
+
+  it('uploads dropped files', async () => {
+    const { wrapper, requests } = await setup('s-urlaub', {
+      'POST /resource/s-urlaub/Plan.pdf/': () =>
+        json({ type: 'resource', id: 'r-plan', name: 'Plan.pdf', filesize: 3, modtime: '' }),
+    })
+    const root = wrapper.find('.section-view')
+    const dataTransfer = { types: ['Files'], files: [new File(['abc'], 'Plan.pdf')] }
+    await root.trigger('dragenter', { dataTransfer })
+    expect(wrapper.find('[data-testid="drop-zone"]').exists()).toBe(true)
+    await root.trigger('drop', { dataTransfer })
+    expect(wrapper.find('[data-testid="drop-zone"]').exists()).toBe(false)
+    await vi.waitFor(() =>
+      expect(requests.some((r) => r.url.includes('/resource/s-urlaub/Plan.pdf'))).toBe(true),
+    )
     wrapper.unmount()
   })
 })

@@ -67,6 +67,26 @@ describe('tree store', () => {
         })
         return json(tree.documents.at(-1))
       },
+      'POST /resource/root/logo%20(2).png/': () => {
+        tree.resources.push({
+          type: 'resource',
+          id: 'r2',
+          name: 'logo (2).png',
+          filesize: 1,
+          modtime: '',
+        })
+        return json(tree.resources.at(-1))
+      },
+      'POST /resource/root/logo%20(3).png/': () => {
+        tree.resources.push({
+          type: 'resource',
+          id: 'r3',
+          name: 'logo (3).png',
+          filesize: 1,
+          modtime: '',
+        })
+        return json(tree.resources.at(-1))
+      },
       'DELETE /section/s-urlaub/': () => {
         tree = sampleTree()
         tree.subsections.pop()
@@ -99,6 +119,19 @@ describe('tree store', () => {
     expect(store.document('d-new')).toBeDefined()
     await store.deleteSection('s-urlaub')
     expect(store.section('s-urlaub')).toBeUndefined()
+  })
+
+  it('uploads files under free names and reloads the tree', async () => {
+    const { requests } = backend()
+    const store = useTreeStore()
+    await store.load()
+    const files = [new File(['a'], 'logo.png'), new File(['b'], 'logo.png')]
+    const created = await store.uploadFiles('root', files)
+    expect(created.map((r) => r.name)).toEqual(['logo (2).png', 'logo (3).png'])
+    expect(store.get('r3')).toBeDefined()
+    const upload = requests.find((r) => r.method === 'POST')!
+    expect(upload.body).toBeInstanceOf(FormData)
+    expect(((upload.body as FormData).get('file') as File).name).toBe('logo (2).png')
   })
 
   it('keeps the error of a failed load', async () => {
