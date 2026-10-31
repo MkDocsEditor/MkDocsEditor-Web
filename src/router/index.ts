@@ -2,8 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { Router, RouterHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
-import HomeView from '@/views/HomeView.vue'
 import LoginView from '@/views/LoginView.vue'
+import SectionView from '@/views/SectionView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -17,7 +17,14 @@ export function buildRouter(history: RouterHistory): Router {
     history,
     routes: [
       { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
-      { path: '/', name: 'home', component: HomeView },
+      { path: '/', name: 'home', component: SectionView },
+      { path: '/section/:id', name: 'section', component: SectionView, props: true },
+      {
+        path: '/document/:id',
+        name: 'document',
+        component: () => import('@/views/DocumentView.vue'),
+        props: true,
+      },
       { path: '/:pathMatch(.*)*', redirect: '/' },
     ],
   })

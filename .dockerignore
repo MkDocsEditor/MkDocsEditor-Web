@@ -7,3 +7,4 @@ e2e/.tmp
 test-results
 playwright-report
 public/config.json
+dist-e2e

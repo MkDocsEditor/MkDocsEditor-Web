@@ -86,3 +86,37 @@ jobs:
           curl -fs http://localhost:8080/some/client/route | grep -q '<div id="app">'
           test "$(docker inspect --format '{{.Config.User}}' mkdocseditor-web:ci)" = "101"
           docker rm -f web
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check out the backend (master)
+        uses: actions/checkout@v7
+        with:
+          repository: MkDocsEditor/MkDocsEditor-Backend
+          path: e2e/.tmp/backend
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: e2e/.tmp/backend/go.mod
+          cache-dependency-path: e2e/.tmp/backend/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          E2E_BACKEND_LOG: ${{ runner.temp }}/backend.log
+      - name: Upload report and backend log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+            ${{ runner.temp }}/backend.log
+          retention-days: 7

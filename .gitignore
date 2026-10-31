@@ -14,3 +14,4 @@ playwright-report/
 e2e/.tmp/
 # runtime config for local development, see public/config.example.json
 public/config.json
+dist-e2e
