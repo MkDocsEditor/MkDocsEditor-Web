@@ -199,11 +199,19 @@ test.describe('accounts', () => {
     await accountMenu(page, 'menu-logout')
     await expect(page.getByTestId('section-title')).toHaveText('Wiki')
 
-    // The button: the autofill request waits while nobody touches the authenticator.
+    // The button, in a browser without passkey autofill: the autofill request would answer
+    // first. Presence is off until the reload, so signing out does not sign in again.
+    await page.addInitScript(() => {
+      Object.defineProperty(PublicKeyCredential, 'isConditionalMediationAvailable', {
+        value: async () => false,
+      })
+    })
     await authenticator.setPresence(false)
     await logout(page)
-    await page.getByTestId('passkey-login').click()
+    await page.reload()
     await authenticator.setPresence(true)
+    await expect(page.getByTestId('passkey-login')).toBeVisible()
+    await page.getByTestId('passkey-login').click()
     await expect(page.getByTestId('section-title')).toHaveText('Wiki')
   })
 
