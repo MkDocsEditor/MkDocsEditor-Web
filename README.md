@@ -13,6 +13,8 @@ together, in real time, from a phone or a desktop browser. It talks to the
 - Accounts with roles (readers, editors, admins): sign in with a password, optionally with a
   code from an authenticator app (TOTP) and recovery codes, or with a passkey. Works with
   password managers such as Bitwarden (passwords, passkeys and TOTP codes).
+  After a sign-in without a passkey, the client suggests creating one ("Later" pauses the
+  suggestion for a few days).
 - New accounts by invite link only; the first admin comes from a one-time setup link. A
   forgotten password is reset with a single-use link from an admin. No email needed.
 - Account page: profile and colour, password, authenticator app, recovery codes, passkeys,
