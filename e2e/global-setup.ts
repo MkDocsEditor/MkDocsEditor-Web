@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { BACKEND_PORT, E2E_USER } from './ports'
+import { BACKEND_PORT, USERS } from './ports'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const tmp = path.join(here, '.tmp')
@@ -88,25 +88,33 @@ export default async function globalSetup(): Promise<() => void> {
   const workDir = path.join(tmp, 'run')
   const wiki = path.join(workDir, 'wiki')
   createWiki(wiki)
-  // The backend reads mkdocsrest.yaml from its working directory.
+  const hash = (password: string) =>
+    execFileSync(bin, ['hash-password'], { input: password }).toString().trim()
+  const users = Object.values(USERS).flatMap((user) => [
+    `      - username: "${user.username}"`,
+    `        passwordHash: "${hash(user.password)}"`,
+    `        role: ${user.role}`,
+  ])
+  const config = path.join(workDir, 'mkdocsrest.yaml')
   writeFileSync(
-    path.join(workDir, 'mkdocsrest.yaml'),
+    config,
     [
       'server:',
       '  host: "127.0.0.1"',
       `  port: ${BACKEND_PORT}`,
-      '  basicAuth:',
-      `    user: "${E2E_USER.username}"`,
-      `    password: "${E2E_USER.password}"`,
+      '  auth:',
+      '    users:',
+      ...users,
       'mkdocs:',
       `  projectPath: "${wiki}"`,
-      `  configFile: "${path.join(wiki, 'mkdocs.yml')}"`,
-      `  docsPath: "${path.join(wiki, 'docs')}"`,
       '',
     ].join('\n'),
   )
 
-  const backend = spawn(bin, [], { cwd: workDir, stdio: ['ignore', 'pipe', 'pipe'] })
+  const backend = spawn(bin, ['--config', config], {
+    cwd: workDir,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
   const log: string[] = []
   backend.stdout?.on('data', (chunk: Buffer) => log.push(chunk.toString()))
   backend.stderr?.on('data', (chunk: Buffer) => log.push(chunk.toString()))

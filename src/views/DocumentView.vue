@@ -12,6 +12,7 @@ import {
   mdiViewSplitVertical,
 } from '@mdi/js'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
@@ -26,6 +27,7 @@ import type { DocumentSession } from '@/sync'
 const props = defineProps<{ id: string }>()
 
 const tree = useTreeStore()
+const router = useRouter()
 const { mobile } = useDisplay()
 
 const document = computed(() => tree.document(props.id))
@@ -53,11 +55,24 @@ const text = ref('')
 const ready = ref(false)
 const topLine = ref(0)
 
+/** Set while following a server-side rename: the session already moved to the new id. */
+let renamedTo: string | null = null
+
+function onRenamed(newId: string): void {
+  renamedTo = newId
+  void tree.load().catch(() => undefined)
+  void router.replace({ name: 'document', params: { id: newId } })
+}
+
 watch(
   () => props.id,
   (id) => {
+    if (id === renamedTo) {
+      renamedTo = null
+      return
+    }
     session.value?.close()
-    const next = createDocumentSession(id)
+    const next = createDocumentSession(id, { onRenamed })
     session.value = next
     ready.value = false
     text.value = next.getText()

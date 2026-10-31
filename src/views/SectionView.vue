@@ -10,6 +10,7 @@ import {
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { ApiError } from '@/api'
 import type { TreeItem } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
@@ -123,16 +124,25 @@ async function rename(name: string): Promise<void> {
   }
 }
 
-async function remove(): Promise<void> {
-  const item = deleteTarget.value
+// Deleting a page somebody has open fails with 409; the user can then force it.
+const forceTarget = ref<TreeItem | null>(null)
+const forceOpen = computed({
+  get: () => forceTarget.value !== null,
+  set: (open) => {
+    if (!open) forceTarget.value = null
+  },
+})
+
+async function remove(item = deleteTarget.value, force = false): Promise<void> {
   if (!item) return
   try {
-    if (item.type === 'section') await tree.deleteSection(item.id)
-    else if (item.type === 'document') await tree.deleteDocument(item.id)
+    if (item.type === 'section') await tree.deleteSection(item.id, force)
+    else if (item.type === 'document') await tree.deleteDocument(item.id, force)
     else await tree.deleteResource(item.id)
     notify.success(`„${item.name}“ gelöscht`)
   } catch (error) {
-    notify.error(error, 'Löschen fehlgeschlagen')
+    if (!force && error instanceof ApiError && error.status === 409) forceTarget.value = item
+    else notify.error(error, 'Löschen fehlgeschlagen')
   }
 }
 
@@ -256,7 +266,15 @@ const deleteText = computed(() => {
       :text="deleteText"
       confirm-text="Löschen"
       danger
-      @confirm="remove"
+      @confirm="remove()"
+    />
+    <ConfirmDialog
+      v-model="forceOpen"
+      title="Wird gerade bearbeitet"
+      text="Jemand hat das gerade geöffnet. Wenn du trotzdem löschst, bekommt diese Person einen Hinweis und kann ihren Text noch kopieren."
+      confirm-text="Trotzdem löschen"
+      danger
+      @confirm="remove(forceTarget, true)"
     />
   </v-container>
 </template>

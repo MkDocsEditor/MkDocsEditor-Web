@@ -129,3 +129,30 @@ describe('ApiClient', () => {
     expect(await api2.token()).toEqual({ token: 'abc' })
   })
 })
+
+describe('ApiClient protocol v1 endpoints', () => {
+  it('sends X-Requested-With so browsers show no auth dialog', async () => {
+    const { api, requests } = client({ 'GET /section/': () => json(tree) })
+    await api.getTree()
+    expect(requests[0]?.headers.get('X-Requested-With')).toBe('XMLHttpRequest')
+  })
+
+  it('gets websocket tickets, actors and authorship', async () => {
+    const { api, requests } = client({
+      'POST /auth/ws-ticket/': () => json({ ticket: 't1', expiresAt: 'x' }),
+      'GET /actors/': () => json([{ actorId: 'a', username: 'anna' }]),
+      'GET /document/d1/authorship/': () => json({ heads: [], runs: [] }),
+    })
+    expect((await api.wsTicket()).ticket).toBe('t1')
+    expect(await api.getActors()).toHaveLength(1)
+    expect(await api.getAuthorship('d1')).toEqual({ heads: [], runs: [] })
+    expect(await api.getAuthorship('d2')).toBeNull()
+    expect(requests[0]?.method).toBe('POST')
+  })
+
+  it('keeps query strings when adding the trailing slash', async () => {
+    const { api, requests } = client({ 'DELETE /document/d1/': () => new Response(null) })
+    await api.deleteDocument('d1', true)
+    expect(requests[0]?.url).toBe('http://backend:7413/document/d1/?force=true')
+  })
+})

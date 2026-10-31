@@ -230,11 +230,11 @@ export const useTreeStore = defineStore('tree', () => {
     createSection: (parentId: string, name: string) =>
       mutate(() => api().createSection(parentId, name)),
     renameSection: (id: string, name: string) => mutate(() => api().renameSection(id, name)),
-    deleteSection: (id: string) => mutate(() => api().deleteSection(id)),
+    deleteSection: (id: string, force = false) => mutate(() => api().deleteSection(id, force)),
     createDocument: (parentId: string, name: string) =>
       mutate(() => api().createDocument(parentId, name)),
     renameDocument: (id: string, name: string) => mutate(() => api().renameDocument(id, name)),
-    deleteDocument: (id: string) => mutate(() => api().deleteDocument(id)),
+    deleteDocument: (id: string, force = false) => mutate(() => api().deleteDocument(id, force)),
     uploadResource: (parentId: string, name: string, file: Blob) =>
       mutate(() => api().uploadResource(parentId, name, file)),
     renameResource: (id: string, name: string) => mutate(() => api().renameResource(id, name)),
