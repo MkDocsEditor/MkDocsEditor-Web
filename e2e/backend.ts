@@ -8,6 +8,18 @@ import { USERS } from './ports'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const TMP = path.join(here, '.tmp')
+/** The wiki of the backend that global setup starts for all tests. */
+export const MAIN_WIKI = path.join(TMP, 'run', 'wiki')
+
+/** Runs git in a test wiki with a fixed identity. */
+export function git(wiki: string, args: string[], author = 'E2E <e2e@example.com>'): string {
+  const [, name = 'E2E', email = 'e2e@example.com'] = /^(.*) <(.*)>$/.exec(author) ?? []
+  return execFileSync(
+    'git',
+    ['-c', `user.name=${name}`, '-c', `user.email=${email}`, '-c', 'commit.gpgsign=false', ...args],
+    { cwd: wiki },
+  ).toString()
+}
 /** Where global setup leaves the built binary for the tests. */
 const BIN_PATH = path.join(TMP, 'mkdocsrest')
 
@@ -71,6 +83,10 @@ export function createWiki(root: string): void {
     ),
   )
   writeFileSync(path.join(docs, 'Rezepte', 'Kürbissuppe.md'), '# Kürbissuppe\n')
+  // a git repository, like a real wiki, so the backend can commit and show the history
+  git(root, ['init', '-q', '-b', 'main'])
+  git(root, ['add', '-A'])
+  git(root, ['commit', '-q', '-m', 'Test-Wiki'])
 }
 
 const hashes = new Map<string, string>()
@@ -100,6 +116,8 @@ export function writeConfig(bin: string, workDir: string, wiki: string, port: nu
       '  auth:',
       '    users:',
       ...users,
+      'git:',
+      '  enabled: true',
       'mkdocs:',
       `  projectPath: "${wiki}"`,
       '',

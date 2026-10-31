@@ -155,4 +155,31 @@ describe('ApiClient protocol v1 endpoints', () => {
     await api.deleteDocument('d1', true)
     expect(requests[0]?.url).toBe('http://backend:7413/document/d1/?force=true')
   })
+
+  it('reads the history and treats 404 as "no history"', async () => {
+    const entry = {
+      revision: 'abc1234',
+      time: '2026-10-31T12:00:00Z',
+      author: { name: 'Anna', email: 'a@x', username: 'anna' },
+      coAuthors: [],
+      message: 'Update a.md',
+      path: 'a.md',
+    }
+    const { api, requests } = client({
+      'GET /document/d1/history/': () => json([entry]),
+      'GET /document/d1/history/abc1234/content/': () => new Response('alt'),
+      'GET /document/d1/history/diff/': () => new Response('@@ -1 +1 @@'),
+      'POST /document/d1/history/abc1234/restore/': () => new Response(null, { status: 204 }),
+    })
+    expect(await api.getHistory('d1')).toEqual([entry])
+    expect(requests[0]!.url).toBe('http://backend:7413/document/d1/history/?limit=100')
+    expect(await api.getRevisionContent('d1', 'abc1234')).toBe('alt')
+    expect(await api.getRevisionDiff('d1', 'abc1234')).toBe('@@ -1 +1 @@')
+    expect(requests[2]!.url).toBe(
+      'http://backend:7413/document/d1/history/diff/?from=abc1234&to=current',
+    )
+    await api.restoreRevision('d1', 'abc1234')
+    expect(requests[3]!.method).toBe('POST')
+    expect(await api.getHistory('d2')).toBeNull()
+  })
 })

@@ -7,6 +7,7 @@ import {
   mdiDotsVertical,
   mdiEyeOutline,
   mdiFileDocumentEditOutline,
+  mdiHistory,
   mdiLockOutline,
   mdiOpenInNew,
   mdiViewSplitVertical,
@@ -15,6 +16,7 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
+import HistoryDialog from '@/components/history/HistoryDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
@@ -54,6 +56,7 @@ const mode = computed<Mode>({
   },
 })
 const showAuthorship = ref(false)
+const historyOpen = ref(false)
 
 const session = shallowRef<DocumentSession | null>(null)
 const text = ref('')
@@ -216,6 +219,12 @@ const connection = computed(() => {
               @click="showAuthorship = !showAuthorship"
             />
             <v-list-item
+              :prepend-icon="mdiHistory"
+              title="Versionen"
+              data-testid="open-history"
+              @click="historyOpen = true"
+            />
+            <v-list-item
               v-if="wikiUrl"
               :prepend-icon="mdiOpenInNew"
               title="Im Wiki ansehen"
@@ -271,6 +280,7 @@ const connection = computed(() => {
         />
       </div>
     </div>
+    <HistoryDialog v-model="historyOpen" :document-id="id" :read-only="status?.readOnly ?? true" />
   </div>
 </template>
 
