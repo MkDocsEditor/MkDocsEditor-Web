@@ -68,3 +68,22 @@ export interface TokenResponse {
   token: string
   expiresAt?: string
 }
+
+export interface RevisionAuthor {
+  name: string
+  email: string
+  /** Empty for authors who are not configured users. */
+  username: string
+}
+
+/** A git commit that touched a document (`GET /document/{id}/history/`). */
+export interface Revision {
+  revision: string
+  /** ISO timestamp */
+  time: string
+  author: RevisionAuthor
+  coAuthors: RevisionAuthor[] | null
+  message: string
+  /** The file's path in that commit (history follows renames). */
+  path: string
+}

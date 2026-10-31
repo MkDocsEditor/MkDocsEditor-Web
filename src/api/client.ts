@@ -4,6 +4,7 @@ import type {
   Credentials,
   DocumentModel,
   ResourceModel,
+  Revision,
   SectionModel,
   TokenResponse,
   WhoAmI,
@@ -215,6 +216,43 @@ export class ApiClient {
   }
 
   /** Downloads a resource with auth (for previews of images that need credentials). */
+  /**
+   * Git history of a document, newest first. Returns null when the backend has no history
+   * (git not enabled, or an older backend).
+   */
+  async getHistory(id: string, limit = 100): Promise<Revision[] | null> {
+    try {
+      return await this.json<Revision[]>(
+        'GET',
+        `/document/${encodeURIComponent(id)}/history?limit=${limit}`,
+      )
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null
+      throw error
+    }
+  }
+
+  async getRevisionContent(id: string, revision: string): Promise<string> {
+    const path = `/document/${encodeURIComponent(id)}/history/${encodeURIComponent(revision)}/content`
+    return (await this.request('GET', path)).text()
+  }
+
+  /** Unified diff between two revisions; `current` is the live text. Empty when equal. */
+  async getRevisionDiff(id: string, from: string, to = 'current'): Promise<string> {
+    const query = new URLSearchParams({ from, to })
+    return (
+      await this.request('GET', `/document/${encodeURIComponent(id)}/history/diff?${query}`)
+    ).text()
+  }
+
+  /** Sets the live document to the text of `revision` (arrives as a normal edit). */
+  async restoreRevision(id: string, revision: string): Promise<void> {
+    await this.request(
+      'POST',
+      `/document/${encodeURIComponent(id)}/history/${encodeURIComponent(revision)}/restore`,
+    )
+  }
+
   async getResourceContent(id: string): Promise<Blob> {
     const response = await this.request('GET', `/resource/${encodeURIComponent(id)}/content`)
     return response.blob()
