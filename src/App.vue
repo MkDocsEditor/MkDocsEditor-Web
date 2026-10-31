@@ -93,7 +93,10 @@ window.addEventListener('keydown', onKeydown)
             <v-btn v-bind="props" :icon="mdiAccountCircle" aria-label="Konto" />
           </template>
           <v-list density="compact">
-            <v-list-item :title="auth.username" subtitle="angemeldet" />
+            <v-list-item
+              :title="auth.displayName || auth.username"
+              :subtitle="auth.role ? `angemeldet (${auth.role})` : 'angemeldet'"
+            />
             <v-divider />
             <v-list-item :prepend-icon="mdiLogout" title="Abmelden" @click="logout" />
           </v-list>

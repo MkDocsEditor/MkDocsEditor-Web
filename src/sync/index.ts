@@ -1,16 +1,32 @@
+import { useApi } from '@/api'
+
+import { loadAutomerge } from './automerge'
+import { createAutomergeSession } from './automergeSession'
+import { getOfflineStore } from './offlineStore'
 import type { DocumentSession } from './session'
-import { createSnapshotSession } from './snapshotSession'
+
+export interface SessionOptions {
+  /** The server renamed the document (or a folder above it); the session follows by itself. */
+  onRenamed?: (newDocumentId: string) => void
+}
 
 /**
- * Creates the session for a document. Live collaborative editing (Automerge over the backend's
- * document websocket, see docs/sync-protocol.md in the backend repo) plugs in here; until it is
- * enabled the editor shows a read-only snapshot.
+ * Creates the live session for a document: Automerge over the backend's document websocket
+ * (protocol v1, see docs/sync-protocol.md in MkDocsEditor-Backend), with an offline copy in
+ * IndexedDB.
  */
-export function createDocumentSession(documentId: string): DocumentSession {
-  return createSnapshotSession(
+export function createDocumentSession(
+  documentId: string,
+  options: SessionOptions = {},
+): DocumentSession {
+  return createAutomergeSession({
     documentId,
-    'Nur lesen: Gemeinsames Bearbeiten wird gerade eingebaut.',
-  )
+    automerge: loadAutomerge(),
+    api: useApi(),
+    store: getOfflineStore(),
+    onRenamed: options.onRenamed,
+    clientName: `MkDocsEditor-Web/${import.meta.env.VITE_APP_VERSION ?? 'dev'}`,
+  })
 }
 
 export type * from './session'

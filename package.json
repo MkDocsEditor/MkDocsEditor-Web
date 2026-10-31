@@ -19,6 +19,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@automerge/automerge": "3.5.0",
     "@codemirror/commands": "6.11.1",
     "@codemirror/lang-markdown": "6.5.2",
     "@codemirror/language": "6.13.1",

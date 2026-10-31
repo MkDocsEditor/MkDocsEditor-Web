@@ -18,6 +18,8 @@ export const useAuthStore = defineStore('auth', () => {
   /** True when the backend needs no login at all. */
   const anonymous = ref(false)
   const username = ref<string>(credentials.value?.username ?? '')
+  const displayName = ref<string>('')
+  const role = ref<string>('')
   const checked = ref(false)
 
   setCredentialsProvider(() => credentials.value)
@@ -29,6 +31,8 @@ export const useAuthStore = defineStore('auth', () => {
     const who = await useApi().whoami(candidate)
     credentials.value = candidate
     username.value = who.username || candidate.username
+    displayName.value = who.displayName ?? ''
+    role.value = who.role ?? ''
     anonymous.value = false
     checked.value = true
     remove(local(), STORAGE_KEY)
@@ -65,5 +69,15 @@ export const useAuthStore = defineStore('auth', () => {
     checked.value = true
   }
 
-  return { credentials, anonymous, username, isLoggedIn, login, logout, ensureChecked }
+  return {
+    credentials,
+    anonymous,
+    username,
+    displayName,
+    role,
+    isLoggedIn,
+    login,
+    logout,
+    ensureChecked,
+  }
 })
