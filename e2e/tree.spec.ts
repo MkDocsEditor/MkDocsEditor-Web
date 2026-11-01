@@ -6,14 +6,20 @@ import { login, testName } from './helpers'
 /**
  * Opens the actions menu of an entry and picks an action. A live tree update (another test's
  * edit reaching the disk) can close the menu in between, so this retries until `opens` shows.
+ *
+ * It waits for the menu's opening animation first. Otherwise Playwright retries the click while
+ * the item is "not stable" and scrolls the page on its fourth try. In a long list the menu then
+ * repositions between mouse down and up, the click misses the item, and no dialog opens.
  */
 async function menuAction(page: Page, entry: string, action: string, opens: Locator) {
   await expect(async () => {
     await page.getByRole('button', { name: `Actions for ${entry}` }).click()
-    await page
-      .locator('.v-overlay--active')
-      .getByText(action, { exact: true })
-      .click({ timeout: 2000 })
+    const item = page.locator('.v-overlay--active').getByText(action, { exact: true })
+    await item.evaluate((element) => {
+      const menu = element.closest('.v-overlay__content') ?? element
+      return Promise.all(menu.getAnimations({ subtree: true }).map((a) => a.finished))
+    })
+    await item.click({ timeout: 2000 })
     await expect(opens).toBeVisible({ timeout: 2000 })
   }).toPass({ timeout: 20_000 })
 }
