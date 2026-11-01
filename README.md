@@ -86,6 +86,12 @@ server:
 The client serves the link pages `/setup`, `/invite` and `/reset`; the token is in the URL
 fragment (`#mdl_…`), so it never reaches a web server log.
 
+**Bitwarden's browser extension** can leave a page with two copies of its scripts, when the page
+loads while the extension's service worker is stopped. On that page every passkey request opens
+two windows and fails right away with "Something went wrong.". The cause is in the extension;
+reloading the page helps, because the worker is running by then. The client says so and offers
+the reload.
+
 ### First start
 
 1. Start the backend with an empty state directory and no `server.auth.users`. It prints a

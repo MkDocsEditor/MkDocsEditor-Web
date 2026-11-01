@@ -17,7 +17,7 @@ import {
 import { addVirtualAuthenticator, totp } from './authenticators'
 import { backendBinary, createWiki, startBackend, TMP, waitForLog, writeConfig } from './backend'
 import { backendRequest, login, skipPasskeyStep } from './helpers'
-import { BACKEND_URL } from './ports'
+import { BACKEND_URL, BROWSER_BACKEND_URL } from './ports'
 
 test.describe('accounts', () => {
   test('the setup link creates the first admin', async ({ browser }, testInfo) => {
@@ -213,6 +213,58 @@ test.describe('accounts', () => {
     await expect(page.getByTestId('passkey-login')).toBeVisible()
     await page.getByTestId('passkey-login').click()
     await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+  })
+
+  test('a passkey confirms a sensitive action', async ({ browser }, testInfo) => {
+    await requireEndpoints('/account/', '/account/passkeys/', '/account/device-links/')
+    const user = await createAccount(uniqueUsername('stepup', testInfo))
+    const page = await devicePage(browser, testInfo)
+    const authenticator = await addVirtualAuthenticator(page)
+    await login(page, user)
+    await accountMenu(page, 'menu-account')
+    await page.getByRole('tab', { name: 'Security' }).click()
+    await page.getByTestId('passkey-add').click()
+    await expect(page.getByTestId('passkey-list').locator('.v-list-item')).toHaveCount(1)
+    expect(await authenticator.credentialCount()).toBe(1)
+
+    // A fresh login counts as recent for 10 minutes. A session from a device link does not, so
+    // swap the browser's session for one of those.
+    const paired = await page.evaluate(async (backend) => {
+      const post = (path: string, body: object) =>
+        fetch(backend + path, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify(body),
+        })
+      const created = await post('/account/device-links/', {})
+      const { token } = (await created.json()) as { token: string }
+      return (await post('/auth/device-link/redeem/', { token, sessionType: 'cookie' })).status
+    }, BROWSER_BACKEND_URL)
+    expect(paired).toBe(200)
+    await page.reload()
+    await page.getByRole('tab', { name: 'Devices' }).click()
+
+    // the provider fails, as with two copies of Bitwarden's scripts in the page
+    await page.evaluate(() => {
+      navigator.credentials.get = () => Promise.reject(new Error('Something went wrong.'))
+    })
+    const dialog = page.getByTestId('reauth-dialog')
+    await page.getByTestId('connect-create').click()
+    await dialog.getByTestId('reauth-passkey').click()
+    await expect(dialog).toContainText('reload the page')
+    await expect(dialog).toContainText('confirm with your password')
+    await expect(dialog.getByTestId('reauth-reload')).toBeVisible()
+    await expect(dialog.getByTestId('reauth-passkey')).toHaveCount(0)
+
+    // after the reload the passkey works, and the dialog is not needed again for 10 minutes
+    await dialog.getByTestId('reauth-reload').click()
+    await page.getByTestId('connect-create').click()
+    const finish = page.waitForResponse((r) => r.url().includes('/auth/reauth/passkey/finish/'))
+    await dialog.getByTestId('reauth-passkey').click()
+    expect((await finish).status()).toBe(200)
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByTestId('connect-countdown')).toBeVisible()
   })
 
   test('the passkey step after an invite, and the reminder after "Later"', async ({

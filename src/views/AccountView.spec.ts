@@ -5,6 +5,7 @@ import { defineComponent, h } from 'vue'
 import { ApiClient, setApiClient } from '@/api'
 import type { AccountInfo } from '@/api'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
+import { PasskeyProviderError } from '@/services/passkeys'
 import { useAuthStore } from '@/stores/auth'
 import { createFetchMock, json } from '@/test/fetchMock'
 import type { RecordedRequest } from '@/test/fetchMock'
@@ -93,6 +94,46 @@ async function confirmReauth(password = 'my password!'): Promise<void> {
 }
 
 describe('AccountView', () => {
+  it('offers a reload and the password when the passkey provider fails', async () => {
+    passkeys.getPasskey.mockRejectedValueOnce(new PasskeyProviderError('Something went wrong.'))
+    const reload = vi.fn()
+    vi.stubGlobal('location', { ...window.location, reload })
+    const { mock } = await mount(
+      'sessions',
+      {
+        ...stepUpOnce('POST /account/device-links/', () =>
+          json({
+            deviceLink: { id: 'dl1', status: 'pending', expiresAt: '2099-01-01T00:00:00Z' },
+            token: 'mdd_x',
+            expiresAt: '2099-01-01T00:00:00Z',
+            connectUrl: null,
+          }),
+        ),
+        'POST /auth/reauth/passkey/begin/': () =>
+          json({ ceremonyId: 'c1', publicKey: { challenge: 'abc' } }),
+      },
+      { passkeyCount: 1 },
+    )
+    byTestId('connect-create').click()
+    await flushPromises()
+    byTestId('reauth-passkey').click()
+    await flushPromises()
+
+    const dialog = byTestId('reauth-dialog')
+    expect(dialog.textContent).toContain('("Something went wrong.")')
+    expect(dialog.textContent).toContain('reload the page')
+    expect(dialog.textContent).toContain('confirm with your password')
+    // another try would only open more windows of the provider
+    expect(document.querySelector('[data-testid="reauth-passkey"]')).toBeNull()
+    byTestId('reauth-reload').click()
+    expect(reload).toHaveBeenCalledOnce()
+    expect(mock.requests.some((r) => r.url.includes('/passkey/finish/'))).toBe(false)
+
+    await confirmReauth()
+    expect(byTestId('connect-countdown')).not.toBeNull()
+    vi.unstubAllGlobals()
+  })
+
   it('creates a connect link for the Android app after a step-up and follows it', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
     vi.setSystemTime(new Date('2026-11-01T12:00:00Z'))

@@ -141,7 +141,9 @@ async function passkeyLogin(): Promise<void> {
     await done(await api.passkeyLoginFinish(ceremony.ceremonyId, credential))
   } catch (e) {
     if (e instanceof ApiError) showError(e)
-    else if (!isPasskeyCancel(e)) error.value = describePasskeyError(e)
+    else if (!isPasskeyCancel(e)) {
+      error.value = describePasskeyError(e, 'sign in with your password')
+    }
   } finally {
     loading.value = false
   }
