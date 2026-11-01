@@ -1,0 +1,225 @@
+{
+  "description": "Test vectors of the link path algorithm, docs/references.md section 8. target.index is the path of a section's index document or empty.",
+  "vectors": [
+    {
+      "name": "same folder",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "guide/install.md" },
+      "expected": "install.md"
+    },
+    {
+      "name": "into a folder",
+      "from": "index.md",
+      "target": { "type": "document", "path": "guide/setup.md" },
+      "expected": "guide/setup.md"
+    },
+    {
+      "name": "up one folder",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "index.md" },
+      "expected": "../index.md"
+    },
+    {
+      "name": "sibling folder",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "reference/api.md" },
+      "expected": "../reference/api.md"
+    },
+    {
+      "name": "deep",
+      "from": "a/b/c/page.md",
+      "target": { "type": "document", "path": "a/x/y.md" },
+      "expected": "../../x/y.md"
+    },
+    {
+      "name": "from deep to the top",
+      "from": "a/b/c/page.md",
+      "target": { "type": "document", "path": "index.md" },
+      "expected": "../../../index.md"
+    },
+    {
+      "name": "segment-wise common prefix",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "guidelines/x.md" },
+      "expected": "../guidelines/x.md"
+    },
+    {
+      "name": "case-sensitive",
+      "from": "Guide/a.md",
+      "target": { "type": "document", "path": "guide/b.md" },
+      "expected": "../guide/b.md"
+    },
+    {
+      "name": "resource in the same folder",
+      "from": "guide/setup.md",
+      "target": { "type": "resource", "path": "guide/image.png" },
+      "expected": "image.png"
+    },
+    {
+      "name": "resource from the top",
+      "from": "index.md",
+      "target": { "type": "resource", "path": "assets/img/logo.svg" },
+      "expected": "assets/img/logo.svg"
+    },
+    {
+      "name": "space and parentheses",
+      "from": "guide/setup.md",
+      "target": { "type": "resource", "path": "img/Strand (2).png" },
+      "expected": "../img/Strand%20%282%29.png"
+    },
+    {
+      "name": "umlauts stay",
+      "from": "Rezepte/Kuchen.md",
+      "target": { "type": "document", "path": "Rezepte/Käsekuchen.md" },
+      "expected": "Käsekuchen.md"
+    },
+    {
+      "name": "umlaut folder",
+      "from": "Küche/Geräte.md",
+      "target": { "type": "document", "path": "Garten/Gemüse.md" },
+      "expected": "../Garten/Gemüse.md"
+    },
+    {
+      "name": "ampersand stays",
+      "from": "index.md",
+      "target": { "type": "document", "path": "Haus & Garten/Grillen.md" },
+      "expected": "Haus%20&%20Garten/Grillen.md"
+    },
+    {
+      "name": "percent and hash",
+      "from": "index.md",
+      "target": { "type": "resource", "path": "files/100% #1.pdf" },
+      "expected": "files/100%25%20%231.pdf"
+    },
+    {
+      "name": "brackets",
+      "from": "index.md",
+      "target": { "type": "document", "path": "notes/[draft].md" },
+      "expected": "notes/%5Bdraft%5D.md"
+    },
+    {
+      "name": "question mark and quotes",
+      "from": "index.md",
+      "target": { "type": "document", "path": "faq/why? \"really\".md" },
+      "expected": "faq/why%3F%20%22really%22.md"
+    },
+    {
+      "name": "other ASCII stays",
+      "from": "index.md",
+      "target": { "type": "resource", "path": "a+b,c;d=e@f!g$h*i~j.txt" },
+      "expected": "a+b,c;d=e@f!g$h*i~j.txt"
+    },
+    {
+      "name": "colon in the first segment",
+      "from": "index.md",
+      "target": { "type": "document", "path": "a:b.md" },
+      "expected": "./a:b.md"
+    },
+    {
+      "name": "colon in a later segment",
+      "from": "index.md",
+      "target": { "type": "document", "path": "notes/a:b.md" },
+      "expected": "notes/a:b.md"
+    },
+    {
+      "name": "colon after going up",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "a:b.md" },
+      "expected": "../a:b.md"
+    },
+    {
+      "name": "anchor",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "guide/install.md" },
+      "anchor": "requirements",
+      "expected": "install.md#requirements"
+    },
+    {
+      "name": "same document with anchor",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "guide/setup.md" },
+      "anchor": "step-2",
+      "expected": "#step-2"
+    },
+    {
+      "name": "same document without anchor",
+      "from": "guide/setup.md",
+      "target": { "type": "document", "path": "guide/setup.md" },
+      "expected": "setup.md"
+    },
+    {
+      "name": "same document with a space in the name",
+      "from": "guide/my page.md",
+      "target": { "type": "document", "path": "guide/my page.md" },
+      "expected": "my%20page.md"
+    },
+    {
+      "name": "section with index",
+      "from": "index.md",
+      "target": { "type": "section", "path": "guide", "index": "guide/index.md" },
+      "expected": "guide/index.md"
+    },
+    {
+      "name": "section with README",
+      "from": "guide/setup.md",
+      "target": { "type": "section", "path": "reference", "index": "reference/README.md" },
+      "expected": "../reference/README.md"
+    },
+    {
+      "name": "section without index",
+      "from": "guide/setup.md",
+      "target": { "type": "section", "path": "reference", "index": "" },
+      "expected": "../reference/"
+    },
+    {
+      "name": "subsection without index",
+      "from": "index.md",
+      "target": { "type": "section", "path": "a/b", "index": "" },
+      "expected": "a/b/"
+    },
+    {
+      "name": "parent section without index",
+      "from": "a/b/page.md",
+      "target": { "type": "section", "path": "a", "index": "" },
+      "expected": "../"
+    },
+    {
+      "name": "own section without index",
+      "from": "a/page.md",
+      "target": { "type": "section", "path": "a", "index": "" },
+      "expected": "./"
+    },
+    {
+      "name": "root section with index",
+      "from": "guide/setup.md",
+      "target": { "type": "section", "path": "", "index": "index.md" },
+      "expected": "../index.md"
+    },
+    {
+      "name": "root section without index from the top",
+      "from": "page.md",
+      "target": { "type": "section", "path": "", "index": "" },
+      "expected": "./"
+    },
+    {
+      "name": "root section without index from a folder",
+      "from": "a/page.md",
+      "target": { "type": "section", "path": "", "index": "" },
+      "expected": "../"
+    },
+    {
+      "name": "section with anchor",
+      "from": "index.md",
+      "target": { "type": "section", "path": "guide", "index": "" },
+      "anchor": "top",
+      "expected": "guide/#top"
+    },
+    {
+      "name": "anchor encoding",
+      "from": "index.md",
+      "target": { "type": "document", "path": "a.md" },
+      "anchor": "a b",
+      "expected": "a.md#a%20b"
+    }
+  ]
+}

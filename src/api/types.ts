@@ -9,7 +9,12 @@ export interface DocumentModel {
   modtime: string
   /** Path of the rendered page on the MkDocs site, relative to the site root, e.g. `Foo/Bar/`. */
   url: string
+  /** Path relative to the docs folder, e.g. `Foo/Bar.md` (newer backends). */
+  path?: string
 }
+
+/** Kind of a resource, for icons and pickers (`docs/references.md` section 9). */
+export type ResourceKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'archive' | 'other'
 
 export interface ResourceModel {
   type: 'resource'
@@ -18,12 +23,21 @@ export interface ResourceModel {
   name: string
   filesize: number
   modtime: string
+  /** Newer backends: path relative to the docs folder, MIME type, kind, thumbnail support. */
+  path?: string
+  mimeType?: string
+  kind?: ResourceKind
+  thumbnail?: boolean
 }
 
 export interface SectionModel {
   type: 'section'
   id: string
   name: string
+  /** Newer backends: path relative to the docs folder (`""` for the root). */
+  path?: string
+  /** Newer backends: id of the index document (`index.md`, else `README.md`), or `""`. */
+  index?: string
   subsections: SectionModel[]
   documents: DocumentModel[]
   resources: ResourceModel[]

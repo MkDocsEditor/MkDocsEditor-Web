@@ -25,10 +25,9 @@ describe('upload helpers', () => {
 
   it('writes markdown for images and other files', () => {
     expect(markdownFor('Foto (2).jpg', true)).toBe('![Foto (2)](Foto%20%282%29.jpg)')
-    expect(markdownFor('Einkaufsliste.pdf', false)).toBe('[Einkaufsliste](Einkaufsliste.pdf)')
-    expect(markdownFor('Grüße [alt].png', true)).toBe(
-      '![Grüße alt](Gr%C3%BC%C3%9Fe%20%5Balt%5D.png)',
-    )
+    expect(markdownFor('Einkaufsliste.pdf', false)).toBe('[Einkaufsliste.pdf](Einkaufsliste.pdf)')
+    expect(markdownFor('Grüße [alt].png', true)).toBe('![Grüße alt](Grüße%20%5Balt%5D.png)')
+    expect(markdownFor('logo.png', true, '../img/logo.png')).toBe('![logo](../img/logo.png)')
   })
 
   it('keeps files it does not shrink', async () => {

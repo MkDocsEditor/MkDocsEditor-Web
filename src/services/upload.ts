@@ -1,6 +1,7 @@
 import type { SectionModel } from '@/api'
 
 import { extensionOf } from './icons'
+import { encodeSegment } from './linkPath'
 
 /** Makes a file name safe for the wiki: no path separators or reserved characters. */
 export function sanitizeFileName(name: string): string {
@@ -26,11 +27,18 @@ export function uniqueName(section: SectionModel, name: string): string {
   }
 }
 
-/** Markdown that embeds (images) or links (other files) an uploaded resource of the same folder. */
-export function markdownFor(name: string, isImage: boolean): string {
-  const target = encodeURI(name).replace(/\(/g, '%28').replace(/\)/g, '%29')
-  const label = name.replace(/\.[^.]+$/, '').replace(/[[\]]/g, '')
-  return isImage ? `![${label}](${target})` : `[${label}](${target})`
+/**
+ * Markdown that embeds (images) or links (other files) a resource, like the backend's
+ * `GET /link/`: `![name without extension](dest)` or `[file name](dest)`. The destination
+ * defaults to a file in the same folder.
+ */
+export function markdownFor(
+  name: string,
+  isImage: boolean,
+  destination = encodeSegment(name),
+): string {
+  const label = (isImage ? name.replace(/\.[^.]+$/, '') : name).replace(/[[\]]/g, '')
+  return isImage ? `![${label}](${destination})` : `[${label}](${destination})`
 }
 
 /** Photos from phones are huge; larger JPEGs are scaled down to this width or height. */
