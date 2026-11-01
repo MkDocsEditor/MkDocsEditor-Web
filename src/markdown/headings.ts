@@ -28,7 +28,9 @@ function plain(text: string): string {
   return text
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[*_~`]/g, '')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<[^>]*>/g, '')
+    // stray angle brackets too, so no tag can survive (the text is shown as plain text anyway)
+    .replace(/[<>]/g, '')
     .trim()
 }
 
