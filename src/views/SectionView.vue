@@ -10,25 +10,27 @@ import {
   mdiPlus,
   mdiUpload,
 } from '@mdi/js'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api'
-import type { Backlink, TreeItem } from '@/api'
+import type { TreeItem } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
+import { openWhileSet } from '@/services/dialogTarget'
 import { colorFor, formatSize, iconFor } from '@/services/icons'
 import { stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
-import { breakWarning, externalBacklinks } from '@/components/references/backlinks'
+import { useBreakWarning } from '@/components/references/backlinks'
 import { useMovedRedirect } from '@/services/redirects'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
-import { sortByName, useTreeStore } from '@/stores/tree'
+import { useTreeStore } from '@/stores/tree'
+import { sortByName } from '@/stores/treeIndex'
 
 const props = defineProps<{ id?: string }>()
 
@@ -71,10 +73,9 @@ function subtitle(item: TreeItem): string {
   return ''
 }
 
+/** The routes are named like the item types. */
 function linkTo(item: TreeItem) {
-  if (item.type === 'section') return { name: 'section', params: { id: item.id } }
-  if (item.type === 'document') return { name: 'document', params: { id: item.id } }
-  return { name: 'resource', params: { id: item.id } }
+  return { name: item.type, params: { id: item.id } }
 }
 
 async function open(item: TreeItem): Promise<void> {
@@ -87,26 +88,11 @@ async function open(item: TreeItem): Promise<void> {
 
 // create / rename / delete
 const createKind = ref<'section' | 'document' | null>(null)
-const createOpen = computed({
-  get: () => createKind.value !== null,
-  set: (open) => {
-    if (!open) createKind.value = null
-  },
-})
+const createOpen = openWhileSet(createKind)
 const renameTarget = ref<TreeItem | null>(null)
-const renameOpen = computed({
-  get: () => renameTarget.value !== null,
-  set: (open) => {
-    if (!open) renameTarget.value = null
-  },
-})
+const renameOpen = openWhileSet(renameTarget)
 const deleteTarget = ref<TreeItem | null>(null)
-const deleteOpen = computed({
-  get: () => deleteTarget.value !== null,
-  set: (open) => {
-    if (!open) deleteTarget.value = null
-  },
-})
+const deleteOpen = openWhileSet(deleteTarget)
 
 async function create(name: string): Promise<void> {
   const parent = section.value
@@ -141,12 +127,7 @@ async function rename(name: string): Promise<void> {
 
 // Deleting a page somebody has open fails with 409; the user can then force it.
 const forceTarget = ref<TreeItem | null>(null)
-const forceOpen = computed({
-  get: () => forceTarget.value !== null,
-  set: (open) => {
-    if (!open) forceTarget.value = null
-  },
-})
+const forceOpen = openWhileSet(forceTarget)
 
 async function remove(item = deleteTarget.value, force = false): Promise<void> {
   if (!item) return
@@ -212,25 +193,16 @@ function onDrop(event: DragEvent): void {
   void upload(Array.from(event.dataTransfer?.files ?? []))
 }
 
-/** Links from other pages that a delete would break ("3 pages link to this file"). */
-const deleteBacklinks = ref<Backlink[] | null>(null)
-watch(deleteTarget, async (item) => {
-  deleteBacklinks.value = null
-  if (!item) return
-  const links = await externalBacklinks(item.type, item.id).catch(() => null)
-  if (deleteTarget.value?.id === item.id) deleteBacklinks.value = links
-})
+const deleteWarning = useBreakWarning(() => deleteTarget.value)
 
 const deleteText = computed(() => {
   const item = deleteTarget.value
   if (!item) return ''
-  const what = { section: 'folder', document: 'page', resource: 'file' }[item.type]
-  const warning = breakWarning(deleteBacklinks.value, what)
   const base =
     item.type === 'section'
       ? `The folder “${item.name}” is deleted with everything in it.`
       : `“${item.name}” will be deleted.`
-  return warning ? `${base} ${warning}` : base
+  return deleteWarning.value ? `${base} ${deleteWarning.value}` : base
 })
 </script>
 

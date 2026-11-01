@@ -11,7 +11,7 @@ export class ReauthCancelled extends Error {
   }
 }
 
-export function isReauthRequired(error: unknown): boolean {
+function isReauthRequired(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403 && error.code === 'reauth-required'
 }
 

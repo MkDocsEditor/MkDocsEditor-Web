@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { mdiAlertCircleOutline, mdiOpenInNew, mdiPlus, mdiUpload } from '@mdi/js'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
 import type { ResourceModel } from '@/api'
 import { findReferences } from '@/markdown/references'
+import { useDebounced } from '@/services/debounced'
 import type { TextReference } from '@/markdown/references'
 import { formatSize } from '@/services/icons'
-import { sortByName, useTreeStore } from '@/stores/tree'
+import { useTreeStore } from '@/stores/tree'
+import { sortByName } from '@/stores/treeIndex'
 
 import ResourceThumb from './ResourceThumb.vue'
 
@@ -33,16 +35,7 @@ const tree = useTreeStore()
 const section = computed(() => tree.parentOf(props.documentId))
 
 /** Recomputed at most every 300 ms while typing. */
-const debounced = ref(props.text)
-let timer: ReturnType<typeof setTimeout> | undefined
-watch(
-  () => props.text,
-  (text) => {
-    clearTimeout(timer)
-    timer = setTimeout(() => (debounced.value = text), 300)
-  },
-)
-onBeforeUnmount(() => clearTimeout(timer))
+const debounced = useDebounced(() => props.text, 300)
 const references = computed(() => findReferences(debounced.value))
 
 interface Used {

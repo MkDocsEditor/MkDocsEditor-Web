@@ -1,13 +1,15 @@
 import { ref, shallowRef } from 'vue'
 
 import { ApiError } from '@/api'
+import { urlPath } from '@/api/client'
 import type { ActorInfo, AuthorshipResponse, WsTicket } from '@/api'
 
 import { applyChangesToRuns, runsFromCodePoints } from './authorRuns'
 import type { Run } from './authorRuns'
 import type { Automerge } from './automerge'
-import type { OfflineStore } from './offlineStore'
-import { applyChanges, diffText } from './session'
+import type { OfflineStore, StoredCopy } from './offlineStore'
+import { rebaseChanges } from './rebase'
+import { diffText } from './session'
 import type {
   AuthorRun,
   DocumentSession,
@@ -30,7 +32,10 @@ import type {
  *   reloads and offline periods, even when the server starts a new epoch.
  */
 
-type AmDoc = Automerge.Doc<{ content: string }>
+interface DocContent {
+  content: string
+}
+type AmDoc = Automerge.Doc<DocContent>
 type AutomergeApi = typeof Automerge
 
 /** The subset of WebSocket the session needs (replaced by a fake in tests). */
@@ -89,8 +94,18 @@ interface PeerState {
   resolved: TextSelection[]
 }
 
+/** Colour of users the server told nothing about. */
+const UNKNOWN_USER_COLOR = '#9e9e9e'
+
+/** Close codes of the document websocket (`docs/sync-protocol.md` section 5). */
+const CLOSE_REFUSED = 4003
+const CLOSE_DELETED = 4004
+const CLOSE_HEARTBEAT_TIMEOUT = 4008
+const CLOSE_RENAMED = 4009
+const CLOSE_PROTOCOL_ERROR = 4400
+
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
-export function randomActorId(): string {
+function randomActorId(): string {
   const bytes = new Uint8Array(16)
   crypto.getRandomValues(bytes)
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -128,76 +143,6 @@ function patchesToChanges(patches: readonly Automerge.Patch[]): TextChange[] | n
     else return null
   }
   return changes
-}
-
-/** Number of characters around a change used to find its place in a changed text. */
-const CONTEXT = 40
-
-/** The occurrence of `needle` in `text` closest to `hint`, or -1. */
-function nearestIndex(text: string, needle: string, hint: number): number {
-  let best = -1
-  for (let i = text.indexOf(needle); i >= 0; i = text.indexOf(needle, i + 1)) {
-    if (best < 0 || Math.abs(i - hint) < Math.abs(best - hint)) best = i
-    if (i > hint) break
-  }
-  return best
-}
-
-/**
- * Finds where the text `removed`, which sat between `before` and `after`, is in `text` now.
- * Returns the start index. Text that only exists in `text` (edits by others) is never covered, so
- * a pure insert goes next to its old neighbours instead of replacing what was added there.
- */
-function locate(text: string, before: string, removed: string, after: string): number {
-  const hint = before.length
-  if (text.startsWith(before) && text.startsWith(removed, before.length)) return before.length
-  const end = text.length - after.length
-  if (
-    end - removed.length >= 0 &&
-    text.endsWith(after) &&
-    text.startsWith(removed, end - removed.length)
-  ) {
-    return end - removed.length
-  }
-  const prefix = before.slice(-CONTEXT)
-  const suffix = after.slice(0, CONTEXT)
-  for (const [needle, offset] of [
-    [prefix + removed + suffix, prefix.length],
-    [prefix + removed, prefix.length],
-    [removed + suffix, 0],
-  ] as const) {
-    if (!needle) continue
-    const index = nearestIndex(text, needle, hint - offset)
-    if (index >= 0) return index + offset
-  }
-  return -1
-}
-
-/**
- * Re-applies `unsynced` (changes made on top of `base`) to `target`, a text that may differ from
- * `base`. Each change is placed by its surrounding text when possible, otherwise at the same
- * position (clamped). Text is never dropped: neither the inserted text nor text that only exists
- * in `target`.
- */
-export function rebaseChanges(
-  base: string,
-  unsynced: readonly TextChange[],
-  target: string,
-): TextChange[] {
-  const result: TextChange[] = []
-  let text = target
-  let baseText = base
-  for (const change of unsynced) {
-    const removed = baseText.slice(change.from, change.to)
-    const found = locate(text, baseText.slice(0, change.from), removed, baseText.slice(change.to))
-    // Not found: the removed text is gone or changed there, so only insert, at the old position.
-    const from = found >= 0 ? found : Math.min(change.from, text.length)
-    const to = found >= 0 ? found + removed.length : from
-    result.push({ from, to, insert: change.insert })
-    text = applyChanges(text, [{ from, to, insert: change.insert }])
-    baseText = applyChanges(baseText, [change])
-  }
-  return result
 }
 
 export function createAutomergeSession(options: AutomergeSessionOptions): DocumentSession {
@@ -308,7 +253,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
           from: run.from,
           to: run.to,
           username: user?.displayName ?? run.username,
-          color: user?.color ?? '#9e9e9e',
+          color: user?.color ?? UNKNOWN_USER_COLOR,
         },
       ]
     })
@@ -381,7 +326,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         clientId: state.info.clientId,
         username: state.info.username,
         displayName: state.info.displayName ?? state.info.username,
-        color: state.info.color ?? '#9e9e9e',
+        color: state.info.color ?? UNKNOWN_USER_COLOR,
         selections: state.resolved,
       })
     }
@@ -435,8 +380,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   async function connect(): Promise<void> {
     if (closed) return
-    setStatus({ connection: doc ? 'offline' : 'connecting' })
-    if (attempt > 0) setStatus({ connection: 'offline' })
+    setStatus({ connection: doc || attempt > 0 ? 'offline' : 'connecting' })
     let ticket: WsTicket
     try {
       ticket = await options.api.wsTicket()
@@ -450,7 +394,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     }
     if (closed) return
 
-    const ws = createSocket(options.api.wsUrl(`/document/${encodeURIComponent(documentId)}/ws`))
+    const ws = createSocket(options.api.wsUrl(urlPath`/document/${documentId}/ws`))
     socket = ws
     synced = false
     ws.onopen = () => {
@@ -505,16 +449,16 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     peers.value = []
     if (closed) return
     switch (code) {
-      case 4003:
+      case CLOSE_REFUSED:
         fail('The server refused this connection.')
         return
-      case 4004:
+      case CLOSE_DELETED:
         fail('This page was deleted. Your text is still here – copy it if you want to keep it.')
         return
-      case 4400:
+      case CLOSE_PROTOCOL_ERROR:
         fail('Connection error (protocol). Please reload the page.')
         return
-      case 4009:
+      case CLOSE_RENAMED:
         // reconnect with the new id once the stored copy follows (its epoch goes into hello)
         attempt = 0
         void renaming.finally(() => connect())
@@ -598,22 +542,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (existing && !doc) {
       // No copy under the old id (it was re-keyed already, for example by the tree's rescue of
       // moved copies): continue with the stored copy of the new id, like on start.
-      doc = A.load<{ content: string }>(existing.bytes, { actor: existing.actorId })
-      actorId = existing.actorId
-      epoch = existing.epoch
-      serverHeads = existing.serverHeads
-      readOnly = false
-      setStatus({ readOnly: false })
-      emit(diffText('', text()))
-      updateUnsynced()
-      markReady()
+      adoptStoredCopy(existing)
     } else if (existing && existing.epoch !== epoch) {
       next()
       return
     } else if (existing && doc) {
       // An older copy of the same document under the new id: keep its edits too.
       const before = text()
-      doc = A.merge(doc, A.load<{ content: string }>(existing.bytes, { actor: existing.actorId }))
+      doc = A.merge(doc, A.load<DocContent>(existing.bytes, { actor: existing.actorId }))
       emit(diffText(before, text()))
       updateUnsynced()
       scheduleFlush()
@@ -626,11 +562,24 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     previous()
   }
 
+  /** Editing works offline on a persisted copy; the server merges it after the reconnect. */
+  function adoptStoredCopy(stored: StoredCopy): void {
+    doc = A.load<DocContent>(stored.bytes, { actor: stored.actorId })
+    actorId = stored.actorId
+    epoch = stored.epoch
+    serverHeads = stored.serverHeads
+    readOnly = false
+    setStatus({ readOnly: false })
+    emit(diffText('', text()))
+    updateUnsynced()
+    markReady()
+  }
+
   function rememberUser(info: { username: string; displayName?: string; color?: string }): void {
     if (!info.username) return
     users.set(info.username, {
       displayName: info.displayName || info.username,
-      color: info.color ?? users.get(info.username)?.color ?? '#9e9e9e',
+      color: info.color ?? users.get(info.username)?.color ?? UNKNOWN_USER_COLOR,
     })
   }
 
@@ -652,7 +601,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (doc && epoch === serverEpoch) {
       // Same lineage: keep our copy (with offline edits) and let the sync loop merge.
     } else {
-      const loaded = A.load<{ content: string }>(fromBase64(String(message.documentState ?? '')), {
+      const loaded = A.load<DocContent>(fromBase64(String(message.documentState ?? '')), {
         actor: doc ? randomActorId() : actorId,
       })
       let next = loaded
@@ -724,8 +673,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       const stale = socket
       socket = null
       synced = false
-      stale.close(4008, 'heartbeat timeout')
-      handleClose(4008)
+      stale.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
+      handleClose(CLOSE_HEARTBEAT_TIMEOUT)
       return
     }
     if (synced && now - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
@@ -778,16 +727,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       release = await options.store.claim(documentId)
       const stored = release ? await options.store.get(documentId) : undefined
       if (stored && !closed) {
-        doc = A.load<{ content: string }>(stored.bytes, { actor: stored.actorId })
-        actorId = stored.actorId
-        epoch = stored.epoch
-        serverHeads = stored.serverHeads
-        readOnly = false
-        // Editing works offline on a persisted copy; the server merges it after the reconnect.
-        setStatus({ connection: 'connecting', readOnly: false })
-        emit(diffText('', text()))
-        updateUnsynced()
-        markReady()
+        adoptStoredCopy(stored)
       }
     } catch (error) {
       console.error('mkdocseditor: could not load the local copy', error)

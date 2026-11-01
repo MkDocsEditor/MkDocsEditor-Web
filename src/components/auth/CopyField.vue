@@ -1,19 +1,11 @@
 <script setup lang="ts">
 import { mdiCheck, mdiContentCopy } from '@mdi/js'
-import { ref } from 'vue'
 
-import { copyText } from '@/services/clipboard'
+import { useCopied } from '@/services/copied'
 
-const props = defineProps<{ value: string; label: string; testid?: string }>()
+defineProps<{ value: string; label: string; testid?: string }>()
 
-const copied = ref(false)
-let timer: ReturnType<typeof setTimeout> | undefined
-
-async function copy(): Promise<void> {
-  copied.value = await copyText(props.value)
-  clearTimeout(timer)
-  timer = setTimeout(() => (copied.value = false), 2000)
-}
+const { copied, copy } = useCopied()
 </script>
 
 <template>
@@ -33,7 +25,7 @@ async function copy(): Promise<void> {
         :aria-label="copied ? 'Copied' : `Copy ${label.toLowerCase()}`"
         variant="text"
         size="small"
-        @click="copy"
+        @click="copy(value)"
       />
     </template>
   </v-text-field>

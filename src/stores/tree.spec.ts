@@ -6,6 +6,7 @@ import type { SectionModel } from '@/api'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
 
+import { useTreeStore } from './tree'
 import {
   ancestorsOf,
   indexDocumentOf,
@@ -15,8 +16,7 @@ import {
   resolveRelative,
   searchTree,
   sortByName,
-  useTreeStore,
-} from './tree'
+} from './treeIndex'
 
 describe('tree helpers', () => {
   const index = indexTree(sampleTree())

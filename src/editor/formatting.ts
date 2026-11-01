@@ -17,7 +17,7 @@ const USER_EVENT = 'input.format'
  * selection is already wrapped (inside or just outside the selection). An empty selection
  * inserts the pair and puts the cursor between.
  */
-export function toggleInline(marker: string): Format {
+function toggleInline(marker: string): Format {
   const n = marker.length
   return (state) =>
     state.update(
@@ -129,7 +129,7 @@ function hasPrefix(kind: PrefixKind, text: string): boolean {
  * Turns the selected lines into a list (or quote), or back into plain lines when all of them
  * already are. Another list type is replaced (a bullet list becomes numbered).
  */
-export function toggleLinePrefix(kind: PrefixKind): Format {
+function toggleLinePrefix(kind: PrefixKind): Format {
   return (state) => {
     const ranges = state.selection.ranges
     const allLines = ranges.flatMap((r) => selectedLines(state, r))
@@ -211,7 +211,7 @@ export function toggleHeading(level: number): Format {
  * Inserts `block` on lines of its own at the main selection (or replaces the selection). The
  * part of the block between `select[0]` and `select[1]` (offsets in `block`) is selected.
  */
-export function insertBlock(
+function insertBlock(
   state: EditorState,
   block: string,
   select: [number, number] = [block.length, block.length],
@@ -232,7 +232,7 @@ export function insertBlock(
 }
 
 /** A fenced code block around the selected lines, or an empty one with the cursor inside. */
-export const codeBlock: Format = (state) => {
+const codeBlock: Format = (state) => {
   const range = state.selection.main
   if (range.empty) {
     const block = '```\n\n```'
@@ -251,7 +251,7 @@ export const codeBlock: Format = (state) => {
 }
 
 /** `[text](url)`: the selection becomes the text, the URL placeholder is selected. */
-export function linkTemplate(image: boolean): Format {
+function linkTemplate(image: boolean): Format {
   return (state) => {
     const range = state.selection.main
     const text = state.sliceDoc(range.from, range.to)
@@ -272,7 +272,7 @@ export function linkTemplate(image: boolean): Format {
 }
 
 /** A two-column table; the first header cell is selected. */
-export const table: Format = (state) =>
+const table: Format = (state) =>
   insertBlock(
     state,
     '| Column 1 | Column 2 |\n| -------- | -------- |\n|          |          |',
@@ -329,7 +329,7 @@ export function admonition(type: string = 'note'): Format {
 }
 
 /** A horizontal rule on a line of its own, after a blank line (so it does not make a heading). */
-export const horizontalRule: Format = (state) => {
+const horizontalRule: Format = (state) => {
   const { from } = state.selection.main
   const line = state.doc.lineAt(from)
   const textBefore = state.doc.sliceString(line.from, from)

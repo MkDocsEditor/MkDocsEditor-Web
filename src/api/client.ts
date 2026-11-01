@@ -16,6 +16,13 @@ import type {
   WsTicket,
 } from './types'
 
+/** Builds a backend path; every interpolated value is URL encoded. */
+export function urlPath(strings: TemplateStringsArray, ...values: (string | number)[]): string {
+  return String.raw({ raw: strings }, ...values.map((v) => encodeURIComponent(v)))
+}
+
+const forceQuery = (force: boolean) => (force ? '?force=true' : '')
+
 /** An error response (or a network failure) of the backend. */
 export class ApiError extends Error {
   constructor(
@@ -166,15 +173,10 @@ export class ApiClient {
 
   /** Who wrote which part of a document, or null when the backend does not support it yet. */
   async getAuthorship(id: string): Promise<AuthorshipResponse | null> {
-    try {
-      return await this.json<AuthorshipResponse>(
-        'GET',
-        `/document/${encodeURIComponent(id)}/authorship`,
-      )
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 404 || error.status === 405)) return null
-      throw error
-    }
+    return nullWhen(
+      [404, 405],
+      this.json<AuthorshipResponse>('GET', urlPath`/document/${id}/authorship`),
+    )
   }
 
   async getTree(): Promise<SectionModel> {
@@ -189,22 +191,22 @@ export class ApiClient {
 
   async renameSection(id: string, name: string): Promise<SectionModel> {
     return normalizeSection(
-      await this.json<SectionModel>('PUT', `/section/${encodeURIComponent(id)}`, {
+      await this.json<SectionModel>('PUT', urlPath`/section/${id}`, {
         json: { name },
       }),
     )
   }
 
   async deleteSection(id: string, force = false): Promise<void> {
-    await this.request('DELETE', `/section/${encodeURIComponent(id)}${force ? '?force=true' : ''}`)
+    await this.request('DELETE', urlPath`/section/${id}` + forceQuery(force))
   }
 
   async getDocument(id: string): Promise<DocumentModel> {
-    return this.json<DocumentModel>('GET', `/document/${encodeURIComponent(id)}`)
+    return this.json<DocumentModel>('GET', urlPath`/document/${id}`)
   }
 
   async getDocumentContent(id: string): Promise<string> {
-    const response = await this.request('GET', `/document/${encodeURIComponent(id)}/content`)
+    const response = await this.request('GET', urlPath`/document/${id}/content`)
     return response.text()
   }
 
@@ -213,14 +215,14 @@ export class ApiClient {
   }
 
   async renameDocument(id: string, name: string): Promise<DocumentModel> {
-    return this.json<DocumentModel>('PUT', `/document/${encodeURIComponent(id)}`, {
+    return this.json<DocumentModel>('PUT', urlPath`/document/${id}`, {
       json: { name },
     })
   }
 
   /** `force` deletes even while someone has the document open (otherwise 409). */
   async deleteDocument(id: string, force = false): Promise<void> {
-    await this.request('DELETE', `/document/${encodeURIComponent(id)}${force ? '?force=true' : ''}`)
+    await this.request('DELETE', urlPath`/document/${id}` + forceQuery(force))
   }
 
   /**
@@ -228,43 +230,33 @@ export class ApiClient {
    * (git not enabled, or an older backend).
    */
   async getHistory(id: string, limit = 100): Promise<Revision[] | null> {
-    try {
-      return await this.json<Revision[]>(
-        'GET',
-        `/document/${encodeURIComponent(id)}/history?limit=${limit}`,
-      )
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) return null
-      throw error
-    }
+    return nullWhen(
+      [404],
+      this.json<Revision[]>('GET', urlPath`/document/${id}/history?limit=${limit}`),
+    )
   }
 
   async getRevisionContent(id: string, revision: string): Promise<string> {
-    const path = `/document/${encodeURIComponent(id)}/history/${encodeURIComponent(revision)}/content`
+    const path = urlPath`/document/${id}/history/${revision}/content`
     return (await this.request('GET', path)).text()
   }
 
   /** Unified diff between two revisions; `current` is the live text. Empty when equal. */
   async getRevisionDiff(id: string, from: string, to = 'current'): Promise<string> {
     const query = new URLSearchParams({ from, to })
-    return (
-      await this.request('GET', `/document/${encodeURIComponent(id)}/history/diff?${query}`)
-    ).text()
+    return (await this.request('GET', `${urlPath`/document/${id}/history/diff`}?${query}`)).text()
   }
 
   /** Sets the live document to the text of `revision` (arrives as a normal edit). */
   async restoreRevision(id: string, revision: string): Promise<void> {
-    await this.request(
-      'POST',
-      `/document/${encodeURIComponent(id)}/history/${encodeURIComponent(revision)}/restore`,
-    )
+    await this.request('POST', urlPath`/document/${id}/history/${revision}/restore`)
   }
 
   /** References to an item from all documents ("used by"), sorted by source path and line. */
   async getBacklinks(type: ItemType, id: string): Promise<Backlink[]> {
     const answer = await this.json<{ backlinks: Backlink[] }>(
       'GET',
-      `/${type}/${encodeURIComponent(id)}/backlinks`,
+      urlPath`/${type}/${id}/backlinks`,
     )
     return answer.backlinks ?? []
   }
@@ -294,46 +286,44 @@ export class ApiClient {
    * the item is gone, or the backend has no redirects.
    */
   async getMoved(id: string): Promise<MovedTo | null> {
-    try {
-      return await this.json<MovedTo>('GET', `/moved/${encodeURIComponent(id)}`)
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 404 || error.status === 405)) return null
-      throw error
-    }
+    return nullWhen([404, 405], this.json<MovedTo>('GET', urlPath`/moved/${id}`))
   }
 
   async getResourceContent(id: string): Promise<Blob> {
-    const response = await this.request('GET', `/resource/${encodeURIComponent(id)}/content`)
+    const response = await this.request('GET', urlPath`/resource/${id}/content`)
     return response.blob()
   }
 
   /** A scaled-down JPEG or PNG of an image resource (newer backends, `thumbnail: true`). */
   async getResourceThumbnail(id: string, size = 256): Promise<Blob> {
-    const response = await this.request(
-      'GET',
-      `/resource/${encodeURIComponent(id)}/thumbnail?size=${size}`,
-    )
+    const response = await this.request('GET', urlPath`/resource/${id}/thumbnail?size=${size}`)
     return response.blob()
   }
 
   async uploadResource(parentId: string, name: string, file: Blob): Promise<ResourceModel> {
     const form = new FormData()
     form.append('file', file, name)
-    return this.json<ResourceModel>(
-      'POST',
-      `/resource/${encodeURIComponent(parentId)}/${encodeURIComponent(name)}`,
-      { body: form },
-    )
+    return this.json<ResourceModel>('POST', urlPath`/resource/${parentId}/${name}`, { body: form })
   }
 
   async renameResource(id: string, name: string): Promise<ResourceModel> {
-    return this.json<ResourceModel>('PUT', `/resource/${encodeURIComponent(id)}`, {
+    return this.json<ResourceModel>('PUT', urlPath`/resource/${id}`, {
       json: { name },
     })
   }
 
   async deleteResource(id: string): Promise<void> {
-    await this.request('DELETE', `/resource/${encodeURIComponent(id)}`)
+    await this.request('DELETE', urlPath`/resource/${id}`)
+  }
+}
+
+/** The answer of a request, or null for the statuses that mean "the backend has no such thing". */
+async function nullWhen<T>(statuses: readonly number[], request: Promise<T>): Promise<T | null> {
+  try {
+    return await request
+  } catch (error) {
+    if (error instanceof ApiError && statuses.includes(error.status)) return null
+    throw error
   }
 }
 

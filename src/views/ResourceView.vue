@@ -12,16 +12,16 @@ import { useRouter } from 'vue-router'
 
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import BacklinksList from '@/components/references/BacklinksList.vue'
-import { breakWarning, externalBacklinks } from '@/components/references/backlinks'
+import { useBreakWarning } from '@/components/references/backlinks'
 import NameDialog from '@/components/common/NameDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import { useApi } from '@/api'
-import type { Backlink } from '@/api'
-import { copyText } from '@/services/clipboard'
+import { copyText, downloadUrl } from '@/services/clipboard'
 import { KIND_LABELS, colorFor, formatSize, iconFor, resourceKind } from '@/services/icons'
 import { openResource } from '@/services/resources'
 import { resourceObjectUrl } from '@/services/resourceUrls'
 import { useMovedRedirect } from '@/services/redirects'
+import { formatDate } from '@/services/time'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
@@ -47,10 +47,7 @@ const kind = computed(() => (resource.value ? resourceKind(resource.value) : 'ot
 const path = computed(() => tree.path(props.id))
 const modified = computed(() => {
   const time = resource.value?.modtime
-  const date = time ? new Date(time) : null
-  return date && !Number.isNaN(date.getTime())
-    ? date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })
-    : ''
+  return time && !Number.isNaN(new Date(time).getTime()) ? formatDate(time) : ''
 })
 
 /** Images, PDFs, video and audio are shown inline; text files as text. */
@@ -76,7 +73,7 @@ watch(
         if (resource.value?.id === id) previewUrl.value = url
       }
     } catch {
-      previewFailed.value = true
+      if (resource.value?.id === id) previewFailed.value = true
     }
   },
   { immediate: true },
@@ -94,11 +91,7 @@ async function download(): Promise<void> {
   const item = resource.value
   if (!item) return
   try {
-    const url = await resourceObjectUrl(item.id)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = item.name
-    link.click()
+    downloadUrl(item.name, await resourceObjectUrl(item.id))
   } catch (error) {
     notify.error(error, 'Download failed')
   }
@@ -110,15 +103,10 @@ async function copyPath(): Promise<void> {
 
 const renameOpen = ref(false)
 const deleteOpen = ref(false)
-const deleteBacklinks = ref<Backlink[] | null>(null)
-watch(deleteOpen, async (open) => {
-  deleteBacklinks.value = null
-  if (open) deleteBacklinks.value = await externalBacklinks('resource', props.id).catch(() => null)
-})
+const deleteWarning = useBreakWarning(() => (deleteOpen.value ? resource.value : null))
 const deleteText = computed(() => {
-  const warning = breakWarning(deleteBacklinks.value, 'file')
   const base = `“${resource.value?.name}” will be deleted.`
-  return warning ? `${base} ${warning}` : base
+  return deleteWarning.value ? `${base} ${deleteWarning.value}` : base
 })
 
 async function rename(name: string): Promise<void> {
@@ -133,9 +121,11 @@ async function rename(name: string): Promise<void> {
 
 async function remove(): Promise<void> {
   const parent = tree.parentOf(props.id)
+  // read before the delete: afterwards the tree no longer has the file
+  const name = resource.value?.name ?? 'file'
   try {
     await tree.deleteResource(props.id)
-    notify.success(`Deleted “${resource.value?.name ?? 'file'}”`)
+    notify.success(`Deleted “${name}”`)
     await router.replace(
       parent && parent.id !== tree.root?.id
         ? { name: 'section', params: { id: parent.id } }

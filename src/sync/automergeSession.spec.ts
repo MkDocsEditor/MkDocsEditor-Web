@@ -4,7 +4,8 @@ import { FakeSyncServer } from '@/test/fakeSyncServer'
 
 import { loadAutomerge } from './automerge'
 import type { Automerge } from './automerge'
-import { createAutomergeSession, rebaseChanges } from './automergeSession'
+import { createAutomergeSession } from './automergeSession'
+import { rebaseChanges } from './rebase'
 import { memoryStore } from './offlineStore'
 import type { OfflineStore } from './offlineStore'
 import type { DocumentSession, TextChange } from './session'
@@ -344,9 +345,15 @@ describe('rebaseChanges', () => {
     await vi.waitFor(() => expect(server.text).toBe('Text\nmehr\n'))
     server.rename('doc-2')
     await vi.waitFor(() => expect(renamed).toEqual(['doc-2']))
+    // the session may still count as online here: wait for the hello of the new connection
+    await vi.waitFor(() =>
+      expect(server.connections.at(-1)?.socket.sent[0]).toMatchObject({
+        type: 'hello',
+        documentId: 'doc-2',
+        epoch: 'epoch-1',
+      }),
+    )
     await online(anna)
-    const hellos = server.connections.map((c) => c.socket.sent[0])
-    expect(hellos.at(-1)).toMatchObject({ type: 'hello', documentId: 'doc-2', epoch: 'epoch-1' })
     anna.insert('end', 'danach\n')
     await vi.waitFor(() => expect(server.text).toBe('Text\nmehr\ndanach\n'))
     await vi.waitFor(async () => expect(await anna.store.keys()).toEqual(['doc-2']))

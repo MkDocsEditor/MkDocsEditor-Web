@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { diffStats, formatWhen, parseUnifiedDiff } from './diff'
+import { diffStats, parseUnifiedDiff } from './diff'
 
 const DIFF = `diff --git a/docs/a.md b/docs/a.md
 index 1111111..2222222 100644
@@ -29,17 +29,5 @@ describe('parseUnifiedDiff', () => {
 
   it('returns nothing for an empty diff', () => {
     expect(parseUnifiedDiff('')).toEqual([])
-  })
-})
-
-describe('formatWhen', () => {
-  const now = Date.parse('2026-10-31T12:00:00Z')
-
-  it('says how long ago, then the date', () => {
-    expect(formatWhen('2026-10-31T11:59:30Z', now)).toBe('just now')
-    expect(formatWhen('2026-10-31T11:55:00Z', now)).toBe('5 minutes ago')
-    expect(formatWhen('2026-10-30T12:00:00Z', now)).toBe('yesterday')
-    expect(formatWhen('2026-09-01T12:00:00Z', now)).toMatch(/2026/)
-    expect(formatWhen('kaputt', now)).toBe('kaputt')
   })
 })

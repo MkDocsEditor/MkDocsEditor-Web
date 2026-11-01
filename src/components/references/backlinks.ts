@@ -1,3 +1,6 @@
+import { computed, ref, watch } from 'vue'
+import type { ComputedRef } from 'vue'
+
 import { ApiError, useApi } from '@/api'
 import type { Backlink, ItemRef, ItemType } from '@/api'
 
@@ -43,4 +46,27 @@ export function breakWarning(backlinks: readonly Backlink[] | null, what: string
   return `${pages === 1 ? '1 page links' : `${pages} pages link`} to this ${what}; ${
     backlinks.length === 1 ? 'that link' : 'those links'
   } will break.`
+}
+
+const ITEM_LABELS: Record<ItemType, string> = {
+  section: 'folder',
+  document: 'page',
+  resource: 'file',
+}
+
+/** The warning for deleting `target` (see `breakWarning`), loaded whenever the target changes. */
+export function useBreakWarning(
+  target: () => { type: ItemType; id: string } | null | undefined,
+): ComputedRef<string> {
+  const backlinks = ref<Backlink[] | null>(null)
+  watch(target, async (item) => {
+    backlinks.value = null
+    if (!item) return
+    const links = await externalBacklinks(item.type, item.id).catch(() => null)
+    if (target()?.id === item.id) backlinks.value = links
+  })
+  return computed(() => {
+    const item = target()
+    return item ? breakWarning(backlinks.value, ITEM_LABELS[item.type]) : ''
+  })
 }

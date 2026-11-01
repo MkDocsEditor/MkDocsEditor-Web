@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import type { CDPSession, Page } from '@playwright/test'
 
 /** Decodes RFC 4648 base32 (the TOTP secret format), ignoring padding, spaces and case. */
-export function base32Decode(input: string): Buffer {
+function base32Decode(input: string): Buffer {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
   const clean = input.toUpperCase().replace(/[\s=-]/g, '')
   let bits = 0
@@ -30,13 +30,6 @@ export function totp(secret: string, time = Date.now(), step = 30, digits = 6): 
   const offset = (hmac[hmac.length - 1] ?? 0) & 0x0f
   const code = (hmac.readUInt32BE(offset) & 0x7fffffff) % 10 ** digits
   return code.toString().padStart(digits, '0')
-}
-
-/** The `secret` parameter of an `otpauth://` URI. */
-export function secretFromUri(uri: string): string {
-  const secret = new URL(uri).searchParams.get('secret')
-  if (!secret) throw new Error(`no secret in ${uri}`)
-  return secret
 }
 
 export interface VirtualAuthenticator {

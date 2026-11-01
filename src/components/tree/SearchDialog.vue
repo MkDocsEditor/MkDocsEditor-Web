@@ -3,7 +3,7 @@ import { mdiMagnify } from '@mdi/js'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { SearchHit } from '@/stores/tree'
+import type { SearchHit } from '@/stores/treeIndex'
 import { colorFor, iconFor } from '@/services/icons'
 import { useTreeStore } from '@/stores/tree'
 

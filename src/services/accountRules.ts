@@ -37,15 +37,7 @@ export const colorRule: Rule = (value) =>
 export const totpRule: Rule = (value) =>
   /^\d{6}$/.test((value ?? '').replace(/\s/g, '')) || '6 digits from the app'
 
-/** Formats an ISO time, for example "Oct 31, 2026, 2:05 PM". */
-export function formatTime(iso: string | null | undefined): string {
-  if (!iso) return '–'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '–'
-  return date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-export const ROLE_LABELS: Record<string, string> = {
+const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   editor: 'Editor',
   reader: 'Reader',

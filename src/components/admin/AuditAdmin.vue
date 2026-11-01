@@ -3,7 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 
 import { useAuthApi } from '@/api'
 import type { AuditEvent } from '@/api'
-import { formatTime } from '@/services/accountRules'
+import { formatTime } from '@/services/time'
 import { useNotifyStore } from '@/stores/notify'
 
 const api = useAuthApi()

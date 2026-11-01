@@ -6,7 +6,7 @@ import { useAuthApi } from '@/api'
 import type { CreatedDeviceLink, DeviceLink } from '@/api'
 import QrCode from '@/components/auth/QrCode.vue'
 import { describeAuthError } from '@/services/authErrors'
-import { copyText } from '@/services/clipboard'
+import { useCopied } from '@/services/copied'
 import { connectUrlFor, OBTAINIUM_ADD_URL } from '@/services/connectLink'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
@@ -24,7 +24,7 @@ const created = ref<CreatedDeviceLink | null>(null)
 const link = ref<DeviceLink | null>(null)
 const busy = ref(false)
 const error = ref('')
-const copied = ref(false)
+const { copied, copy } = useCopied()
 const now = ref(Date.now())
 
 let clock: ReturnType<typeof setInterval> | undefined
@@ -96,10 +96,10 @@ async function revoke(): Promise<void> {
   link.value = null
 }
 
-async function copy(): Promise<void> {
-  copied.value = await copyText(url.value)
-  if (!copied.value) notify.error('The browser did not allow copying. Select the link instead.')
-  setTimeout(() => (copied.value = false), 2000)
+async function copyUrl(): Promise<void> {
+  if (!(await copy(url.value))) {
+    notify.error('The browser did not allow copying. Select the link instead.')
+  }
 }
 
 function reset(): void {
@@ -166,7 +166,7 @@ onBeforeUnmount(stopTimers)
             variant="tonal"
             :prepend-icon="copied ? mdiCheckCircle : mdiContentCopy"
             data-testid="connect-copy"
-            @click="copy"
+            @click="copyUrl"
           >
             {{ copied ? 'Copied' : 'Copy link' }}
           </v-btn>

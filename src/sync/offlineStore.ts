@@ -61,7 +61,7 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 /** IndexedDB store; falls back to memory when IndexedDB is unavailable (private mode). */
-export function indexedDbStore(): OfflineStore {
+function indexedDbStore(): OfflineStore {
   let dbPromise: Promise<IDBDatabase> | null = null
   const open = () =>
     (dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {

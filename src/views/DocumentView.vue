@@ -20,6 +20,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
 import { EditorSelection } from '@codemirror/state'
+import type { EditorView } from '@codemirror/view'
 
 import type { ResourceModel } from '@/api'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
@@ -53,10 +54,10 @@ const moveStore = useMoveStore()
 const router = useRouter()
 const { mobile } = useDisplay()
 
-const document = computed(() => tree.document(props.id))
+const page = computed(() => tree.document(props.id))
 const ancestors = computed(() => tree.ancestors(props.id))
 const parentId = computed(() => tree.parentOf(props.id)?.id)
-const wikiUrl = computed(() => (document.value ? wikiPageUrl(document.value.url) : null))
+const wikiUrl = computed(() => (page.value ? wikiPageUrl(page.value.url) : null))
 
 type Mode = 'edit' | 'split' | 'preview'
 const MODE_KEY = 'mkdocseditor.documentMode'
@@ -73,6 +74,11 @@ const mode = computed<Mode>({
 })
 const showAuthorship = ref(false)
 
+/** Leaves the preview-only mode, for actions that need the editor on screen. */
+function showEditor(): void {
+  if (mode.value === 'preview') mode.value = mobile.value ? 'edit' : 'split'
+}
+
 /** The files panel; remembered on wide screens, closed by default on phones. */
 const FILES_KEY = 'mkdocseditor.filesPanel'
 const filesStored = ref(readJson<boolean>(local(), FILES_KEY) ?? false)
@@ -87,6 +93,9 @@ const filesOpen = computed<boolean>({
     }
   },
 })
+function closeFilesOnPhone(): void {
+  if (mobile.value) filesOpen.value = false
+}
 const historyOpen = ref(false)
 
 const session = shallowRef<DocumentSession | null>(null)
@@ -133,7 +142,7 @@ function openLinkPicker(): void {
 function openResourcePicker(): void {
   pickerSelection.value = selectedText()
   resourceOpen.value = true
-  if (mobile.value) filesOpen.value = false
+  closeFilesOnPhone()
 }
 
 const toolbarOverride = { link: openLinkPicker, image: openResourcePicker }
@@ -142,18 +151,23 @@ const shortcutOverride = {
   image: () => (openResourcePicker(), true),
 }
 
-/** Replaces the selection (or inserts at the cursor) and puts the cursor after it. */
-function replaceSelection(text: string): void {
-  const view = editorView()
-  if (!view || view.state.readOnly) return
-  const { from, to } = view.state.selection.main
+/** Replaces a range with text as user input and puts the cursor after it. */
+function insertText(view: EditorView, from: number, to: number, insert: string): void {
   view.dispatch({
-    changes: { from, to, insert: text },
-    selection: { anchor: from + text.length },
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
     userEvent: 'input.insert',
     scrollIntoView: true,
   })
   view.focus()
+}
+
+/** Replaces the selection (or inserts at the cursor). */
+function replaceSelection(insert: string): void {
+  const view = editorView()
+  if (!view || view.state.readOnly) return
+  const { from, to } = view.state.selection.main
+  insertText(view, from, to, insert)
 }
 
 function insertFromPicker(snippets: string[]): void {
@@ -165,16 +179,9 @@ function insertFromPicker(snippets: string[]): void {
 function insertSnippets(snippets: string[]): void {
   const view = editorView()
   if (!view || snippets.length === 0 || view.state.readOnly) return
-  if (mode.value === 'preview') mode.value = mobile.value ? 'edit' : 'split'
+  showEditor()
   const at = view.state.selection.main.head
-  const insert = insertionFor(view.state.doc, at, snippets)
-  view.dispatch({
-    changes: { from: at, insert },
-    selection: { anchor: at + insert.length },
-    userEvent: 'input.insert',
-    scrollIntoView: true,
-  })
-  view.focus()
+  insertText(view, at, at, insertionFor(view.state.doc, at, snippets))
 }
 
 /** Markdown for a resource, relative to this page. */
@@ -185,7 +192,7 @@ function markdownOf(resource: ResourceModel): string {
 
 function insertResource(resource: ResourceModel): void {
   insertSnippets([markdownOf(resource)])
-  if (mobile.value) filesOpen.value = false
+  closeFilesOnPhone()
 }
 
 async function uploadAndInsert(files: File[]): Promise<void> {
@@ -199,7 +206,7 @@ async function uploadAndInsert(files: File[]): Promise<void> {
 function reveal(reference: TextReference): void {
   const view = editorView()
   if (!view) return
-  if (mode.value === 'preview') mode.value = mobile.value ? 'edit' : 'split'
+  showEditor()
   const length = view.state.doc.length
   view.dispatch({
     selection: EditorSelection.range(
@@ -209,16 +216,17 @@ function reveal(reference: TextReference): void {
     scrollIntoView: true,
   })
   view.focus()
-  if (mobile.value) filesOpen.value = false
+  closeFilesOnPhone()
 }
 
 /** `?line=12` (from "linked from" lists): select that line once the text is there. */
 const route = useRoute()
+let revealTimer: ReturnType<typeof setTimeout> | undefined
 function revealLine(number: number, attempt = 0): void {
   const view = editorView()
   // the editor creates its view a moment after the text is ready
   if (!view || view.state.doc.length < text.value.length) {
-    if (attempt < 40) setTimeout(() => revealLine(number, attempt + 1), 50)
+    if (attempt < 40) revealTimer = setTimeout(() => revealLine(number, attempt + 1), 50)
     return
   }
   const target = view.state.doc.line(Math.min(number, view.state.doc.lines))
@@ -230,7 +238,7 @@ watch(
   ([isReady, line]) => {
     const number = Number(line)
     if (!isReady || !Number.isInteger(number) || number < 1) return
-    if (mode.value === 'preview') mode.value = mobile.value ? 'edit' : 'split'
+    showEditor()
     void router.replace({ query: { ...route.query, line: undefined } })
     revealLine(number)
   },
@@ -272,7 +280,10 @@ watch(
   },
   { immediate: true },
 )
-onBeforeUnmount(() => session.value?.close())
+onBeforeUnmount(() => {
+  clearTimeout(revealTimer)
+  session.value?.close()
+})
 
 const status = computed(() => session.value?.status.value)
 const peers = computed(() => session.value?.peers.value ?? [])
@@ -314,10 +325,10 @@ const connection = computed(() => {
 <template>
   <div class="document-view">
     <div class="document-view__bar px-3 pt-1">
-      <ItemBreadcrumbs v-if="!mobile" :ancestors="ancestors" :current="document?.name" />
+      <ItemBreadcrumbs v-if="!mobile" :ancestors="ancestors" :current="page?.name" />
       <div class="d-flex align-center ga-2 pb-1">
         <h1 class="document-view__title text-truncate flex-grow-1" data-testid="document-title">
-          {{ document?.name }}
+          {{ page?.name }}
         </h1>
 
         <v-avatar-group v-if="onlineUsers.length > 0" data-testid="online-users">
@@ -388,11 +399,11 @@ const connection = computed(() => {
               @click="showAuthorship = !showAuthorship"
             />
             <v-list-item
-              v-if="document"
+              v-if="page"
               :prepend-icon="mdiFolderMoveOutline"
               title="Move or rename…"
               data-testid="document-move"
-              @click="moveStore.open(document)"
+              @click="moveStore.open(page)"
             />
             <v-list-item
               :prepend-icon="mdiHistory"

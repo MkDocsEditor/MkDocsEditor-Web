@@ -6,7 +6,7 @@ import { local } from './storage'
 /** The "Use the Android app" hint shows once per browser, on phone-sized screens. */
 const KEY = 'mkdocseditor.androidHintShown'
 
-export function androidHintSeen(): boolean {
+function androidHintSeen(): boolean {
   try {
     return local()?.getItem(KEY) === '1'
   } catch {

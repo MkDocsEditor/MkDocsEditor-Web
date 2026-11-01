@@ -11,12 +11,12 @@ import PasskeyStep from '@/components/auth/PasskeyStep.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import {
   displayNameRule,
-  formatTime,
   passwordRule,
   roleLabel,
   sameAsRule,
   usernameRule,
 } from '@/services/accountRules'
+import { formatTime } from '@/services/time'
 import { useAndroidHint } from '@/services/androidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { describeAuthError } from '@/services/authErrors'

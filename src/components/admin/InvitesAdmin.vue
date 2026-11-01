@@ -7,7 +7,8 @@ import { ROLES } from '@/api/authTypes'
 import type { CreatedLink, LinkInfo, Role } from '@/api'
 import LinkResultDialog from '@/components/admin/LinkResultDialog.vue'
 import LinkStatusChip from '@/components/admin/LinkStatusChip.vue'
-import { formatTime, roleLabel } from '@/services/accountRules'
+import { roleLabel } from '@/services/accountRules'
+import { formatTime } from '@/services/time'
 import { useNotifyStore } from '@/stores/notify'
 
 const api = useAuthApi()

@@ -34,7 +34,7 @@ const MONO = 'ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monosp
  * task boxes use `keyword`, quotes and rules `comment`, inline code `string`. The colours follow
  * the app theme through CSS variables (`plugins/codeColors.ts`).
  */
-export const codeHighlightStyle = HighlightStyle.define([
+const codeHighlightStyle = HighlightStyle.define([
   // Markdown
   { tag: t.heading1, color: c('heading'), fontWeight: '700', fontSize: '1.15em' },
   { tag: t.heading2, color: c('heading'), fontWeight: '700', fontSize: '1.08em' },

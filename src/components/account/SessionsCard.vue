@@ -6,7 +6,7 @@ import { useRouter } from 'vue-router'
 import { useAuthApi } from '@/api'
 import type { SessionInfo } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { formatTime } from '@/services/accountRules'
+import { formatTime } from '@/services/time'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 
