@@ -81,6 +81,11 @@ export const useTreeStore = defineStore('tree', () => {
     return pathOf(index.value, id)
   }
 
+  /** A folder's path for sentences; the root has no path of its own. */
+  function folderLabel(id: string): string {
+    return path(id) || 'Wiki (top folder)'
+  }
+
   function linkTarget(item: TreeItem): LinkTarget {
     return linkTargetOf(index.value, item)
   }
@@ -136,6 +141,7 @@ export const useTreeStore = defineStore('tree', () => {
     parentOf,
     ancestors,
     path,
+    folderLabel,
     linkTarget,
     search,
     resolve,

@@ -65,10 +65,7 @@ const blocked = computed(() => {
   return ids
 })
 
-const targetPath = computed(() => {
-  const path = tree.path(sectionId.value)
-  return path === '' ? 'Wiki (top folder)' : path
-})
+const targetPath = computed(() => tree.folderLabel(sectionId.value))
 
 const cleanName = computed(() =>
   item.value?.type === 'document' ? stripMarkdownExtension(name.value) : name.value.trim(),

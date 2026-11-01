@@ -5,16 +5,17 @@ import { ApiError, useApi } from '@/api'
 import type { Backlink, ItemRef, ItemType } from '@/api'
 import { ITEM_LABELS } from '@/services/names'
 
-/** Backlinks grouped by the page they come from. */
-export interface BacklinkSource {
+/** References grouped by the page they come from, in text order. */
+export interface SourceGroup<T> {
   source: ItemRef
-  /** The references on that page, in text order. */
-  links: Backlink[]
+  links: T[]
 }
 
-export function groupBySource(backlinks: readonly Backlink[]): BacklinkSource[] {
-  const groups = new Map<string, BacklinkSource>()
-  for (const link of backlinks) {
+export function groupBySource<T extends { source: ItemRef }>(
+  references: readonly T[],
+): SourceGroup<T>[] {
+  const groups = new Map<string, SourceGroup<T>>()
+  for (const link of references) {
     const group = groups.get(link.source.id)
     if (group) group.links.push(link)
     else groups.set(link.source.id, { source: link.source, links: [link] })

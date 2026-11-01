@@ -6,6 +6,7 @@ import { ApiError, useApi } from '@/api'
 import type { BrokenReference, ResourceModel } from '@/api'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
 import { formatSize } from '@/services/icons'
+import { groupBySource } from '@/components/references/backlinks'
 import { useTreeStore } from '@/stores/tree'
 
 /**
@@ -45,15 +46,7 @@ async function load(): Promise<void> {
 }
 watch(() => tree.root, load, { immediate: true })
 
-const groups = computed(() => {
-  const map = new Map<string, { source: BrokenReference['source']; refs: BrokenReference[] }>()
-  for (const ref of broken.value ?? []) {
-    const group = map.get(ref.source.id)
-    if (group) group.refs.push(ref)
-    else map.set(ref.source.id, { source: ref.source, refs: [ref] })
-  }
-  return [...map.values()]
-})
+const groups = computed(() => groupBySource(broken.value ?? []))
 
 function explain(ref: BrokenReference): string {
   const where = `Line ${ref.line}`
@@ -111,7 +104,7 @@ function resourcePath(resource: ResourceModel): string {
             {{ group.source.path }}
           </v-list-subheader>
           <v-list-item
-            v-for="item in group.refs"
+            v-for="item in group.links"
             :key="`${item.line}:${item.column}`"
             :title="item.destination"
             :subtitle="explain(item)"
