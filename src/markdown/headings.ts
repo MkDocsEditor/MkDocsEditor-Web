@@ -25,13 +25,15 @@ export function slugify(text: string): string {
 
 /** Inline Markdown of a heading as plain text (what the slug is made of). */
 function plain(text: string): string {
-  return text
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[*_~`]/g, '')
-    .replace(/<[^>]*>/g, '')
-    // stray angle brackets too, so no tag can survive (the text is shown as plain text anyway)
-    .replace(/[<>]/g, '')
-    .trim()
+  return (
+    text
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/[*_~`]/g, '')
+      .replace(/<[^>]*>/g, '')
+      // stray angle brackets too, so no tag can survive (the text is shown as plain text anyway)
+      .replace(/[<>]/g, '')
+      .trim()
+  )
 }
 
 /** The headings of a page with their anchors, skipping code blocks and front matter. */
