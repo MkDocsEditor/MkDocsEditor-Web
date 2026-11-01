@@ -135,6 +135,26 @@ describe('LoginView', () => {
     wrapper.unmount()
   })
 
+  it('stays silent when the browser rejects the passkey autofill', async () => {
+    passkeys.autofill = true
+    passkeys.getPasskey.mockRejectedValueOnce(
+      Object.assign(
+        new Error("Resident credentials or empty 'allowCredentials' lists are not supported"),
+        {
+          name: 'NotSupportedError',
+        },
+      ),
+    )
+    backend({
+      'POST /auth/passkey/login/begin/': () => json({ ceremonyId: 'c1', publicKey: { a: 1 } }),
+    })
+    const { wrapper } = await mount()
+    await flushPromises()
+    expect(passkeys.getPasskey).toHaveBeenCalledWith({ a: 1 }, true)
+    expect(wrapper.find('[data-testid="login-error"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('ignores redirects to other hosts', async () => {
     backend({ 'POST /auth/login/': () => json(sessionResponse()) })
     const { wrapper, router } = await mount('/login?redirect=//evil.example/x')

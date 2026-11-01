@@ -160,9 +160,10 @@ async function startAutofill(): Promise<void> {
     loading.value = true
     await done(await api.passkeyLoginFinish(ceremony.ceremonyId, credential))
   } catch (e) {
-    // aborted when the user starts another login; other failures show up like a normal login
+    // Server answers show up like a normal login. The browser's own failures stay silent:
+    // the autofill runs in the background, some browsers reject it (for example without a
+    // platform authenticator), and the button and the password still work.
     if (e instanceof ApiError) showError(e)
-    else if (!isPasskeyCancel(e)) error.value = describePasskeyError(e)
   } finally {
     autofillRunning = false
     loading.value = false
