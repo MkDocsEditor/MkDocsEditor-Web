@@ -224,6 +224,10 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let closed = false
   let attempt = 0
   let release: (() => void) | null = null
+  /** Id under which the copy is persisted; stays the old id while a rename cannot take over. */
+  let storedId = documentId
+  /** The re-keying of the stored copy after `document-renamed`; the reconnect waits for it. */
+  let renaming: Promise<void> = Promise.resolve()
   let lastSent = 0
   let lastReceived = 0
   let heartbeat: ReturnType<typeof setInterval> | null = null
@@ -284,7 +288,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   async function persist(): Promise<void> {
     if (!release || !doc || epoch === null) return
     await options.store.put({
-      documentId,
+      documentId: storedId,
       epoch,
       actorId,
       bytes: A.save(doc),
@@ -511,8 +515,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         fail('Connection error (protocol). Please reload the page.')
         return
       case 4009:
+        // reconnect with the new id once the stored copy follows (its epoch goes into hello)
         attempt = 0
-        void connect()
+        void renaming.finally(() => connect())
         return
       default:
         scheduleReconnect()
@@ -557,7 +562,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         if (next) {
           const old = documentId
           documentId = next
-          void moveStoredCopy(old)
+          renaming = followRename(old, next).catch((error: unknown) =>
+            console.error('mkdocseditor: could not move the local copy', error),
+          )
           options.onRenamed?.(next)
         }
         break
@@ -573,10 +580,50 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     }
   }
 
-  async function moveStoredCopy(oldId: string): Promise<void> {
-    if (!release) return
-    await options.store.delete(oldId)
+  /**
+   * Moves the persisted copy to the new id (`docs/references.md` section 7). The copy is
+   * written under the new id before the old record goes, so a crash leaves two copies, never
+   * none. If another tab holds the new id, or a copy of another lineage is stored there, this
+   * copy stays under the old id; it syncs with the new id all the same.
+   */
+  async function followRename(oldId: string, newId: string): Promise<void> {
+    if (!release || storedId !== oldId) return
+    const next = await options.store.claim(newId)
+    if (!next) return
+    if (closed || !release) {
+      next()
+      return
+    }
+    const existing = await options.store.get(newId)
+    if (existing && !doc) {
+      // No copy under the old id (it was re-keyed already, for example by the tree's rescue of
+      // moved copies): continue with the stored copy of the new id, like on start.
+      doc = A.load<{ content: string }>(existing.bytes, { actor: existing.actorId })
+      actorId = existing.actorId
+      epoch = existing.epoch
+      serverHeads = existing.serverHeads
+      readOnly = false
+      setStatus({ readOnly: false })
+      emit(diffText('', text()))
+      updateUnsynced()
+      markReady()
+    } else if (existing && existing.epoch !== epoch) {
+      next()
+      return
+    } else if (existing && doc) {
+      // An older copy of the same document under the new id: keep its edits too.
+      const before = text()
+      doc = A.merge(doc, A.load<{ content: string }>(existing.bytes, { actor: existing.actorId }))
+      emit(diffText(before, text()))
+      updateUnsynced()
+      scheduleFlush()
+    }
+    storedId = newId
     await persist()
+    await options.store.delete(oldId)
+    const previous = release
+    release = next
+    previous()
   }
 
   function rememberUser(info: { username: string; displayName?: string; color?: string }): void {
@@ -684,8 +731,22 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (synced && now - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
   }
 
+  /** Writes a pending change right away when the page is hidden or closed. */
+  function persistNow(): void {
+    if (!persistTimer) return
+    clearTimeout(persistTimer)
+    persistTimer = null
+    void persist()
+  }
+  const onHidden = () => {
+    if (globalThis.document?.visibilityState !== 'visible') persistNow()
+  }
+
   function shutdown(normal: boolean): void {
     closed = true
+    globalThis.removeEventListener?.('pagehide', persistNow)
+    globalThis.removeEventListener?.('beforeunload', persistNow)
+    globalThis.document?.removeEventListener('visibilitychange', onHidden)
     for (const timer of [reconnectTimer, flushTimer, presenceTimer, authorshipTimer]) {
       if (timer) clearTimeout(timer)
     }
@@ -713,6 +774,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       return
     }
     try {
+      storedId = documentId
       release = await options.store.claim(documentId)
       const stored = release ? await options.store.get(documentId) : undefined
       if (stored && !closed) {
@@ -731,6 +793,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       console.error('mkdocseditor: could not load the local copy', error)
     }
     if (closed) return
+    globalThis.addEventListener?.('pagehide', persistNow)
+    globalThis.addEventListener?.('beforeunload', persistNow)
+    globalThis.document?.addEventListener('visibilitychange', onHidden)
     heartbeat = setInterval(tick, Math.min(timing.heartbeatMs, 1_000))
     await connect()
   }
