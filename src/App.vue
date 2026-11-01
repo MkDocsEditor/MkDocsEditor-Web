@@ -4,6 +4,8 @@ import {
   mdiAccountCog,
   mdiLogout,
   mdiMagnify,
+  mdiPaperclip,
+  mdiPaperclipOff,
   mdiRefresh,
   mdiShieldAccount,
 } from '@mdi/js'
@@ -17,6 +19,7 @@ import NotificationHost from '@/components/common/NotificationHost.vue'
 import NavTree from '@/components/tree/NavTree.vue'
 import SearchDialog from '@/components/tree/SearchDialog.vue'
 import { roleLabel } from '@/services/accountRules'
+import { local, readJson, writeJson } from '@/services/storage'
 import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
 import { describeError } from '@/stores/notify'
@@ -35,6 +38,11 @@ const drawer = ref<boolean | null>(null)
 const searchOpen = ref(false)
 const opened = reactive(new Set<string>())
 
+/** Files (resources) in the drawer tree; can be hidden in large wikis. */
+const SHOW_FILES_KEY = 'mkdocseditor.treeShowFiles'
+const showFiles = ref(readJson<boolean>(local(), SHOW_FILES_KEY) ?? true)
+watch(showFiles, (show) => writeJson(local(), SHOW_FILES_KEY, show))
+
 const activeId = computed(() =>
   typeof route.params.id === 'string' ? route.params.id : tree.root?.id,
 )
@@ -43,7 +51,10 @@ const activeId = computed(() =>
 watch(
   [activeId, () => tree.root],
   ([id]) => {
-    if (id) for (const section of tree.ancestors(id)) opened.add(section.id)
+    if (!id) return
+    for (const section of tree.ancestors(id)) opened.add(section.id)
+    // a folder that is open on the page is expanded in the tree too
+    if (tree.section(id)) opened.add(id)
   },
   { immediate: true },
 )
@@ -185,13 +196,27 @@ window.addEventListener('keydown', onKeydown)
           title="Wiki"
           class="font-weight-bold"
           @click="mobile && (drawer = false)"
-        />
+        >
+          <template #append>
+            <v-btn
+              :icon="showFiles ? mdiPaperclip : mdiPaperclipOff"
+              variant="text"
+              size="x-small"
+              :aria-label="showFiles ? 'Hide files' : 'Show files'"
+              :title="showFiles ? 'Hide files' : 'Show files'"
+              :aria-pressed="showFiles"
+              data-testid="tree-toggle-files"
+              @click.stop.prevent="showFiles = !showFiles"
+            />
+          </template>
+        </v-list-item>
         <NavTree
           v-if="tree.root"
           :section="tree.root"
           :depth="0"
           :active-id="activeId"
           :opened="opened"
+          :show-files="showFiles"
           @toggle="toggle"
           @navigate="mobile && (drawer = false)"
         />

@@ -139,3 +139,24 @@ export async function typeAt(page: Page, where: 'start' | 'end', text: string): 
   await page.keyboard.press(where === 'end' ? 'ControlOrMeta+End' : 'ControlOrMeta+Home')
   await page.keyboard.type(text)
 }
+
+/** Uploads a file into a folder over REST. */
+export async function uploadResource(
+  sectionId: string,
+  name: string,
+  body: BlobPart,
+  type = 'application/octet-stream',
+): Promise<{ id: string; name: string }> {
+  const form = new FormData()
+  form.append('file', new Blob([body], { type }), name)
+  const response = await fetch(
+    `${BACKEND_URL}/resource/${sectionId}/${encodeURIComponent(name)}/`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await bearerToken(E2E_USER)}` },
+      body: form,
+    },
+  )
+  expect(response.ok).toBe(true)
+  return (await response.json()) as { id: string; name: string }
+}

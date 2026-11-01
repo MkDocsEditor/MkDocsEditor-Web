@@ -3,6 +3,7 @@ import { computed, ref, shallowRef } from 'vue'
 
 import { useApi } from '@/api'
 import type { DocumentModel, ResourceModel, SectionModel, TreeItem } from '@/api'
+import type { LinkTarget } from '@/services/linkPath'
 import { sanitizeFileName, shrinkImage, uniqueName } from '@/services/upload'
 
 export interface TreeIndex {
@@ -40,6 +41,45 @@ export function ancestorsOf(index: TreeIndex, id: string): SectionModel[] {
     current = index.parents.get(current)
   }
   return chain
+}
+
+/** The file name of an item in the docs folder (documents get `.md`). */
+export function fileNameOf(item: TreeItem): string {
+  return item.type === 'document' ? `${item.name}.md` : item.name
+}
+
+/**
+ * Path of an item relative to the docs folder (`docs/references.md` section 1). Newer backends
+ * send it; for older ones it is built from the names of the sections above.
+ */
+export function pathOf(index: TreeIndex, id: string): string {
+  const item = index.items.get(id)
+  if (!item) return ''
+  if (item.path !== undefined) return item.path
+  if (!index.parents.has(id)) return '' // the root section
+  return [
+    ...ancestorsOf(index, id)
+      .slice(1)
+      .map((s) => s.name),
+    fileNameOf(item),
+  ].join('/')
+}
+
+/** The index document of a section: `index.md`, else `README.md` (as MkDocs does). */
+export function indexDocumentOf(section: SectionModel): DocumentModel | undefined {
+  if (section.index !== undefined) return section.documents.find((d) => d.id === section.index)
+  return (
+    section.documents.find((d) => d.name === 'index') ??
+    section.documents.find((d) => d.name === 'README')
+  )
+}
+
+/** Input of the link path algorithm for an item. */
+export function linkTargetOf(index: TreeIndex, item: TreeItem): LinkTarget {
+  const path = pathOf(index, item.id)
+  if (item.type !== 'section') return { type: item.type, path }
+  const doc = indexDocumentOf(item)
+  return { type: 'section', path, index: doc ? pathOf(index, doc.id) : '' }
 }
 
 export interface SearchHit {
@@ -197,6 +237,14 @@ export const useTreeStore = defineStore('tree', () => {
     return from ? resolveRelative(index.value, from, href) : undefined
   }
 
+  function path(id: string): string {
+    return pathOf(index.value, id)
+  }
+
+  function linkTarget(item: TreeItem): LinkTarget {
+    return linkTargetOf(index.value, item)
+  }
+
   function search(query: string): SearchHit[] {
     return searchTree(index.value, query)
   }
@@ -247,6 +295,8 @@ export const useTreeStore = defineStore('tree', () => {
     document,
     parentOf,
     ancestors,
+    path,
+    linkTarget,
     search,
     resolve,
     reset,

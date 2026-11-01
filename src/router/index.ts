@@ -58,6 +58,12 @@ export function buildRouter(history: RouterHistory): Router {
         props: true,
       },
       {
+        path: '/resource/:id',
+        name: 'resource',
+        component: () => import('@/views/ResourceView.vue'),
+        props: true,
+      },
+      {
         path: '/account/:tab(profile|security|sessions)?',
         name: 'account',
         component: () => import('@/views/AccountView.vue'),

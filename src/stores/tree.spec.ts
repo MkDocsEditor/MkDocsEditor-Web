@@ -2,12 +2,16 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import type { SectionModel } from '@/api'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
 
 import {
   ancestorsOf,
+  indexDocumentOf,
   indexTree,
+  linkTargetOf,
+  pathOf,
   resolveRelative,
   searchTree,
   sortByName,
@@ -18,10 +22,32 @@ describe('tree helpers', () => {
   const index = indexTree(sampleTree())
 
   it('indexes every item and its parent', () => {
-    expect(index.items.size).toBe(8)
+    expect(index.items.size).toBe(10)
     expect(index.parents.get('d-apfel')).toBe('s-kuchen')
     expect(index.parents.get('s-kuchen')).toBe('s-rezepte')
     expect(index.parents.has('root')).toBe(false)
+  })
+
+  it('builds paths when the backend sends none, and uses them when it does', () => {
+    expect(pathOf(index, 'd-apfel')).toBe('Rezepte/Kuchen/Apfelkuchen.md')
+    expect(pathOf(index, 'r-plan')).toBe('Rezepte/Kuchen/Plan (alt).pdf')
+    expect(pathOf(index, 's-rezepte')).toBe('Rezepte')
+    expect(pathOf(index, 'root')).toBe('')
+    const tree = sampleTree()
+    tree.documents[0]!.path = 'custom/index.md'
+    expect(pathOf(indexTree(tree), 'd-index')).toBe('custom/index.md')
+  })
+
+  it('finds the index document of a section', () => {
+    const root = index.items.get('root') as SectionModel
+    expect(indexDocumentOf(root)?.id).toBe('d-index')
+    expect(linkTargetOf(index, root)).toEqual({ type: 'section', path: '', index: 'index.md' })
+    const kuchen = index.items.get('s-kuchen') as SectionModel
+    expect(linkTargetOf(index, kuchen)).toEqual({
+      type: 'section',
+      path: 'Rezepte/Kuchen',
+      index: '',
+    })
   })
 
   it('lists ancestors from the root down', () => {

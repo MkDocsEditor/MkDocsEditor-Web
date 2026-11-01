@@ -10,18 +10,26 @@ import {
   mdiHistory,
   mdiLockOutline,
   mdiOpenInNew,
+  mdiPaperclip,
   mdiViewSplitVertical,
 } from '@mdi/js'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
+import { EditorSelection } from '@codemirror/state'
+
+import type { ResourceModel } from '@/api'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
+import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
+import { insertionFor } from '@/editor/upload'
+import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
-import { isImage } from '@/services/icons'
+import { isImage, resourceKind } from '@/services/icons'
+import { linkDestination } from '@/services/linkPath'
 import { initials } from '@/services/names'
 import { local, readJson, writeJson } from '@/services/storage'
 import { markdownFor } from '@/services/upload'
@@ -57,6 +65,21 @@ const mode = computed<Mode>({
   },
 })
 const showAuthorship = ref(false)
+
+/** The files panel; remembered on wide screens, closed by default on phones. */
+const FILES_KEY = 'mkdocseditor.filesPanel'
+const filesStored = ref(readJson<boolean>(local(), FILES_KEY) ?? false)
+const filesMobile = ref(false)
+const filesOpen = computed<boolean>({
+  get: () => (mobile.value ? filesMobile.value : filesStored.value),
+  set: (open) => {
+    if (mobile.value) filesMobile.value = open
+    else {
+      filesStored.value = open
+      writeJson(local(), FILES_KEY, open)
+    }
+  },
+})
 const historyOpen = ref(false)
 
 const session = shallowRef<DocumentSession | null>(null)
@@ -81,6 +104,57 @@ async function upload(files: File[]): Promise<string[]> {
   } finally {
     uploading.value--
   }
+}
+
+/** Inserts snippets at the cursor, on lines of their own (like pasted files). */
+function insertSnippets(snippets: string[]): void {
+  const view = editorView()
+  if (!view || snippets.length === 0 || view.state.readOnly) return
+  if (mode.value === 'preview') mode.value = mobile.value ? 'edit' : 'split'
+  const at = view.state.selection.main.head
+  const insert = insertionFor(view.state.doc, at, snippets)
+  view.dispatch({
+    changes: { from: at, insert },
+    selection: { anchor: at + insert.length },
+    userEvent: 'input.insert',
+    scrollIntoView: true,
+  })
+  view.focus()
+}
+
+/** Markdown for a resource, relative to this page. */
+function markdownOf(resource: ResourceModel): string {
+  const destination = linkDestination(tree.path(props.id), tree.linkTarget(resource))
+  return markdownFor(resource.name, resourceKind(resource) === 'image', destination)
+}
+
+function insertResource(resource: ResourceModel): void {
+  insertSnippets([markdownOf(resource)])
+  if (mobile.value) filesOpen.value = false
+}
+
+async function uploadAndInsert(files: File[]): Promise<void> {
+  try {
+    insertSnippets(await upload(files))
+  } catch {
+    // upload() reports it
+  }
+}
+
+function reveal(reference: TextReference): void {
+  const view = editorView()
+  if (!view) return
+  if (mode.value === 'preview') mode.value = mobile.value ? 'edit' : 'split'
+  const length = view.state.doc.length
+  view.dispatch({
+    selection: EditorSelection.range(
+      Math.min(reference.from, length),
+      Math.min(reference.to, length),
+    ),
+    scrollIntoView: true,
+  })
+  view.focus()
+  if (mobile.value) filesOpen.value = false
 }
 
 /** Set while following a server-side rename: the session already moved to the new id. */
@@ -210,6 +284,17 @@ const connection = computed(() => {
           <v-btn value="preview" :icon="mdiEyeOutline" aria-label="Preview" />
         </v-btn-toggle>
 
+        <v-btn
+          :icon="mdiPaperclip"
+          :variant="filesOpen ? 'tonal' : 'text'"
+          :color="filesOpen ? 'primary' : undefined"
+          aria-label="Files"
+          title="Files"
+          :aria-pressed="filesOpen"
+          data-testid="toggle-files"
+          @click="filesOpen = !filesOpen"
+        />
+
         <v-menu>
           <template #activator="{ props: menu }">
             <v-btn v-bind="menu" :icon="mdiDotsVertical" variant="text" aria-label="More" />
@@ -290,6 +375,24 @@ const connection = computed(() => {
         />
       </div>
     </div>
+    <v-navigation-drawer
+      v-model="filesOpen"
+      location="end"
+      :temporary="mobile"
+      width="320"
+      data-testid="files-drawer"
+    >
+      <ResourcesPanel
+        v-if="filesOpen"
+        :text="text"
+        :document-id="id"
+        :read-only="!ready || (status?.readOnly ?? true)"
+        :uploading="uploading > 0"
+        @insert="insertResource"
+        @upload="uploadAndInsert"
+        @reveal="reveal"
+      />
+    </v-navigation-drawer>
     <HistoryDialog v-model="historyOpen" :document-id="id" :read-only="status?.readOnly ?? true" />
   </div>
 </template>

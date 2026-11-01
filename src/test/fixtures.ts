@@ -22,7 +22,16 @@ export function sampleTree(): SectionModel {
             id: 's-kuchen',
             name: 'Kuchen',
             subsections: [],
-            resources: [],
+            resources: [
+              { type: 'resource', id: 'r-apfel', name: 'apfel.png', filesize: 70, modtime: '' },
+              {
+                type: 'resource',
+                id: 'r-plan',
+                name: 'Plan (alt).pdf',
+                filesize: 900,
+                modtime: '',
+              },
+            ],
             documents: [
               {
                 type: 'document',

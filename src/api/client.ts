@@ -210,7 +210,6 @@ export class ApiClient {
     await this.request('DELETE', `/document/${encodeURIComponent(id)}${force ? '?force=true' : ''}`)
   }
 
-  /** Downloads a resource with auth (for previews of images that need credentials). */
   /**
    * Git history of a document, newest first. Returns null when the backend has no history
    * (git not enabled, or an older backend).
@@ -250,6 +249,15 @@ export class ApiClient {
 
   async getResourceContent(id: string): Promise<Blob> {
     const response = await this.request('GET', `/resource/${encodeURIComponent(id)}/content`)
+    return response.blob()
+  }
+
+  /** A scaled-down JPEG or PNG of an image resource (newer backends, `thumbnail: true`). */
+  async getResourceThumbnail(id: string, size = 256): Promise<Blob> {
+    const response = await this.request(
+      'GET',
+      `/resource/${encodeURIComponent(id)}/thumbnail?size=${size}`,
+    )
     return response.blob()
   }
 

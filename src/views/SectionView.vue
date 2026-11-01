@@ -2,6 +2,7 @@
 import {
   mdiDelete,
   mdiDotsVertical,
+  mdiOpenInNew,
   mdiFileDocumentPlusOutline,
   mdiFolderPlusOutline,
   mdiPencil,
@@ -17,7 +18,8 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
-import { formatSize, iconFor } from '@/services/icons'
+import ResourceThumb from '@/components/resources/ResourceThumb.vue'
+import { colorFor, formatSize, iconFor } from '@/services/icons'
 import { stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
@@ -62,11 +64,10 @@ function subtitle(item: TreeItem): string {
 function linkTo(item: TreeItem) {
   if (item.type === 'section') return { name: 'section', params: { id: item.id } }
   if (item.type === 'document') return { name: 'document', params: { id: item.id } }
-  return undefined
+  return { name: 'resource', params: { id: item.id } }
 }
 
 async function open(item: TreeItem): Promise<void> {
-  if (item.type !== 'resource') return
   try {
     await openResource(item.id)
   } catch (error) {
@@ -241,10 +242,19 @@ const deleteText = computed(() => {
           :to="linkTo(item)"
           :title="item.name"
           :subtitle="subtitle(item)"
-          :prepend-icon="iconFor(item)"
           :data-testid="`entry-${item.type}`"
-          @click="open(item)"
         >
+          <template #prepend>
+            <ResourceThumb
+              v-if="item.type === 'resource'"
+              :resource="item"
+              :size="36"
+              class="me-4"
+            />
+            <span v-else class="section-view__icon me-4">
+              <v-icon :icon="iconFor(item)" :color="colorFor(item)" />
+            </span>
+          </template>
           <template #append>
             <OnlineAvatars
               v-if="item.type === 'document'"
@@ -263,6 +273,12 @@ const deleteText = computed(() => {
                 />
               </template>
               <v-list density="compact">
+                <v-list-item
+                  v-if="item.type === 'resource'"
+                  :prepend-icon="mdiOpenInNew"
+                  title="Open in a new tab"
+                  @click="open(item)"
+                />
                 <v-list-item
                   :prepend-icon="mdiPencil"
                   title="Rename"
@@ -372,6 +388,13 @@ const deleteText = computed(() => {
 </template>
 
 <style scoped>
+.section-view__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
 .section-view__drop {
   border: 2px dashed rgb(var(--v-theme-primary));
   border-radius: 8px;

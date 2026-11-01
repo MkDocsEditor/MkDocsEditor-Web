@@ -25,6 +25,7 @@ export function stubRoutes(): RouteRecordRaw[] {
     { path: '/', name: 'home', component: Stub },
     { path: '/section/:id', name: 'section', component: Stub, props: true },
     { path: '/document/:id', name: 'document', component: Stub, props: true },
+    { path: '/resource/:id', name: 'resource', component: Stub, props: true },
     { path: '/setup', name: 'setup', component: Stub, meta: { public: true } },
     { path: '/invite', name: 'invite', component: Stub, meta: { public: true } },
     { path: '/reset', name: 'reset', component: Stub, meta: { public: true } },

@@ -4,15 +4,12 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { SearchHit } from '@/stores/tree'
-import { iconFor } from '@/services/icons'
-import { openResource } from '@/services/resources'
-import { useNotifyStore } from '@/stores/notify'
+import { colorFor, iconFor } from '@/services/icons'
 import { useTreeStore } from '@/stores/tree'
 
 const open = defineModel<boolean>({ required: true })
 const tree = useTreeStore()
 const router = useRouter()
-const notify = useNotifyStore()
 
 const query = ref('')
 const hits = computed(() => tree.search(query.value))
@@ -26,7 +23,7 @@ async function choose(hit: SearchHit): Promise<void> {
     await router.push({ name: 'section', params: { id: hit.item.id } })
   else if (hit.item.type === 'document')
     await router.push({ name: 'document', params: { id: hit.item.id } })
-  else openResource(hit.item.id).catch((e: unknown) => notify.error(e))
+  else await router.push({ name: 'resource', params: { id: hit.item.id } })
 }
 
 function chooseFirst(): void {
@@ -42,7 +39,7 @@ function chooseFirst(): void {
         <v-text-field
           v-model="query"
           :prepend-inner-icon="mdiMagnify"
-          placeholder="Search pages and folders…"
+          placeholder="Search pages, folders and files…"
           variant="solo-filled"
           flat
           autofocus
@@ -59,9 +56,12 @@ function chooseFirst(): void {
             :key="hit.item.id"
             :title="hit.item.name"
             :subtitle="hit.path.join(' › ')"
-            :prepend-icon="iconFor(hit.item)"
             @click="choose(hit)"
-          />
+          >
+            <template #prepend>
+              <v-icon :icon="iconFor(hit.item)" :color="colorFor(hit.item)" />
+            </template>
+          </v-list-item>
         </v-list>
         <p v-else-if="query" class="text-medium-emphasis pa-4">Nothing found.</p>
       </v-card-text>
