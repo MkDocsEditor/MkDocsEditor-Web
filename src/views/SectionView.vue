@@ -10,11 +10,11 @@ import {
   mdiPlus,
   mdiUpload,
 } from '@mdi/js'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api'
-import type { TreeItem } from '@/api'
+import type { Backlink, TreeItem } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
@@ -24,6 +24,7 @@ import { colorFor, formatSize, iconFor } from '@/services/icons'
 import { stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
+import { breakWarning, externalBacklinks } from '@/components/references/backlinks'
 import { useMovedRedirect } from '@/services/redirects'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
@@ -211,11 +212,25 @@ function onDrop(event: DragEvent): void {
   void upload(Array.from(event.dataTransfer?.files ?? []))
 }
 
+/** Links from other pages that a delete would break ("3 pages link to this file"). */
+const deleteBacklinks = ref<Backlink[] | null>(null)
+watch(deleteTarget, async (item) => {
+  deleteBacklinks.value = null
+  if (!item) return
+  const links = await externalBacklinks(item.type, item.id).catch(() => null)
+  if (deleteTarget.value?.id === item.id) deleteBacklinks.value = links
+})
+
 const deleteText = computed(() => {
   const item = deleteTarget.value
   if (!item) return ''
-  if (item.type === 'section') return `The folder “${item.name}” is deleted with everything in it.`
-  return `“${item.name}” will be deleted.`
+  const what = { section: 'folder', document: 'page', resource: 'file' }[item.type]
+  const warning = breakWarning(deleteBacklinks.value, what)
+  const base =
+    item.type === 'section'
+      ? `The folder “${item.name}” is deleted with everything in it.`
+      : `“${item.name}” will be deleted.`
+  return warning ? `${base} ${warning}` : base
 })
 </script>
 

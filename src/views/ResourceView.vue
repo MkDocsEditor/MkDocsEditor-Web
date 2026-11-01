@@ -11,9 +11,12 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import BacklinksList from '@/components/references/BacklinksList.vue'
+import { breakWarning, externalBacklinks } from '@/components/references/backlinks'
 import NameDialog from '@/components/common/NameDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import { useApi } from '@/api'
+import type { Backlink } from '@/api'
 import { copyText } from '@/services/clipboard'
 import { KIND_LABELS, colorFor, formatSize, iconFor, resourceKind } from '@/services/icons'
 import { openResource } from '@/services/resources'
@@ -107,6 +110,16 @@ async function copyPath(): Promise<void> {
 
 const renameOpen = ref(false)
 const deleteOpen = ref(false)
+const deleteBacklinks = ref<Backlink[] | null>(null)
+watch(deleteOpen, async (open) => {
+  deleteBacklinks.value = null
+  if (open) deleteBacklinks.value = await externalBacklinks('resource', props.id).catch(() => null)
+})
+const deleteText = computed(() => {
+  const warning = breakWarning(deleteBacklinks.value, 'file')
+  const base = `“${resource.value?.name}” will be deleted.`
+  return warning ? `${base} ${warning}` : base
+})
 
 async function rename(name: string): Promise<void> {
   try {
@@ -192,6 +205,11 @@ async function remove(): Promise<void> {
         </v-list>
       </v-card>
 
+      <v-card variant="outlined" class="mb-4">
+        <v-card-subtitle class="pt-3">Used by</v-card-subtitle>
+        <BacklinksList :id="resource.id" type="resource" :reload-key="tree.root" />
+      </v-card>
+
       <div class="resource-view__preview" data-testid="resource-preview">
         <img v-if="previewUrl && kind === 'image'" :src="previewUrl" :alt="resource.name" />
         <object
@@ -231,7 +249,7 @@ async function remove(): Promise<void> {
     <ConfirmDialog
       v-model="deleteOpen"
       title="Delete?"
-      :text="`“${resource?.name}” will be deleted.`"
+      :text="deleteText"
       confirm-text="Delete"
       danger
       @confirm="remove"

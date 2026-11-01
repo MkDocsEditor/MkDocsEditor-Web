@@ -71,6 +71,12 @@ export function buildRouter(history: RouterHistory): Router {
         meta: { standalone: true },
       },
       {
+        path: '/links/:tab(broken|unused)?',
+        name: 'references',
+        component: () => import('@/views/ReferencesView.vue'),
+        props: true,
+      },
+      {
         path: '/welcome',
         name: 'welcome',
         component: () => import('@/views/WelcomeView.vue'),

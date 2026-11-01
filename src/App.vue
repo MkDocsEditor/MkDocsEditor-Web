@@ -2,6 +2,7 @@
 import {
   mdiAccountCircle,
   mdiAccountCog,
+  mdiLinkVariantOff,
   mdiLogout,
   mdiMagnify,
   mdiPaperclip,
@@ -199,6 +200,12 @@ window.addEventListener('keydown', onKeydown)
               title="Account"
               :to="{ name: 'account' }"
               data-testid="menu-account"
+            />
+            <v-list-item
+              :prepend-icon="mdiLinkVariantOff"
+              title="Broken links and unused files"
+              :to="{ name: 'references' }"
+              data-testid="menu-references"
             />
             <v-list-item
               v-if="auth.isAdmin"

@@ -64,6 +64,44 @@ export interface MovedItem {
   newPath: string
 }
 
+export type ReferenceKind = 'link' | 'image' | 'definition' | 'html'
+
+/** One reference in a document (`docs/references.md` section 4). */
+export interface Reference {
+  kind: ReferenceKind
+  /** 1-based line and column. */
+  line: number
+  column: number
+  /** As written, including `?query` and `#anchor`. */
+  destination: string
+  anchor: string
+  status: 'ok' | 'broken'
+  target: ItemRef | null
+  reason?: 'not-found' | 'outside-docs'
+  /** The resolved path that does not exist (broken only). */
+  path?: string
+  /** The moved item behind a broken path, and the destination that would fix it. */
+  movedTo?: ItemRef
+  suggestedDestination?: string
+}
+
+/** A reference to an item from a document ("used by"). */
+export interface Backlink {
+  source: ItemRef
+  kind: ReferenceKind
+  line: number
+  column: number
+  destination: string
+  anchor: string
+  target: ItemRef
+  /** Section backlinks: the source is inside the section and moves along. */
+  internal: boolean
+}
+
+export interface BrokenReference extends Reference {
+  source: ItemRef
+}
+
 /** `POST /move/` (`docs/references.md` section 5). */
 export interface MoveRequest {
   type: ItemType

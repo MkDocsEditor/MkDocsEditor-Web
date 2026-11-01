@@ -1,8 +1,11 @@
 import type {
   ActorInfo,
   AuthorshipResponse,
+  Backlink,
+  BrokenReference,
   DocumentModel,
   ItemRef,
+  ItemType,
   MovedTo,
   MoveRequest,
   MoveResult,
@@ -254,6 +257,30 @@ export class ApiClient {
     await this.request(
       'POST',
       `/document/${encodeURIComponent(id)}/history/${encodeURIComponent(revision)}/restore`,
+    )
+  }
+
+  /** References to an item from all documents ("used by"), sorted by source path and line. */
+  async getBacklinks(type: ItemType, id: string): Promise<Backlink[]> {
+    const answer = await this.json<{ backlinks: Backlink[] }>(
+      'GET',
+      `/${type}/${encodeURIComponent(id)}/backlinks`,
+    )
+    return answer.backlinks ?? []
+  }
+
+  /** All broken references of the wiki. */
+  async getBrokenReferences(): Promise<BrokenReference[]> {
+    return (
+      (await this.json<{ broken: BrokenReference[] }>('GET', '/references/broken')).broken ?? []
+    )
+  }
+
+  /** Resources that no document and `mkdocs.yml` use. */
+  async getUnusedResources(): Promise<ResourceModel[]> {
+    return (
+      (await this.json<{ resources: ResourceModel[] }>('GET', '/references/unused-resources'))
+        .resources ?? []
     )
   }
 
