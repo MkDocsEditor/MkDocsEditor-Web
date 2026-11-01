@@ -22,7 +22,7 @@ import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
 import { openWhileSet } from '@/services/dialogTarget'
 import { colorFor, formatSize, iconFor } from '@/services/icons'
-import { stripMarkdownExtension } from '@/services/names'
+import { plural, stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
 import { useBreakWarning } from '@/components/references/backlinks'
@@ -67,7 +67,7 @@ const typeLabel = { section: 'Folder', document: 'Page', resource: 'File' } as c
 function subtitle(item: TreeItem): string {
   if (item.type === 'section') {
     const count = item.documents.length + item.subsections.length
-    return count === 1 ? '1 item' : `${count} items`
+    return plural(count, 'item')
   }
   if (item.type === 'resource') return formatSize(item.filesize)
   return ''

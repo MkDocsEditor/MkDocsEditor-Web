@@ -37,7 +37,7 @@ import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { isImage, resourceKind } from '@/services/icons'
 import { linkDestination } from '@/services/linkPath'
 import { initials } from '@/services/names'
-import { local, readJson, writeJson } from '@/services/storage'
+import { useStored } from '@/services/storedRef'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
 import { useMoveStore } from '@/stores/move'
@@ -60,8 +60,7 @@ const parentId = computed(() => tree.parentOf(props.id)?.id)
 const wikiUrl = computed(() => (page.value ? wikiPageUrl(page.value.url) : null))
 
 type Mode = 'edit' | 'split' | 'preview'
-const MODE_KEY = 'mkdocseditor.documentMode'
-const storedMode = ref<Mode | null>(readJson<Mode>(local(), MODE_KEY))
+const storedMode = useStored<Mode | null>('mkdocseditor.documentMode', null)
 const mode = computed<Mode>({
   get: () => {
     const m = storedMode.value ?? (mobile.value ? 'preview' : 'split')
@@ -69,7 +68,6 @@ const mode = computed<Mode>({
   },
   set: (m) => {
     storedMode.value = m
-    writeJson(local(), MODE_KEY, m)
   },
 })
 const showAuthorship = ref(false)
@@ -80,17 +78,13 @@ function showEditor(): void {
 }
 
 /** The files panel; remembered on wide screens, closed by default on phones. */
-const FILES_KEY = 'mkdocseditor.filesPanel'
-const filesStored = ref(readJson<boolean>(local(), FILES_KEY) ?? false)
+const filesStored = useStored('mkdocseditor.filesPanel', false)
 const filesMobile = ref(false)
 const filesOpen = computed<boolean>({
   get: () => (mobile.value ? filesMobile.value : filesStored.value),
   set: (open) => {
     if (mobile.value) filesMobile.value = open
-    else {
-      filesStored.value = open
-      writeJson(local(), FILES_KEY, open)
-    }
+    else filesStored.value = open
   },
 })
 function closeFilesOnPhone(): void {

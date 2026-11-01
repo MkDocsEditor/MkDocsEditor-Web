@@ -3,6 +3,7 @@ import type { ComputedRef } from 'vue'
 
 import { ApiError, useApi } from '@/api'
 import type { Backlink, ItemRef, ItemType } from '@/api'
+import { ITEM_LABELS } from '@/services/names'
 
 /** Backlinks grouped by the page they come from. */
 export interface BacklinkSource {
@@ -30,7 +31,7 @@ export function linesLabel(links: readonly Backlink[]): string {
  * The pages that link to an item from outside it (for a folder: not its own pages), or null
  * when the backend cannot tell (older backend, offline).
  */
-export async function externalBacklinks(type: ItemType, id: string): Promise<Backlink[] | null> {
+async function externalBacklinks(type: ItemType, id: string): Promise<Backlink[] | null> {
   try {
     return (await useApi().getBacklinks(type, id)).filter((l) => !l.internal)
   } catch (error) {
@@ -46,12 +47,6 @@ export function breakWarning(backlinks: readonly Backlink[] | null, what: string
   return `${pages === 1 ? '1 page links' : `${pages} pages link`} to this ${what}; ${
     backlinks.length === 1 ? 'that link' : 'those links'
   } will break.`
-}
-
-const ITEM_LABELS: Record<ItemType, string> = {
-  section: 'folder',
-  document: 'page',
-  resource: 'file',
 }
 
 /** The warning for deleting `target` (see `breakWarning`), loaded whenever the target changes. */

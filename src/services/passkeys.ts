@@ -15,6 +15,8 @@ import type {
 
 export type { AuthenticationResponseJSON, RegistrationResponseJSON }
 
+import { errorMessage } from './errors'
+
 /**
  * Passkeys (WebAuthn) in the browser. The backend sends the options in the JSON form of the spec,
  * possibly wrapped in `{ publicKey: ... }` like `navigator.credentials` expects.
@@ -59,7 +61,7 @@ async function ceremony<T>(run: () => Promise<T>): Promise<T> {
     return await run()
   } catch (error) {
     if (error instanceof WebAuthnError || isPasskeyCancel(error)) throw error
-    throw new PasskeyProviderError(error instanceof Error ? error.message : String(error))
+    throw new PasskeyProviderError(errorMessage(error))
   }
 }
 
@@ -111,5 +113,5 @@ export function describePasskeyError(error: unknown, alternative?: string): stri
       return 'Passkeys do not work on this address (the domain does not match the server setting).'
   }
   if (isPasskeyCancel(error)) return 'Cancelled or timed out.'
-  return error instanceof Error ? error.message : String(error)
+  return errorMessage(error)
 }

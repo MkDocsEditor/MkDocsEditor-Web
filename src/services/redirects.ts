@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useRouter } from 'vue-router'
+import type { Router } from 'vue-router'
 
 import { useApi } from '@/api'
 import type { MovedItem } from '@/api'
@@ -88,6 +89,20 @@ export function useMovedRedirect(
     { immediate: true },
   )
   return looking
+}
+
+/**
+ * An open folder or file view follows when its item moved. An open document follows by itself
+ * (its session gets `document-renamed` and replaces the route).
+ */
+export function followMovedRoute(
+  router: Router,
+  moves: readonly Pick<MovedItem, 'oldId' | 'newId'>[],
+): void {
+  const { name, params } = router.currentRoute.value
+  if ((name !== 'section' && name !== 'resource') || typeof params.id !== 'string') return
+  const move = moves.find((m) => m.oldId === params.id)
+  if (move) void router.replace({ name, params: { id: move.newId } })
 }
 
 /** For tests. */

@@ -2,6 +2,7 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
@@ -68,6 +69,7 @@ describe('ResourceView', () => {
     ;(document.querySelector('[data-testid="confirm-button"]') as HTMLElement).click()
     await flushPromises()
     expect(requests.some((r) => r.method === 'DELETE')).toBe(true)
+    expect(useNotifyStore().queue.at(-1)?.text).toBe('Deleted “notes.txt”')
     expect(router.currentRoute.value.name).toBe('home')
     wrapper.unmount()
   })

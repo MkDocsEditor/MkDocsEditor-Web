@@ -9,6 +9,16 @@ import type { Run } from './authorRuns'
 import type { Automerge } from './automerge'
 import type { OfflineStore, StoredCopy } from './offlineStore'
 import { rebaseChanges } from './rebase'
+import {
+  CLOSE_DELETED,
+  CLOSE_HEARTBEAT_TIMEOUT,
+  CLOSE_PROTOCOL_ERROR,
+  CLOSE_REFUSED,
+  CLOSE_RENAMED,
+  SOCKET_OPEN,
+  browserSocket,
+} from './socket'
+import type { SocketLike } from './socket'
 import { diffText } from './session'
 import type {
   AuthorRun,
@@ -37,17 +47,6 @@ interface DocContent {
 }
 type AmDoc = Automerge.Doc<DocContent>
 type AutomergeApi = typeof Automerge
-
-/** The subset of WebSocket the session needs (replaced by a fake in tests). */
-export interface SocketLike {
-  readonly readyState: number
-  send(data: string): void
-  close(code?: number, reason?: string): void
-  onopen: ((event: unknown) => void) | null
-  onmessage: ((event: { data: unknown }) => void) | null
-  onclose: ((event: { code: number; reason?: string }) => void) | null
-  onerror: ((event: unknown) => void) | null
-}
 
 export interface SessionApi {
   wsTicket(): Promise<WsTicket>
@@ -78,8 +77,6 @@ const DEFAULT_TIMING = {
   backoffMs: [500, 1_000, 2_000, 5_000, 10_000, 15_000],
 }
 
-const OPEN = 1
-
 interface RawPresence {
   clientId: string
   username: string
@@ -96,13 +93,6 @@ interface PeerState {
 
 /** Colour of users the server told nothing about. */
 const UNKNOWN_USER_COLOR = '#9e9e9e'
-
-/** Close codes of the document websocket (`docs/sync-protocol.md` section 5). */
-const CLOSE_REFUSED = 4003
-const CLOSE_DELETED = 4004
-const CLOSE_HEARTBEAT_TIMEOUT = 4008
-const CLOSE_RENAMED = 4009
-const CLOSE_PROTOCOL_ERROR = 4400
 
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
 function randomActorId(): string {
@@ -149,7 +139,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   // Assigned in start(); every use happens after a document exists.
   let A!: AutomergeApi
   const timing = { ...DEFAULT_TIMING, ...options.timing }
-  const createSocket = options.createSocket ?? ((url: string) => new WebSocket(url) as SocketLike)
+  const createSocket = options.createSocket ?? browserSocket
   let documentId = options.documentId
 
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
@@ -350,7 +340,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   // ----- websocket -----------------------------------------------------------------------------
 
   function send(message: Record<string, unknown>): void {
-    if (socket?.readyState !== OPEN) return
+    if (socket?.readyState !== SOCKET_OPEN) return
     socket.send(JSON.stringify(message))
     lastSent = Date.now()
   }
@@ -668,7 +658,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   function tick(): void {
     const now = Date.now()
-    if (socket?.readyState === OPEN && now - lastReceived > timing.timeoutMs) {
+    if (socket?.readyState === SOCKET_OPEN && now - lastReceived > timing.timeoutMs) {
       // The server went silent: drop the connection and reconnect.
       const stale = socket
       socket = null

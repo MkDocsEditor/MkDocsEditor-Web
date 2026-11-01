@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 import { ApiError } from '@/api'
 import { describeAuthError } from '@/services/authErrors'
+import { errorMessage } from '@/services/errors'
 
 export interface Notification {
   id: number
@@ -21,7 +22,7 @@ export function describeError(error: unknown): string {
     if (error.status === 404) return 'This does not exist (any more).'
     return error.message
   }
-  return error instanceof Error ? error.message : String(error)
+  return errorMessage(error)
 }
 
 /** Snackbar messages. */

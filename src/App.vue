@@ -22,7 +22,8 @@ import { canDropInto, dragged, dropTarget } from '@/components/tree/dragState'
 import NavTree from '@/components/tree/NavTree.vue'
 import SearchDialog from '@/components/tree/SearchDialog.vue'
 import { roleLabel } from '@/services/accountRules'
-import { local, readJson, writeJson } from '@/services/storage'
+import { followMovedRoute } from '@/services/redirects'
+import { useStored } from '@/services/storedRef'
 import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
 import { useMoveStore } from '@/stores/move'
@@ -43,9 +44,7 @@ const searchOpen = ref(false)
 const opened = reactive(new Set<string>())
 
 /** Files (resources) in the drawer tree; can be hidden in large wikis. */
-const SHOW_FILES_KEY = 'mkdocseditor.treeShowFiles'
-const showFiles = ref(readJson<boolean>(local(), SHOW_FILES_KEY) ?? true)
-watch(showFiles, (show) => writeJson(local(), SHOW_FILES_KEY, show))
+const showFiles = useStored('mkdocseditor.treeShowFiles', true)
 
 const activeId = computed(() =>
   typeof route.params.id === 'string' ? route.params.id : tree.root?.id,
@@ -89,21 +88,17 @@ watch(
 )
 onBeforeUnmount(() => live.stop())
 
-// A folder or file that is open here moved: follow it. An open document follows by itself
-// (its session gets `document-renamed` and replaces the route).
-const stopFollowing = live.onItemsMoved((moves) => {
-  const id = route.params.id
-  if ((route.name !== 'section' && route.name !== 'resource') || typeof id !== 'string') return
-  const move = moves.find((m) => m.oldId === id)
-  if (move) void router.replace({ name: route.name, params: { id: move.newId } })
-})
+const stopFollowing = live.onItemsMoved((moves) => followMovedRoute(router, moves))
 // expanded folders keep their state under their new ids
 const stopRekeying = live.onItemsMoved((moves) => {
   for (const m of moves) {
     if (m.type === 'section' && opened.delete(m.oldId)) opened.add(m.newId)
   }
 })
-onBeforeUnmount(stopRekeying)
+onBeforeUnmount(() => {
+  stopFollowing()
+  stopRekeying()
+})
 
 // Dropping a tree item on "Wiki" moves it to the top folder.
 const moveStore = useMoveStore()
@@ -120,7 +115,8 @@ function onRootDrop(event: DragEvent): void {
   event.preventDefault()
   moveStore.open(item, tree.root.id)
 }
-onBeforeUnmount(stopFollowing)
+
+let loggingOut = false
 
 // The session ended (expired, revoked elsewhere, account disabled): back to the login, then
 // back here. Unsaved edits stay in the offline store and sync after the next sign-in.
@@ -136,7 +132,6 @@ watch(
   },
 )
 
-let loggingOut = false
 async function logout(): Promise<void> {
   loggingOut = true
   live.stop()
@@ -158,6 +153,7 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 window.addEventListener('keydown', onKeydown)
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>

@@ -1,5 +1,4 @@
 /** Validation of section, document and resource names (they become file and folder names). */
-
 const FORBIDDEN = /[/\\:*?"<>|]/
 
 export function validateName(name: string): true | string {
@@ -26,3 +25,11 @@ export function initials(name: string): string {
     .slice(0, 2)
     .toUpperCase()
 }
+
+/** "1 page", "3 pages" */
+export function plural(count: number, one: string, many = `${one}s`): string {
+  return `${count} ${count === 1 ? one : many}`
+}
+
+/** What the items are called in sentences. */
+export const ITEM_LABELS = { section: 'folder', document: 'page', resource: 'file' } as const

@@ -44,12 +44,11 @@ const emit = defineEmits<{
 
 const host = ref<HTMLElement | null>(null)
 const readOnly = new Compartment()
+const gutter = new Compartment()
 let view: EditorView | null = null
 
-const gutter = new Compartment()
-
-function isReadOnly(): boolean {
-  return props.session.status.value.readOnly
+function readOnlyExtensions(value: boolean) {
+  return [EditorState.readOnly.of(value), EditorView.editable.of(!value)]
 }
 
 function emitTopLine(): void {
@@ -78,7 +77,7 @@ onMounted(() => {
       formattingKeymap(() => props.formatOverride ?? {}),
       keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
       placeholder('Write here …'),
-      readOnly.of([EditorState.readOnly.of(isReadOnly()), EditorView.editable.of(!isReadOnly())]),
+      readOnly.of(readOnlyExtensions(props.session.status.value.readOnly)),
       EditorView.contentAttributes.of({ 'aria-label': 'Markdown text', spellcheck: 'true' }),
       remoteCursors(),
       authorship(),
@@ -116,10 +115,7 @@ watch(
 )
 watch(
   () => props.session.status.value.readOnly,
-  (ro) =>
-    view?.dispatch({
-      effects: readOnly.reconfigure([EditorState.readOnly.of(ro), EditorView.editable.of(!ro)]),
-    }),
+  (value) => view?.dispatch({ effects: readOnly.reconfigure(readOnlyExtensions(value)) }),
 )
 
 onBeforeUnmount(() => {
