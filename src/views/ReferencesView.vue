@@ -27,21 +27,27 @@ const unused = ref<ResourceModel[] | null>(null)
 const failure = ref('')
 const loading = ref(false)
 
+/** Every tree change reloads the lists; only the answer to the latest request counts. */
+let generation = 0
+
 async function load(): Promise<void> {
+  const mine = ++generation
   loading.value = true
   failure.value = ''
   try {
     const api = useApi()
     const [b, u] = await Promise.all([api.getBrokenReferences(), api.getUnusedResources()])
+    if (mine !== generation) return
     broken.value = b
     unused.value = u
   } catch (error) {
+    if (mine !== generation) return
     failure.value =
       error instanceof ApiError && error.status === 404
         ? 'This server does not track links yet. Update the backend.'
         : 'The links could not be loaded.'
   } finally {
-    loading.value = false
+    if (mine === generation) loading.value = false
   }
 }
 watch(() => tree.root, load, { immediate: true })

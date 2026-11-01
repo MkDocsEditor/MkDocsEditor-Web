@@ -143,4 +143,49 @@ describe('ReferencesView', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="unused-file"]').text()).toContain('logo.png · 10 B')
   })
+
+  describe('with two requests running', () => {
+    const brokenAt = (line: number) =>
+      json({ broken: [{ source: a, kind: 'link', line, column: 1, destination: 'x.md' }] })
+
+    async function twoRequests() {
+      const answers: ((response: Response) => void)[] = []
+      const mock = createFetchMock({
+        'GET /section/': () => json(sampleTree()),
+        'GET /references/broken/': () => new Promise((resolve) => answers.push(resolve)),
+        'GET /references/unused-resources/': () => json({ resources: [] }),
+      })
+      setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
+      const { wrapper } = await mountWithPlugins(ReferencesView, { props: {} })
+      await useTreeStore().load()
+      await flushPromises()
+      expect(answers).toHaveLength(2)
+      const lines = () => wrapper.findAll('[data-testid="broken-link"]').map((b) => b.text())
+      const loading = () => wrapper.find('[role="progressbar"]').exists()
+      const [older, latest] = answers as [(r: Response) => void, (r: Response) => void]
+      return { older, latest, lines, loading }
+    }
+
+    it('ignores the older answer when it arrives last', async () => {
+      const { older, latest, lines, loading } = await twoRequests()
+      latest(brokenAt(2))
+      await flushPromises()
+      older(brokenAt(1))
+      await flushPromises()
+      expect(lines()).toEqual([expect.stringContaining('Line 2')])
+      expect(loading()).toBe(false)
+    })
+
+    it('keeps loading when the older answer arrives first', async () => {
+      const { older, latest, lines, loading } = await twoRequests()
+      older(brokenAt(1))
+      await flushPromises()
+      expect(lines()).toEqual([])
+      expect(loading()).toBe(true)
+      latest(brokenAt(2))
+      await flushPromises()
+      expect(lines()).toEqual([expect.stringContaining('Line 2')])
+      expect(loading()).toBe(false)
+    })
+  })
 })
