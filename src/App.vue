@@ -102,6 +102,8 @@ async function logout(): Promise<void> {
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  // the editor uses Ctrl+K for links
+  if (event.defaultPrevented) return
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && showWiki.value) {
     event.preventDefault()
     searchOpen.value = true
