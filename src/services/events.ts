@@ -1,3 +1,4 @@
+import type { MovedItem } from '@/api'
 import type { SocketLike } from '@/sync/automergeSession'
 
 /** A user who has a document open. */
@@ -10,6 +11,8 @@ export interface OnlineUser {
 export interface EventsHandlers {
   /** The tree changed, or events may have been missed (after every connect): fetch it again. */
   onTreeChanged(): void
+  /** Items were moved or renamed and have new ids; `tree-changed` follows. */
+  onItemsMoved?(moves: MovedItem[]): void
   /** The complete list of open documents and their users; replaces the previous one. */
   onOnline(documents: Map<string, OnlineUser[]>): void
   /** The connection was refused for good (bad credentials); the caller should log out. */
@@ -73,7 +76,7 @@ export function connectEvents(options: EventsOptions): EventsConnection {
 
   function onMessage(data: unknown): void {
     lastReceived = Date.now()
-    let message: { type?: string; documents?: unknown }
+    let message: { type?: string; documents?: unknown; moves?: unknown }
     try {
       message = JSON.parse(String(data)) as typeof message
     } catch {
@@ -81,6 +84,12 @@ export function connectEvents(options: EventsOptions): EventsConnection {
     }
     if (message.type === 'tree-changed') {
       options.onTreeChanged()
+    } else if (message.type === 'items-moved') {
+      const moves = (Array.isArray(message.moves) ? message.moves : []).filter(
+        (m: Partial<MovedItem>): m is MovedItem =>
+          typeof m?.oldId === 'string' && typeof m.newId === 'string' && typeof m.type === 'string',
+      )
+      if (moves.length > 0) options.onItemsMoved?.(moves)
     } else if (message.type === 'online') {
       const map = new Map<string, OnlineUser[]>()
       const documents = Array.isArray(message.documents) ? message.documents : []

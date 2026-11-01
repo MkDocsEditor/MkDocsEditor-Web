@@ -31,9 +31,15 @@ afterEach(() => {
 })
 
 /** A client: a session plus a mirror of the editor text built only from emitted changes. */
-function client(server: FakeSyncServer, username: string, store: OfflineStore = memoryStore()) {
+function client(
+  server: FakeSyncServer,
+  username: string,
+  store: OfflineStore = memoryStore(),
+  options: { documentId?: string; onRenamed?: (id: string) => void } = {},
+) {
   const session = createAutomergeSession({
-    documentId: server.documentId,
+    documentId: options.documentId ?? server.documentId,
+    onRenamed: options.onRenamed,
     automerge: A,
     api: server.api(username),
     store,
@@ -327,5 +333,121 @@ describe('rebaseChanges', () => {
     const result = applyChanges(target, rebaseChanges(base, unsynced, target))
     expect(result).toContain('B')
     expect(result).toContain('X')
+  })
+
+  it('follows a rename and moves the stored copy to the new id', async () => {
+    const server = new FakeSyncServer(A, 'Text\n')
+    const renamed: string[] = []
+    const anna = client(server, 'anna', memoryStore(), { onRenamed: (id) => renamed.push(id) })
+    await online(anna)
+    anna.insert('end', 'mehr\n')
+    await vi.waitFor(() => expect(server.text).toBe('Text\nmehr\n'))
+    server.rename('doc-2')
+    await vi.waitFor(() => expect(renamed).toEqual(['doc-2']))
+    await online(anna)
+    const hellos = server.connections.map((c) => c.socket.sent[0])
+    expect(hellos.at(-1)).toMatchObject({ type: 'hello', documentId: 'doc-2', epoch: 'epoch-1' })
+    anna.insert('end', 'danach\n')
+    await vi.waitFor(() => expect(server.text).toBe('Text\nmehr\ndanach\n'))
+    await vi.waitFor(async () => expect(await anna.store.keys()).toEqual(['doc-2']))
+    expect((await anna.store.get('doc-2'))!.epoch).toBe('epoch-1')
+  })
+
+  it('brings offline edits of a document that moved meanwhile to its new id', async () => {
+    const server = new FakeSyncServer(A, 'Text\n')
+    const store = memoryStore()
+    const first = client(server, 'anna', store)
+    await online(first)
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(first.session.status.value.connection).toBe('offline'))
+    first.insert('end', 'offline\n')
+    first.session.close()
+    await vi.waitFor(async () =>
+      expect(A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content).toBe(
+        'Text\noffline\n',
+      ),
+    )
+
+    // the page moves while the client is offline
+    server.offline = false
+    server.rename('doc-2')
+    server.externalEdit((t) => t.replace('Text', 'Link geändert'))
+
+    const renamed: string[] = []
+    const again = client(server, 'anna', store, {
+      documentId: 'doc-1',
+      onRenamed: (id) => renamed.push(id),
+    })
+    await again.session.ready
+    expect(again.session.getText()).toBe('Text\noffline\n')
+    await vi.waitFor(() => expect(server.text).toBe('Link geändert\noffline\n'))
+    expect(again.session.getText()).toBe('Link geändert\noffline\n')
+    expect(renamed).toEqual(['doc-2'])
+    await vi.waitFor(async () => expect(await store.keys()).toEqual(['doc-2']))
+  })
+
+  it('writes a pending change at once when the page is hidden', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const store = memoryStore()
+    const session = createAutomergeSession({
+      documentId: server.documentId,
+      automerge: A,
+      api: server.api('anna'),
+      store,
+      createSocket: server.socketFactory,
+      timing: { ...timing, persistMs: 60_000 },
+    })
+    sessions.push(session)
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('online'))
+    session.applyLocalChanges([{ from: 4, to: 4, insert: '!' }])
+    globalThis.dispatchEvent(new Event('pagehide'))
+    await vi.waitFor(async () =>
+      expect(A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content).toBe('Text!'),
+    )
+  })
+
+  it('opened by its old id, picks up a copy that was re-keyed already', async () => {
+    const server = new FakeSyncServer(A, 'Text\n')
+    const store = memoryStore()
+    const first = client(server, 'anna', store)
+    await online(first)
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(first.session.status.value.connection).toBe('offline'))
+    first.insert('end', 'offline\n')
+    first.session.close()
+    await vi.waitFor(async () => expect(await store.keys()).toEqual(['doc-1']))
+    server.offline = false
+    server.rename('doc-2')
+    // the tree's rescue moved the copy before the page opened
+    const copy = (await store.get('doc-1'))!
+    await store.put({ ...copy, documentId: 'doc-2' })
+    await store.delete('doc-1')
+
+    const again = client(server, 'anna', store, { documentId: 'doc-1' })
+    await vi.waitFor(() => expect(server.text).toBe('Text\noffline\n'))
+    expect(again.session.getText()).toBe('Text\noffline\n')
+    expect(again.mirror).toBe('Text\noffline\n')
+    await vi.waitFor(async () => expect(await store.keys()).toEqual(['doc-2']))
+  })
+
+  it('keeps the copy under the old id while another tab holds the new one', async () => {
+    const server = new FakeSyncServer(A, 'Text\n')
+    const store = memoryStore()
+    const anna = client(server, 'anna', store)
+    await online(anna)
+    const blocker = await store.claim('doc-2')
+    server.rename('doc-2')
+    await online(anna)
+    anna.insert('end', 'x')
+    await vi.waitFor(() => expect(server.text).toBe('Text\nx'))
+    await vi.waitFor(async () =>
+      expect(A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content).toBe(
+        'Text\nx',
+      ),
+    )
+    expect(await store.get('doc-2')).toBeUndefined()
+    blocker?.()
   })
 })

@@ -11,6 +11,7 @@ import { copyText } from '@/services/clipboard'
 import { KIND_LABELS, colorFor, formatSize, iconFor, resourceKind } from '@/services/icons'
 import { openResource } from '@/services/resources'
 import { resourceObjectUrl } from '@/services/resourceUrls'
+import { useMovedRedirect } from '@/services/redirects'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
@@ -24,6 +25,11 @@ const resource = computed(() => {
   const item = tree.get(props.id)
   return item?.type === 'resource' ? item : undefined
 })
+const lookingUp = useMovedRedirect(
+  () => props.id,
+  'resource',
+  () => !!tree.root && !tree.loading && resource.value === undefined,
+)
 const ancestors = computed(() => tree.ancestors(props.id))
 const kind = computed(() => (resource.value ? resourceKind(resource.value) : 'other'))
 const path = computed(() => tree.path(props.id))
@@ -189,7 +195,7 @@ async function remove(): Promise<void> {
     </template>
 
     <v-empty-state
-      v-else-if="!tree.loading && tree.root"
+      v-else-if="!tree.loading && tree.root && !lookingUp"
       title="Not found"
       text="This file does not exist (any more)."
     >

@@ -43,7 +43,9 @@ describe('connectEvents', () => {
     const onTreeChanged = vi.fn()
     let online = new Map<string, OnlineUser[]>()
     const onUnauthorized = vi.fn()
+    const onItemsMoved = vi.fn()
     const connection = connectEvents({
+      onItemsMoved,
       wsTicket,
       wsUrl: (path) => `ws://b${path}`,
       createSocket: (url) => {
@@ -56,8 +58,26 @@ describe('connectEvents', () => {
       onOnline: (map) => (online = map),
       onUnauthorized,
     })
-    return { sockets, onTreeChanged, online: () => online, onUnauthorized, connection }
+    return {
+      sockets,
+      onTreeChanged,
+      online: () => online,
+      onUnauthorized,
+      onItemsMoved,
+      connection,
+    }
   }
+
+  it('passes moved items on', async () => {
+    const { sockets, onItemsMoved } = setup()
+    await vi.advanceTimersByTimeAsync(0)
+    sockets[0]!.open()
+    const move = { type: 'document', oldId: 'a', newId: 'b', oldPath: 'a.md', newPath: 'x/a.md' }
+    sockets[0]!.receive({ type: 'items-moved', moves: [move, { broken: true }] })
+    sockets[0]!.receive({ type: 'items-moved', moves: 'nonsense' })
+    expect(onItemsMoved).toHaveBeenCalledTimes(1)
+    expect(onItemsMoved).toHaveBeenCalledWith([move])
+  })
 
   it('says hello with a ticket and reloads the tree on connect and on changes', async () => {
     const { sockets, onTreeChanged, online, connection } = setup()

@@ -23,6 +23,7 @@ import { colorFor, formatSize, iconFor } from '@/services/icons'
 import { stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
+import { useMovedRedirect } from '@/services/redirects'
 import { useNotifyStore } from '@/stores/notify'
 import { sortByName, useTreeStore } from '@/stores/tree'
 
@@ -35,6 +36,11 @@ const router = useRouter()
 
 const section = computed(() =>
   props.id === undefined ? tree.root : (tree.section(props.id) ?? null),
+)
+const lookingUp = useMovedRedirect(
+  () => props.id ?? '',
+  'section',
+  () => props.id !== undefined && !!tree.root && !tree.loading && section.value === null,
 )
 const isRoot = computed(() => section.value !== null && section.value.id === tree.root?.id)
 const ancestors = computed(() => (section.value ? tree.ancestors(section.value.id) : []))
@@ -345,7 +351,7 @@ const deleteText = computed(() => {
     </template>
 
     <v-empty-state
-      v-else-if="!tree.loading && tree.root"
+      v-else-if="!tree.loading && tree.root && !lookingUp"
       title="Not found"
       text="This folder does not exist (any more)."
     >

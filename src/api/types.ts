@@ -46,6 +46,32 @@ export interface SectionModel {
 export type TreeItem = SectionModel | DocumentModel | ResourceModel
 export type ItemType = TreeItem['type']
 
+/** A short description of an item (`docs/references.md` section 4). */
+export interface ItemRef {
+  type: ItemType
+  id: string
+  /** Path relative to the docs folder. */
+  path: string
+  name: string
+}
+
+/** An item whose id changed through a move or rename (`docs/references.md` section 5). */
+export interface MovedItem {
+  type: ItemType
+  oldId: string
+  newId: string
+  oldPath: string
+  newPath: string
+}
+
+/** `GET /moved/{id}/`: where an old id points now. */
+export interface MovedTo {
+  oldId: string
+  type: ItemType
+  item: ItemRef
+  movedAt: string
+}
+
 /** `GET /auth/whoami/` */
 export interface WhoAmI {
   id?: string

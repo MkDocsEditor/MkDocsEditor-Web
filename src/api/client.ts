@@ -2,6 +2,8 @@ import type {
   ActorInfo,
   AuthorshipResponse,
   DocumentModel,
+  ItemRef,
+  MovedTo,
   ResourceModel,
   Revision,
   SectionModel,
@@ -23,6 +25,12 @@ export class ApiError extends Error {
   ) {
     super(message)
     this.name = 'ApiError'
+  }
+
+  /** A 404 for an id that moved carries the item's new place (`docs/references.md` section 7). */
+  get movedTo(): ItemRef | null {
+    const moved = this.details.movedTo as ItemRef | undefined
+    return this.status === 404 && moved && typeof moved.id === 'string' ? moved : null
   }
 
   get isUnauthorized(): boolean {
@@ -245,6 +253,19 @@ export class ApiClient {
       'POST',
       `/document/${encodeURIComponent(id)}/history/${encodeURIComponent(revision)}/restore`,
     )
+  }
+
+  /**
+   * Where an old id points after a move (`GET /moved/{id}/`). Null when the id has not moved,
+   * the item is gone, or the backend has no redirects.
+   */
+  async getMoved(id: string): Promise<MovedTo | null> {
+    try {
+      return await this.json<MovedTo>('GET', `/moved/${encodeURIComponent(id)}`)
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 404 || error.status === 405)) return null
+      throw error
+    }
   }
 
   async getResourceContent(id: string): Promise<Blob> {

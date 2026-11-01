@@ -77,6 +77,8 @@ export class FakeSyncServer {
   offline = false
   readOnlyUsers = new Set<string>()
   ticketsIssued = 0
+  /** Old ids of the document (renames), answered with `document-renamed` after hello. */
+  readonly oldIds = new Set<string>()
 
   constructor(
     private readonly A: Api,
@@ -123,6 +125,15 @@ export class FakeSyncServer {
 
   receive(socket: FakeSocket, message: Record<string, unknown>): void {
     let connection = this.connections.find((c) => c.socket === socket)
+    if (message.type === 'hello' && this.oldIds.has(String(message.documentId))) {
+      socket.deliver({
+        type: 'document-renamed',
+        documentId: message.documentId,
+        newDocumentId: this.documentId,
+      })
+      setTimeout(() => socket.serverClose(4009), 0)
+      return
+    }
     if (message.type === 'hello') {
       const username = String(message.ticket).replace('ticket-', '')
       connection = {
@@ -223,6 +234,22 @@ export class FakeSyncServer {
     for (const connection of [...this.connections]) {
       this.drop(connection.socket)
       connection.socket.serverClose(code)
+    }
+  }
+
+  /** Renames the document: connections get `document-renamed` and close with 4009. */
+  rename(newId: string): void {
+    const oldId = this.documentId
+    this.oldIds.add(oldId)
+    this.documentId = newId
+    for (const connection of [...this.connections]) {
+      connection.socket.deliver({
+        type: 'document-renamed',
+        documentId: oldId,
+        newDocumentId: newId,
+      })
+      this.drop(connection.socket)
+      setTimeout(() => connection.socket.serverClose(4009), 0)
     }
   }
 

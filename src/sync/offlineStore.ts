@@ -21,6 +21,8 @@ export interface OfflineStore {
   get(documentId: string): Promise<StoredCopy | undefined>
   put(copy: StoredCopy): Promise<void>
   delete(documentId: string): Promise<void>
+  /** Ids of all stored copies. */
+  keys(): Promise<string[]>
   /**
    * Claims the record of a document for this tab. Resolves to a release function, or null when
    * another tab holds it (this tab then works with an unpersisted copy).
@@ -39,6 +41,7 @@ export function memoryStore(): OfflineStore {
     delete: async (id) => {
       records.delete(id)
     },
+    keys: async () => [...records.keys()],
     claim: async (id) => {
       if (claimed.has(id)) return null
       claimed.add(id)
@@ -97,6 +100,14 @@ export function indexedDbStore(): OfflineStore {
         await withStore('readwrite', (s) => s.delete(id))
       } catch {
         await fallback.delete(id)
+      }
+    },
+    async keys() {
+      try {
+        const keys = (await withStore('readonly', (s) => s.getAllKeys())) as string[]
+        return [...new Set([...keys, ...(await fallback.keys())])]
+      } catch {
+        return fallback.keys()
       }
     },
     async claim(id) {

@@ -85,6 +85,16 @@ watch(
 )
 onBeforeUnmount(() => live.stop())
 
+// A folder or file that is open here moved: follow it. An open document follows by itself
+// (its session gets `document-renamed` and replaces the route).
+const stopFollowing = live.onItemsMoved((moves) => {
+  const id = route.params.id
+  if ((route.name !== 'section' && route.name !== 'resource') || typeof id !== 'string') return
+  const move = moves.find((m) => m.oldId === id)
+  if (move) void router.replace({ name: route.name, params: { id: move.newId } })
+})
+onBeforeUnmount(stopFollowing)
+
 // The session ended (expired, revoked elsewhere, account disabled): back to the login, then
 // back here. Unsaved edits stay in the offline store and sync after the next sign-in.
 watch(
