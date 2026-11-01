@@ -18,6 +18,7 @@ import { useDisplay } from 'vuetify'
 
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
+import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { isImage } from '@/services/icons'
@@ -62,6 +63,8 @@ const session = shallowRef<DocumentSession | null>(null)
 const text = ref('')
 const ready = ref(false)
 const topLine = ref(0)
+const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+const editorView = () => editor.value?.getView() ?? null
 
 /** Pasted or dropped files go into the folder of the page. */
 const uploading = ref(0)
@@ -257,11 +260,17 @@ const connection = computed(() => {
     />
 
     <div v-if="session" class="document-view__panes" :class="`document-view__panes--${mode}`">
-      <div v-show="mode !== 'preview'" class="document-view__pane">
+      <div v-show="mode !== 'preview'" class="document-view__pane document-view__pane--editor">
+        <template v-if="ready && !status?.readOnly">
+          <FormatToolbar :view="editorView" />
+          <v-divider />
+        </template>
         <v-skeleton-loader v-if="!ready" type="paragraph@3" class="pa-4" />
         <MarkdownEditor
           v-else
+          ref="editor"
           :key="id"
+          class="document-view__editor"
           :session="session"
           :show-authorship="showAuthorship"
           :upload="upload"
@@ -306,5 +315,12 @@ const connection = computed(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+.document-view__pane--editor {
+  display: flex;
+  flex-direction: column;
+}
+.document-view__editor {
+  flex: 1 1 0;
 }
 </style>

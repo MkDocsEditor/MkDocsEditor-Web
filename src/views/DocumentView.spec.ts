@@ -67,6 +67,18 @@ describe('DocumentView', () => {
     wrapper.unmount()
   })
 
+  it('formats with the toolbar', async () => {
+    const { wrapper } = await setup()
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-testid="format-toolbar"]').exists()).toBe(true),
+    )
+    await wrapper.find('[data-testid="format-heading"]').trigger('click')
+    await flushPromises()
+    ;(document.querySelector('[data-testid="format-heading-2"]') as HTMLElement).click()
+    expect(fakes[0]!.session.getText()).toBe('## Apfelkuchen\n\nLecker.')
+    wrapper.unmount()
+  })
+
   it('closes the session when leaving', async () => {
     const { wrapper } = await setup()
     const close = vi.spyOn(fakes[0]!.session, 'close')

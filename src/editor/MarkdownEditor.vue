@@ -19,6 +19,8 @@ import type { DocumentSession } from '@/sync/session'
 import { authorship, setAuthorship } from './authorship'
 import { sessionBinding } from './binding'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
+import { formattingKeymap } from './formatting'
+import type { FormatName } from './formatting'
 import { remoteCursors, setPeers } from './remoteCursors'
 import { fileUpload } from './upload'
 import type { UploadFiles } from './upload'
@@ -30,6 +32,8 @@ const props = defineProps<{
   upload?: UploadFiles
   /** Shows line numbers (off on phones, where every column counts). */
   lineNumbers?: boolean
+  /** Replaces formatting shortcuts, for example Ctrl+K with the link picker. */
+  formatOverride?: Partial<Record<FormatName, () => boolean>>
 }>()
 const emit = defineEmits<{
   /** The first visible source line (0-based), for scrolling the preview along. */
@@ -71,6 +75,7 @@ onMounted(() => {
       }),
       codeTheme(),
       gutter.of(props.lineNumbers ? lineNumberGutter() : []),
+      formattingKeymap(() => props.formatOverride ?? {}),
       keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
       placeholder('Write here …'),
       readOnly.of([EditorState.readOnly.of(isReadOnly()), EditorView.editable.of(!isReadOnly())]),
