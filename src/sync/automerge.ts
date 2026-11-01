@@ -18,3 +18,14 @@ export function loadAutomerge(): Promise<typeof Automerge> {
 }
 
 export type { Automerge }
+
+export type AutomergeApi = typeof Automerge
+
+export interface DocContent {
+  content: string
+}
+export type AmDoc = Automerge.Doc<DocContent>
+
+export function sameHeads(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((h) => b.includes(h))
+}
