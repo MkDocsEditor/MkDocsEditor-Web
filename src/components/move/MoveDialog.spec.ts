@@ -94,6 +94,26 @@ describe('MoveDialog', () => {
     document.body.innerHTML = ''
   })
 
+  it('stops loading when the name goes back before the preview started', async () => {
+    vi.useFakeTimers()
+    const { move, requests, wrapper } = await setup()
+    move.open(useTreeStore().get('s-kuchen')!)
+    await flushPromises()
+    const input = el('move-name').querySelector('input')!
+    const type = async (value: string) => {
+      input.value = value
+      input.dispatchEvent(new Event('input'))
+      await flushPromises()
+    }
+    await type('Torten')
+    expect(el('move-loading')).not.toBeNull()
+    await type('Kuchen')
+    await settle()
+    expect(requests).toEqual([])
+    expect(el('move-loading')).toBeNull()
+    wrapper.unmount()
+  })
+
   it('previews the move of a folder, then moves it and follows the open view', async () => {
     vi.useFakeTimers()
     const { move, requests, router, wrapper } = await setup()

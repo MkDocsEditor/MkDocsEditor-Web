@@ -21,6 +21,7 @@ import type {
   SessionResponse,
   TotpEnrollment,
 } from './authTypes'
+import { urlPath } from './client'
 import type { ApiClient } from './client'
 
 /** The web client always uses cookie sessions; the token never reaches JavaScript. */
@@ -177,11 +178,11 @@ export class AuthApi {
   }
 
   renamePasskey(id: string, name: string): Promise<Passkey> {
-    return this.send('PATCH', `/account/passkeys/${encodeURIComponent(id)}`, { name })
+    return this.send('PATCH', urlPath`/account/passkeys/${id}`, { name })
   }
 
   deletePasskey(id: string): Promise<void> {
-    return this.del(`/account/passkeys/${encodeURIComponent(id)}`)
+    return this.del(urlPath`/account/passkeys/${id}`)
   }
 
   // device pairing (the Android app)
@@ -191,11 +192,11 @@ export class AuthApi {
   }
 
   deviceLink(id: string): Promise<DeviceLink> {
-    return this.get(`/account/device-links/${encodeURIComponent(id)}`)
+    return this.get(urlPath`/account/device-links/${id}`)
   }
 
   revokeDeviceLink(id: string): Promise<void> {
-    return this.del(`/account/device-links/${encodeURIComponent(id)}`)
+    return this.del(urlPath`/account/device-links/${id}`)
   }
 
   sessions(): Promise<SessionInfo[]> {
@@ -203,7 +204,7 @@ export class AuthApi {
   }
 
   revokeSession(id: string): Promise<void> {
-    return this.del(`/account/sessions/${encodeURIComponent(id)}`)
+    return this.del(urlPath`/account/sessions/${id}`)
   }
 
   revokeOtherSessions(): Promise<{ revoked: number }> {
@@ -217,22 +218,22 @@ export class AuthApi {
   }
 
   updateUser(id: string, patch: AdminUserPatch): Promise<AdminUser> {
-    return this.send('PATCH', `/admin/users/${encodeURIComponent(id)}`, patch)
+    return this.send('PATCH', urlPath`/admin/users/${id}`, patch)
   }
 
   deleteUser(id: string): Promise<void> {
-    return this.del(`/admin/users/${encodeURIComponent(id)}`)
+    return this.del(urlPath`/admin/users/${id}`)
   }
 
   revokeUserSessions(id: string): Promise<{ revoked: number }> {
-    return this.send('POST', `/admin/users/${encodeURIComponent(id)}/sessions/revoke`)
+    return this.send('POST', urlPath`/admin/users/${id}/sessions/revoke`)
   }
 
   createResetLink(
     id: string,
     options: { expiresInMinutes?: number; resetSecondFactors?: boolean },
   ): Promise<CreatedLink> {
-    return this.send('POST', `/admin/users/${encodeURIComponent(id)}/reset-link`, options)
+    return this.send('POST', urlPath`/admin/users/${id}/reset-link`, options)
   }
 
   invites(): Promise<LinkInfo[]> {
@@ -253,7 +254,7 @@ export class AuthApi {
   }
 
   revokeInvite(id: string): Promise<void> {
-    return this.del(`/admin/invites/${encodeURIComponent(id)}`)
+    return this.del(urlPath`/admin/invites/${id}`)
   }
 
   resetLinks(): Promise<LinkInfo[]> {
@@ -261,7 +262,7 @@ export class AuthApi {
   }
 
   revokeResetLink(id: string): Promise<void> {
-    return this.del(`/admin/reset-links/${encodeURIComponent(id)}`)
+    return this.del(urlPath`/admin/reset-links/${id}`)
   }
 
   settings(): Promise<InstanceSettings> {

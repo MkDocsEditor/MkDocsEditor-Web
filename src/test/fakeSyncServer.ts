@@ -1,5 +1,6 @@
 import type { Automerge } from '@/sync/automerge'
-import type { SessionApi, SocketLike } from '@/sync/automergeSession'
+import type { SessionApi } from '@/sync/automergeSession'
+import type { SocketLike } from '@/sync/socket'
 
 type AmDoc = Automerge.Doc<{ content: string }>
 type Api = typeof Automerge

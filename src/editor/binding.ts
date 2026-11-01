@@ -6,7 +6,7 @@ import type { EditorView, ViewUpdate } from '@codemirror/view'
 import type { DocumentSession, TextChange, TextSelection } from '@/sync/session'
 
 /** Marks transactions that come from the session, so they are not sent back. */
-export const remoteChange = Annotation.define<boolean>()
+const remoteChange = Annotation.define<boolean>()
 
 /** Sequential TextChanges (each relative to the result of the previous) as one ChangeSet. */
 export function toChangeSet(changes: readonly TextChange[], length: number): ChangeSet {

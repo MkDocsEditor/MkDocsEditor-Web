@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError, useApi } from '@/api'
 import type { MoveRequest, MoveResult, SectionModel, TreeItem } from '@/api'
 import TreeBrowser from '@/components/tree/TreeBrowser.vue'
-import { stripMarkdownExtension, validateName } from '@/services/names'
+import { ITEM_LABELS, plural, stripMarkdownExtension, validateName } from '@/services/names'
+import { followMovedRoute } from '@/services/redirects'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
@@ -64,10 +65,7 @@ const blocked = computed(() => {
   return ids
 })
 
-const targetPath = computed(() => {
-  const path = tree.path(sectionId.value)
-  return path === '' ? 'Wiki (top folder)' : path
-})
+const targetPath = computed(() => tree.folderLabel(sectionId.value))
 
 const cleanName = computed(() =>
   item.value?.type === 'document' ? stripMarkdownExtension(name.value) : name.value.trim(),
@@ -96,12 +94,14 @@ let generation = 0
 watch(
   () => [item.value?.id, sectionId.value, cleanName.value] as const,
   () => {
+    // whatever was still on its way belongs to the previous state of the form
     clearTimeout(timer)
+    const mine = ++generation
+    loading.value = false
     preview.value = null
     problem.value = ''
     const body = request(true)
     if (!body) return
-    const mine = ++generation
     loading.value = true
     timer = setTimeout(async () => {
       try {
@@ -116,13 +116,11 @@ watch(
   },
 )
 
+onBeforeUnmount(() => clearTimeout(timer))
+
 const changedLines = computed(
   () => preview.value?.documents.reduce((sum, doc) => sum + doc.edits.length, 0) ?? 0,
 )
-
-function plural(count: number, one: string, many = `${one}s`): string {
-  return `${count} ${count === 1 ? one : many}`
-}
 
 async function apply(): Promise<void> {
   const body = request(false)
@@ -137,7 +135,7 @@ async function apply(): Promise<void> {
         ? `Moved to ${result.newPath}; links updated in ${plural(pages, 'page')}`
         : `Moved to ${result.newPath}`,
     )
-    followRoute(result)
+    followMovedRoute(router, result.moved)
     move.close()
   } catch (error) {
     problem.value = moveErrorText(error)
@@ -147,19 +145,8 @@ async function apply(): Promise<void> {
   }
 }
 
-/** An open folder or file view follows; an open page follows through its session. */
-function followRoute(result: MoveResult): void {
-  const route = router.currentRoute.value
-  const id = route.params.id
-  if ((route.name !== 'section' && route.name !== 'resource') || typeof id !== 'string') return
-  const moved = result.moved.find((m) => m.oldId === id)
-  if (moved) void router.replace({ name: route.name, params: { id: moved.newId } })
-}
-
 const title = computed(() => {
-  const kind = { section: 'folder', document: 'page', resource: 'file' }[
-    item.value?.type ?? 'document'
-  ]
+  const kind = ITEM_LABELS[item.value?.type ?? 'document']
   return `Move ${kind} “${item.value?.name ?? ''}”`
 })
 </script>
@@ -189,7 +176,13 @@ const title = computed(() => {
         />
         <v-divider class="my-3" />
         <div class="move-dialog__preview" aria-live="polite" data-testid="move-preview">
-          <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-2" />
+          <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="primary"
+            class="mb-2"
+            data-testid="move-loading"
+          />
           <v-alert
             v-if="problem"
             type="warning"

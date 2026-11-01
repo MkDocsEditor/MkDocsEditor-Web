@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { SocketLike } from '@/sync/automergeSession'
+import type { SocketLike } from '@/sync/socket'
 
 import { connectEvents } from './events'
 import type { OnlineUser } from './events'

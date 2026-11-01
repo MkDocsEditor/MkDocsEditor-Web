@@ -1,3 +1,5 @@
+import { isExternalUrl } from '@/services/linkPath'
+
 /**
  * Finds the references of a Markdown text the way the backend does (`docs/references.md`
  * section 2): links, images, reference definitions and HTML `href`/`src` attributes, outside of
@@ -54,16 +56,6 @@ const DEFINITION = /^ {0,3}\[(?!\^)([^\]\n]+)\]:[ \t]*(<[^<>\n]*>|\S+)/gm
 const HTML =
   /<(?:a|img|source|video|audio)\b[^>]*?\s(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi
 
-/** True for destinations that point outside the wiki or only into the same page. */
-export function isExternal(destination: string): boolean {
-  return (
-    destination === '' ||
-    destination.startsWith('#') ||
-    destination.startsWith('//') ||
-    /^[a-z][a-z0-9+.-]*:/i.test(destination)
-  )
-}
-
 export function findReferences(text: string): TextReference[] {
   const masked = maskNonReferences(text)
   const refs: TextReference[] = []
@@ -86,7 +78,7 @@ export function findReferences(text: string): TextReference[] {
       destination = destination.slice(1, -1)
       from++
     }
-    if (isExternal(destination)) return
+    if (destination === '' || destination.startsWith('#') || isExternalUrl(destination)) return
     refs.push({ kind, destination, from, to: from + destination.length, line: lineOf(from) })
   }
 

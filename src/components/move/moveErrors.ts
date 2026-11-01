@@ -1,8 +1,9 @@
 import { ApiError } from '@/api'
+import { errorMessage } from '@/services/errors'
 
 /** A sentence for an error of `POST /move/` (`docs/references.md` section 11). */
 export function moveErrorText(error: unknown): string {
-  if (!(error instanceof ApiError)) return error instanceof Error ? error.message : String(error)
+  if (!(error instanceof ApiError)) return errorMessage(error)
   const reason = typeof error.details.reason === 'string' ? error.details.reason : ''
   if (error.status === 409) {
     const path = typeof error.details.path === 'string' ? error.details.path : 'An item'

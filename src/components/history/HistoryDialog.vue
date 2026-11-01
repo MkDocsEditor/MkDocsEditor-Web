@@ -6,8 +6,9 @@ import { useDisplay } from 'vuetify'
 import { useApi } from '@/api'
 import type { Revision } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { diffStats, formatDate, formatWhen, parseUnifiedDiff } from '@/services/diff'
+import { diffStats, parseUnifiedDiff } from '@/services/diff'
 import type { DiffLine } from '@/services/diff'
+import { formatDate, formatWhen } from '@/services/time'
 import { useNotifyStore } from '@/stores/notify'
 
 const props = defineProps<{ documentId: string; readOnly?: boolean }>()

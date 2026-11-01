@@ -1,5 +1,11 @@
 import type { MovedItem } from '@/api'
-import type { SocketLike } from '@/sync/automergeSession'
+import {
+  CLOSE_HEARTBEAT_TIMEOUT,
+  CLOSE_TICKET_REFUSED,
+  SOCKET_OPEN,
+  browserSocket,
+} from '@/sync/socket'
+import type { SocketLike } from '@/sync/socket'
 
 /** A user who has a document open. */
 export interface OnlineUser {
@@ -46,7 +52,7 @@ export interface EventsConnection {
  */
 export function connectEvents(options: EventsOptions): EventsConnection {
   const timing = { ...DEFAULT_TIMING, ...options.timing }
-  const createSocket = options.createSocket ?? ((url: string) => new WebSocket(url) as SocketLike)
+  const createSocket = options.createSocket ?? browserSocket
   let socket: SocketLike | null = null
   let closed = false
   let connected = false
@@ -56,7 +62,7 @@ export function connectEvents(options: EventsOptions): EventsConnection {
   let ticker: ReturnType<typeof setInterval> | null = null
 
   function send(message: unknown): void {
-    if (socket?.readyState === 1) socket.send(JSON.stringify(message))
+    if (socket?.readyState === SOCKET_OPEN) socket.send(JSON.stringify(message))
   }
 
   function scheduleReconnect(): void {
@@ -134,7 +140,8 @@ export function connectEvents(options: EventsOptions): EventsConnection {
       options.onTreeChanged()
       stopTicker()
       ticker = setInterval(() => {
-        if (Date.now() - lastReceived > timing.timeoutMs) ws.close(4008, 'heartbeat timeout')
+        if (Date.now() - lastReceived > timing.timeoutMs)
+          ws.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
         else send({ type: 'heartbeat' })
       }, timing.heartbeatMs)
     }
@@ -146,7 +153,7 @@ export function connectEvents(options: EventsOptions): EventsConnection {
       connected = false
       stopTicker()
       options.onOnline(new Map())
-      if (event.code === 4001) {
+      if (event.code === CLOSE_TICKET_REFUSED) {
         // The ticket was refused: get a new one; a real auth problem shows up in wsTicket.
         attempt = Math.max(attempt, 1)
       }

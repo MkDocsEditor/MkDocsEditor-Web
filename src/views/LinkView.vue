@@ -11,15 +11,15 @@ import PasskeyStep from '@/components/auth/PasskeyStep.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import {
   displayNameRule,
-  formatTime,
   passwordRule,
   roleLabel,
   sameAsRule,
   usernameRule,
 } from '@/services/accountRules'
+import { formatTime } from '@/services/time'
 import { useAndroidHint } from '@/services/androidHint'
 import { vFocusOnce } from '@/services/focusOnce'
-import { describeAuthError } from '@/services/authErrors'
+import { authErrorText, describeAuthError } from '@/services/authErrors'
 import {
   createPasskey,
   describePasskeyError,
@@ -83,7 +83,7 @@ async function inspect(value: string): Promise<void> {
     link.value = await api.inspectLink(token.value)
   } catch (e) {
     link.value = null
-    linkError.value = describeAuthError(e) ?? (e instanceof Error ? e.message : String(e))
+    linkError.value = authErrorText(e)
   } finally {
     inspecting.value = false
   }
@@ -108,7 +108,7 @@ async function submitPassword(): Promise<void> {
     })
     signIn(response)
   } catch (e) {
-    error.value = describeAuthError(e) ?? (e instanceof Error ? e.message : String(e))
+    error.value = authErrorText(e)
   } finally {
     busy.value = false
   }

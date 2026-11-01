@@ -2,6 +2,8 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useDebounced } from '@/services/debounced'
+import { isExternalUrl } from '@/services/linkPath'
 import { openResource } from '@/services/resources'
 import { resourceObjectUrl } from '@/services/resourceUrls'
 import { useNotifyStore } from '@/stores/notify'
@@ -23,15 +25,7 @@ const notify = useNotifyStore()
 const container = ref<HTMLElement | null>(null)
 
 // Rendering is cheap, but not free: re-render at most every 150 ms while typing.
-const debounced = ref(props.text)
-let timer: ReturnType<typeof setTimeout> | undefined
-watch(
-  () => props.text,
-  (text) => {
-    clearTimeout(timer)
-    timer = setTimeout(() => (debounced.value = text), 150)
-  },
-)
+const debounced = useDebounced(() => props.text, 150)
 const html = computed(() => renderMarkdown(debounced.value))
 
 function resolve(href: string) {
@@ -61,7 +55,7 @@ async function onClick(event: MouseEvent): Promise<void> {
   const href = anchor?.getAttribute('href')
   if (!anchor || !href || event.defaultPrevented || event.button !== 0) return
   if (href.startsWith('#')) return
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//')) {
+  if (isExternalUrl(href)) {
     anchor.target = '_blank'
     anchor.rel = 'noopener'
     return

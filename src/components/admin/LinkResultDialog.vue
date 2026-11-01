@@ -4,7 +4,8 @@ import { computed } from 'vue'
 import type { CreatedLink } from '@/api'
 import CopyField from '@/components/auth/CopyField.vue'
 import QrCode from '@/components/auth/QrCode.vue'
-import { formatTime, roleLabel } from '@/services/accountRules'
+import { roleLabel } from '@/services/accountRules'
+import { formatTime } from '@/services/time'
 
 const props = defineProps<{ link: CreatedLink | null; title: string }>()
 const emit = defineEmits<{ close: [] }>()

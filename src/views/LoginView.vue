@@ -7,7 +7,7 @@ import { ApiError, useAuthApi } from '@/api'
 import type { SecondFactorMethod, SessionResponse } from '@/api'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
-import { describeAuthError } from '@/services/authErrors'
+import { authErrorText, describeAuthError } from '@/services/authErrors'
 import { useAndroidHint } from '@/services/androidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { passkeyReminderDue } from '@/services/passkeyReminder'
@@ -53,19 +53,23 @@ async function done(response: SessionResponse): Promise<void> {
   auth.signedIn(response.user)
   if (response.user.secondFactorSetupRequired) {
     await router.replace({ name: 'account', params: { tab: 'security' } })
-  } else if (offerPasskey(response) || androidHintWanted()) {
-    const target = redirectTarget()
-    await router.replace({
-      name: 'welcome',
-      query: {
-        ...(offerPasskey(response) ? { passkey: '1' } : {}),
-        ...(androidHintWanted() ? { app: '1' } : {}),
-        ...(target !== '/' ? { redirect: target } : {}),
-      },
-    })
-  } else {
-    await router.replace(redirectTarget())
+    return
   }
+  const passkey = offerPasskey(response)
+  const app = androidHintWanted()
+  const target = redirectTarget()
+  if (!passkey && !app) {
+    await router.replace(target)
+    return
+  }
+  await router.replace({
+    name: 'welcome',
+    query: {
+      ...(passkey ? { passkey: '1' } : {}),
+      ...(app ? { app: '1' } : {}),
+      ...(target !== '/' ? { redirect: target } : {}),
+    },
+  })
 }
 
 /** After a login without a passkey: suggest one, unless "Later" was chosen recently. */
@@ -86,7 +90,7 @@ function showError(e: unknown): void {
   } else if (e instanceof ApiError && e.isUnauthorized && !e.code) {
     error.value = 'Wrong username or password.'
   } else {
-    error.value = describeAuthError(e) ?? (e instanceof Error ? e.message : String(e))
+    error.value = authErrorText(e)
   }
 }
 

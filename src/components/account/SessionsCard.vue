@@ -6,7 +6,8 @@ import { useRouter } from 'vue-router'
 import { useAuthApi } from '@/api'
 import type { SessionInfo } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { formatTime } from '@/services/accountRules'
+import { plural } from '@/services/names'
+import { formatTime } from '@/services/time'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 
@@ -56,7 +57,7 @@ async function revokeOthers(): Promise<void> {
   busy.value = true
   try {
     const { revoked } = await api.revokeOtherSessions()
-    notify.success(revoked === 1 ? 'Signed out 1 device' : `Signed out ${revoked} devices`)
+    notify.success(`Signed out ${plural(revoked, 'device')}`)
     await load()
   } catch (e) {
     notify.error(e)

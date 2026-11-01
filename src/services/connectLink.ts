@@ -8,12 +8,12 @@ import { getConfig } from './config'
  * the fragment, so it never reaches a server or its logs.
  */
 
-export const ANDROID_REPO = 'https://github.com/MkDocsEditor/MkDocsEditor-Android'
+const ANDROID_REPO = 'https://github.com/MkDocsEditor/MkDocsEditor-Android'
 /** Adds the app to Obtainium, which installs and updates it from the GitHub releases. */
 export const OBTAINIUM_ADD_URL = `https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/${ANDROID_REPO}`
 export const OBTAINIUM_HOME = 'https://obtainium.imranr.dev'
 /** Fallback scheme of the app, for browsers that do not follow the App Link. */
-export const APP_SCHEME = 'mkdocseditor'
+const APP_SCHEME = 'mkdocseditor'
 
 export interface ConnectPayload {
   v: number

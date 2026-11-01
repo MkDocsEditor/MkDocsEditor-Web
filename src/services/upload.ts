@@ -42,7 +42,7 @@ export function markdownFor(
 }
 
 /** Photos from phones are huge; larger JPEGs are scaled down to this width or height. */
-export const MAX_IMAGE_SIZE = 2560
+const MAX_IMAGE_SIZE = 2560
 
 /**
  * Scales a large JPEG down (keeps everything else as is). Falls back to the original file when

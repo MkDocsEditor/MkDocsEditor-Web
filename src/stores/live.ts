@@ -6,7 +6,7 @@ import type { MovedItem } from '@/api'
 import { connectEvents } from '@/services/events'
 import type { EventsConnection, OnlineUser } from '@/services/events'
 import { followMoves, rescueStoredCopies } from '@/services/redirects'
-import type { SocketLike } from '@/sync/automergeSession'
+import type { SocketLike } from '@/sync/socket'
 
 import { useTreeStore } from './tree'
 

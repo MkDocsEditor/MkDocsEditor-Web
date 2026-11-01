@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createFetchMock, json } from '@/test/fetchMock'
 
-import { ApiClient, ApiError } from './client'
+import { ApiClient, ApiError, urlPath } from './client'
 
 function client(routes: Parameters<typeof createFetchMock>[0], onSessionEnded?: () => void) {
   const mock = createFetchMock(routes)
@@ -24,6 +24,14 @@ const tree = {
   documents: [{ type: 'Document', id: 'd1', name: 'index', filesize: 3, modtime: '', url: '' }],
   resources: [],
 }
+
+describe('urlPath', () => {
+  it('encodes the values, not the path around them', () => {
+    expect(urlPath`/document/${'a/b c'}/history?limit=${5}`).toBe(
+      '/document/a%2Fb%20c/history?limit=5',
+    )
+  })
+})
 
 describe('ApiClient', () => {
   it('builds URLs with trailing slashes and websocket URLs', () => {

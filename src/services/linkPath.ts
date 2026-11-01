@@ -5,6 +5,11 @@
  * vectors (`src/test/data/link-paths.json`, a copy of the backend's `docs/link-paths.json`).
  */
 
+/** True for destinations that leave the wiki: `https:`, `mailto:`, `//host`, … */
+export function isExternalUrl(href: string): boolean {
+  return href.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(href)
+}
+
 export interface LinkTarget {
   type: 'section' | 'document' | 'resource'
   /** Path relative to the docs folder, `/` separated (`""` for the root section). */

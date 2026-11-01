@@ -17,7 +17,7 @@ export function cleanUrl(url: string): string {
  * The default text of a link to an item (like the backend's `GET /link/`): the name, without
  * the extension for an embedded image's alt text.
  */
-export function defaultLinkText(item: TreeItem, embedded = false): string {
+function defaultLinkText(item: TreeItem, embedded = false): string {
   return embedded ? item.name.replace(/\.[^.]+$/, '') : item.name
 }
 

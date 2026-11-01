@@ -5,7 +5,8 @@ import { computed } from 'vue'
 import type { SectionModel, TreeItem } from '@/api'
 import { colorFor, iconFor } from '@/services/icons'
 import { useMoveStore } from '@/stores/move'
-import { sortByName, useTreeStore } from '@/stores/tree'
+import { useTreeStore } from '@/stores/tree'
+import { sortByName } from '@/stores/treeIndex'
 
 import { canDropInto, dragged, dropTarget } from './dragState'
 

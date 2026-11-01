@@ -1,16 +1,21 @@
+import { computed, ref, watch } from 'vue'
+import type { ComputedRef } from 'vue'
+
 import { ApiError, useApi } from '@/api'
 import type { Backlink, ItemRef, ItemType } from '@/api'
+import { ITEM_LABELS } from '@/services/names'
 
-/** Backlinks grouped by the page they come from. */
-export interface BacklinkSource {
+/** References grouped by the page they come from, in text order. */
+export interface SourceGroup<T> {
   source: ItemRef
-  /** The references on that page, in text order. */
-  links: Backlink[]
+  links: T[]
 }
 
-export function groupBySource(backlinks: readonly Backlink[]): BacklinkSource[] {
-  const groups = new Map<string, BacklinkSource>()
-  for (const link of backlinks) {
+export function groupBySource<T extends { source: ItemRef }>(
+  references: readonly T[],
+): SourceGroup<T>[] {
+  const groups = new Map<string, SourceGroup<T>>()
+  for (const link of references) {
     const group = groups.get(link.source.id)
     if (group) group.links.push(link)
     else groups.set(link.source.id, { source: link.source, links: [link] })
@@ -27,7 +32,7 @@ export function linesLabel(links: readonly Backlink[]): string {
  * The pages that link to an item from outside it (for a folder: not its own pages), or null
  * when the backend cannot tell (older backend, offline).
  */
-export async function externalBacklinks(type: ItemType, id: string): Promise<Backlink[] | null> {
+async function externalBacklinks(type: ItemType, id: string): Promise<Backlink[] | null> {
   try {
     return (await useApi().getBacklinks(type, id)).filter((l) => !l.internal)
   } catch (error) {
@@ -43,4 +48,21 @@ export function breakWarning(backlinks: readonly Backlink[] | null, what: string
   return `${pages === 1 ? '1 page links' : `${pages} pages link`} to this ${what}; ${
     backlinks.length === 1 ? 'that link' : 'those links'
   } will break.`
+}
+
+/** The warning for deleting `target` (see `breakWarning`), loaded whenever the target changes. */
+export function useBreakWarning(
+  target: () => { type: ItemType; id: string } | null | undefined,
+): ComputedRef<string> {
+  const backlinks = ref<Backlink[] | null>(null)
+  watch(target, async (item) => {
+    backlinks.value = null
+    if (!item) return
+    const links = await externalBacklinks(item.type, item.id).catch(() => null)
+    if (target()?.id === item.id) backlinks.value = links
+  })
+  return computed(() => {
+    const item = target()
+    return item ? breakWarning(backlinks.value, ITEM_LABELS[item.type]) : ''
+  })
 }

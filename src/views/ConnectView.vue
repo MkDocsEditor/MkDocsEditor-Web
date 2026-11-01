@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 
 import AuthCard from '@/components/auth/AuthCard.vue'
 import CopyField from '@/components/auth/CopyField.vue'
-import { formatTime } from '@/services/accountRules'
+import { formatTime } from '@/services/time'
 import {
   appUrlForPayload,
   connectUrlForPayload,

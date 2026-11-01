@@ -56,10 +56,7 @@ function pick(item: TreeItem): void {
   open.value = false
 }
 
-const uploadPath = computed(() => {
-  const path = tree.path(uploadSection.value)
-  return path === '' ? 'Wiki (top folder)' : path
-})
+const uploadPath = computed(() => tree.folderLabel(uploadSection.value))
 const fileInput = ref<HTMLInputElement | null>(null)
 
 async function onFilesChosen(event: Event): Promise<void> {

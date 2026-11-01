@@ -1,13 +1,16 @@
 import { ApiError } from '@/api'
 
+import { errorMessage } from './errors'
+import { plural } from './names'
+
 /** "5 seconds", "3 minutes" */
 export function waitText(seconds: number): string {
   if (seconds < 90) {
     const n = Math.max(1, Math.round(seconds))
-    return `${n} ${n === 1 ? 'second' : 'seconds'}`
+    return plural(n, 'second')
   }
   const n = Math.ceil(seconds / 60)
-  return `${n} ${n === 1 ? 'minute' : 'minutes'}`
+  return plural(n, 'minute')
 }
 
 const WEAK_PASSWORD: Record<string, string> = {
@@ -31,7 +34,7 @@ export function describeAuthError(error: unknown): string | null {
     case 'invalid-second-factor': {
       const left = Number(error.details.attemptsLeft)
       return Number.isFinite(left) && error.status === 401
-        ? `Wrong code. ${left} ${left === 1 ? 'attempt' : 'attempts'} left.`
+        ? `Wrong code. ${plural(left, 'attempt')} left.`
         : 'Wrong code.'
     }
     case 'challenge-expired':
@@ -78,4 +81,9 @@ export function describeAuthError(error: unknown): string | null {
   }
   if (error.isRateLimited) return 'Too many attempts. Please wait a moment.'
   return null
+}
+
+/** The known message for an error of the account endpoints, else its own message. */
+export function authErrorText(error: unknown): string {
+  return describeAuthError(error) ?? errorMessage(error)
 }
