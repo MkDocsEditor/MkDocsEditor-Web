@@ -30,6 +30,18 @@ describe('findReferences', () => {
     expect(text.slice(ref!.from, ref!.to)).toBe('b c.png')
   })
 
+  it('finds destinations with raw spaces', () => {
+    const text = '![a](./b c.png) [d](e f.md "Titel") [g](Foto (2) neu.png) [h](i.md (j))'
+    expect(dests(text)).toEqual([
+      'image:./b c.png',
+      'link:e f.md',
+      'link:Foto (2) neu.png',
+      'link:i.md',
+    ])
+    const [ref] = findReferences(text)
+    expect(text.slice(ref!.from, ref!.to)).toBe('./b c.png')
+  })
+
   it('finds nested image links separately', () => {
     expect(dests('[![logo](img/logo.png)](index.md)')).toEqual([
       'image:img/logo.png',

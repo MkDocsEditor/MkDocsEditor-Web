@@ -9,6 +9,23 @@ function dom(markdown: string): HTMLElement {
 }
 
 describe('renderMarkdown', () => {
+  it('renders links and images with raw spaces in the destination, like MkDocs', () => {
+    const image = (markdown: string) => dom(markdown).querySelector('img')
+    expect(image('![Liste](./Checkliste Erstausstattung.png)')?.getAttribute('src')).toBe(
+      './Checkliste%20Erstausstattung.png',
+    )
+    const titled = image('![Liste](a b.png "Der Titel")')
+    expect(titled?.getAttribute('src')).toBe('a%20b.png')
+    expect(titled?.getAttribute('title')).toBe('Der Titel')
+    expect(image('![Foto](Foto (2) neu.png)')?.getAttribute('src')).toBe('Foto%20(2)%20neu.png')
+    expect(dom('[Seite](meine seite.md)').querySelector('a')?.getAttribute('href')).toBe(
+      'meine%20seite.md',
+    )
+    expect(image('![Logo](logo.png "Titel")')?.getAttribute('src')).toBe('logo.png')
+    expect(dom('[ref]: a b\n\n[ref]').querySelector('a')).toBeNull()
+    expect(dom('[kein](a b').querySelector('a')).toBeNull()
+  })
+
   it('renders admonitions with title and nested markdown', () => {
     const el = dom('!!! warning "Achtung"\n    Heiß, **nicht** anfassen.\n\nDanach.')
     const box = el.querySelector('div.admonition.warning')
