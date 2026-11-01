@@ -32,6 +32,7 @@ import mark from 'markdown-it-mark'
 import taskLists from 'markdown-it-task-lists'
 
 import { admonitionPlugin } from './admonition'
+import { spacedLinksPlugin } from './spacedLinks'
 
 const languages = {
   bash,
@@ -94,6 +95,7 @@ function createRenderer(): MarkdownIt {
       return `<pre class="hljs"><code>${escapeHtml(code)}</code></pre>`
     },
   })
+  md.use(spacedLinksPlugin)
   md.use(admonitionPlugin)
   md.use(footnote)
   md.use(taskLists, { enabled: false, label: true })
