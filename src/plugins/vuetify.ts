@@ -5,12 +5,15 @@ import type { ThemeDefinition } from 'vuetify'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import { en } from 'vuetify/locale'
 
+import { CODE_DARK, CODE_LIGHT, codeThemeColors } from './codeColors'
+
 /**
  * The colour scheme of the Android app (`MkDocsEditorTheme`, feature/theme/Color.kt in
  * MkDocsEditor-Android), a Material 3 scheme from the seed colour #689F38. The app bar uses
- * `primary-container`, as the app's top bar does.
+ * `primary-container`, as the app's top bar does. The code views add their own palette
+ * (`codeColors.ts`).
  */
-const LIGHT: ThemeDefinition = {
+export const LIGHT: ThemeDefinition = {
   dark: false,
   colors: {
     primary: '#386b01',
@@ -33,10 +36,11 @@ const LIGHT: ThemeDefinition = {
     'surface-light': '#f1f1ea',
     'surface-variant': '#e0e4d6',
     'on-surface-variant': '#44483e',
+    ...codeThemeColors(CODE_LIGHT),
   },
 }
 
-const DARK: ThemeDefinition = {
+export const DARK: ThemeDefinition = {
   dark: true,
   colors: {
     primary: '#9cd769',
@@ -59,6 +63,7 @@ const DARK: ThemeDefinition = {
     'surface-light': '#2f312c',
     'surface-variant': '#44483e',
     'on-surface-variant': '#c4c8ba',
+    ...codeThemeColors(CODE_DARK),
   },
 }
 

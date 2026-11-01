@@ -1,12 +1,23 @@
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
+import cpp from 'highlight.js/lib/languages/cpp'
 import css from 'highlight.js/lib/languages/css'
+import diff from 'highlight.js/lib/languages/diff'
+import dockerfile from 'highlight.js/lib/languages/dockerfile'
+import go from 'highlight.js/lib/languages/go'
 import ini from 'highlight.js/lib/languages/ini'
+import java from 'highlight.js/lib/languages/java'
 import javascript from 'highlight.js/lib/languages/javascript'
 import json from 'highlight.js/lib/languages/json'
+import kotlin from 'highlight.js/lib/languages/kotlin'
+import makefile from 'highlight.js/lib/languages/makefile'
 import markdown from 'highlight.js/lib/languages/markdown'
+import nginx from 'highlight.js/lib/languages/nginx'
+import plaintext from 'highlight.js/lib/languages/plaintext'
+import powershell from 'highlight.js/lib/languages/powershell'
 import python from 'highlight.js/lib/languages/python'
+import rust from 'highlight.js/lib/languages/rust'
 import shell from 'highlight.js/lib/languages/shell'
 import sql from 'highlight.js/lib/languages/sql'
 import typescript from 'highlight.js/lib/languages/typescript'
@@ -24,12 +35,23 @@ import { admonitionPlugin } from './admonition'
 
 const languages = {
   bash,
+  cpp,
   css,
+  diff,
+  dockerfile,
+  go,
   ini,
+  java,
   javascript,
   json,
+  kotlin,
+  makefile,
   markdown,
+  nginx,
+  plaintext,
+  powershell,
   python,
+  rust,
   shell,
   sql,
   typescript,
@@ -45,6 +67,14 @@ hljs.registerAliases(['yml'], { languageName: 'yaml' })
 hljs.registerAliases(['toml', 'conf'], { languageName: 'ini' })
 hljs.registerAliases(['py'], { languageName: 'python' })
 hljs.registerAliases(['md'], { languageName: 'markdown' })
+hljs.registerAliases(['kt', 'kts'], { languageName: 'kotlin' })
+hljs.registerAliases(['golang'], { languageName: 'go' })
+hljs.registerAliases(['c', 'h', 'hpp', 'cc'], { languageName: 'cpp' })
+hljs.registerAliases(['docker'], { languageName: 'dockerfile' })
+hljs.registerAliases(['patch'], { languageName: 'diff' })
+hljs.registerAliases(['rs'], { languageName: 'rust' })
+hljs.registerAliases(['ps1', 'pwsh'], { languageName: 'powershell' })
+hljs.registerAliases(['text', 'txt'], { languageName: 'plaintext' })
 
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)

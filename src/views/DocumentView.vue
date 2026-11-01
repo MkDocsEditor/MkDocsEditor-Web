@@ -265,6 +265,7 @@ const connection = computed(() => {
           :session="session"
           :show-authorship="showAuthorship"
           :upload="upload"
+          :line-numbers="!mobile"
           @change="(t: string) => (text = t)"
           @top-line="(l: number) => (topLine = l)"
         />

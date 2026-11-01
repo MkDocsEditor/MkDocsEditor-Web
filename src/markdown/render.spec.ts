@@ -52,6 +52,19 @@ describe('renderMarkdown', () => {
     expect(el.querySelector('pre b')).toBeNull()
   })
 
+  it.each([
+    ['kotlin', 'val x = 1', '.hljs-keyword'],
+    ['kt', 'fun main() {}', '.hljs-keyword'],
+    ['go', 'func main() {}', '.hljs-keyword'],
+    ['yaml', 'port: 8080', '.hljs-attr'],
+    ['json', '{"a": true}', '.hljs-literal'],
+    ['diff', '+added', '.hljs-addition'],
+    ['dockerfile', 'FROM nginx', '.hljs-keyword'],
+  ])('highlights %s', (language, code, selector) => {
+    const el = dom(`\`\`\`${language}\n${code}\n\`\`\``)
+    expect(el.querySelector(`pre.hljs ${selector}`)).not.toBeNull()
+  })
+
   it('removes scripts and event handlers from raw HTML', () => {
     const el = dom('<img src="x.png" onerror="alert(1)">\n\n<script>alert(1)</script>')
     expect(el.querySelector('script')).toBeNull()
