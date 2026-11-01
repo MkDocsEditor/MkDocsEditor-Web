@@ -10,6 +10,7 @@ import {
   mdiHistory,
   mdiLockOutline,
   mdiOpenInNew,
+  mdiImageSearchOutline,
   mdiPaperclip,
   mdiViewSplitVertical,
 } from '@mdi/js'
@@ -21,6 +22,8 @@ import { EditorSelection } from '@codemirror/state'
 
 import type { ResourceModel } from '@/api'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
+import LinkPickerDialog from '@/components/pickers/LinkPickerDialog.vue'
+import ResourcePickerDialog from '@/components/pickers/ResourcePickerDialog.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
@@ -104,6 +107,54 @@ async function upload(files: File[]): Promise<string[]> {
   } finally {
     uploading.value--
   }
+}
+
+/** The link and image pickers replace the toolbar buttons and Ctrl+K / Ctrl+Shift+K. */
+const linkOpen = ref(false)
+const resourceOpen = ref(false)
+const pickerSelection = ref('')
+
+function selectedText(): string {
+  const view = editorView()
+  if (!view) return ''
+  const { from, to } = view.state.selection.main
+  return view.state.sliceDoc(from, to)
+}
+
+function openLinkPicker(): void {
+  pickerSelection.value = selectedText()
+  linkOpen.value = true
+}
+
+function openResourcePicker(): void {
+  pickerSelection.value = selectedText()
+  resourceOpen.value = true
+  if (mobile.value) filesOpen.value = false
+}
+
+const toolbarOverride = { link: openLinkPicker, image: openResourcePicker }
+const shortcutOverride = {
+  link: () => (openLinkPicker(), true),
+  image: () => (openResourcePicker(), true),
+}
+
+/** Replaces the selection (or inserts at the cursor) and puts the cursor after it. */
+function replaceSelection(text: string): void {
+  const view = editorView()
+  if (!view || view.state.readOnly) return
+  const { from, to } = view.state.selection.main
+  view.dispatch({
+    changes: { from, to, insert: text },
+    selection: { anchor: from + text.length },
+    userEvent: 'input.insert',
+    scrollIntoView: true,
+  })
+  view.focus()
+}
+
+function insertFromPicker(snippets: string[]): void {
+  if (snippets.length === 1) replaceSelection(snippets[0]!)
+  else insertSnippets(snippets)
 }
 
 /** Inserts snippets at the cursor, on lines of their own (like pasted files). */
@@ -347,7 +398,7 @@ const connection = computed(() => {
     <div v-if="session" class="document-view__panes" :class="`document-view__panes--${mode}`">
       <div v-show="mode !== 'preview'" class="document-view__pane document-view__pane--editor">
         <template v-if="ready && !status?.readOnly">
-          <FormatToolbar :view="editorView" />
+          <FormatToolbar :view="editorView" :override="toolbarOverride" />
           <v-divider />
         </template>
         <v-skeleton-loader v-if="!ready" type="paragraph@3" class="pa-4" />
@@ -360,6 +411,7 @@ const connection = computed(() => {
           :show-authorship="showAuthorship"
           :upload="upload"
           :line-numbers="!mobile"
+          :format-override="shortcutOverride"
           @change="(t: string) => (text = t)"
           @top-line="(l: number) => (topLine = l)"
         />
@@ -391,8 +443,36 @@ const connection = computed(() => {
         @insert="insertResource"
         @upload="uploadAndInsert"
         @reveal="reveal"
-      />
+      >
+        <template #footer>
+          <div class="pa-4">
+            <v-btn
+              :prepend-icon="mdiImageSearchOutline"
+              variant="tonal"
+              block
+              :disabled="!ready || (status?.readOnly ?? true)"
+              data-testid="panel-browse"
+              @click="openResourcePicker"
+            >
+              Insert from anywhere in the wiki
+            </v-btn>
+          </div>
+        </template>
+      </ResourcesPanel>
     </v-navigation-drawer>
+    <LinkPickerDialog
+      v-model="linkOpen"
+      :document-id="id"
+      :text="text"
+      :selection="pickerSelection"
+      @insert="replaceSelection"
+    />
+    <ResourcePickerDialog
+      v-model="resourceOpen"
+      :document-id="id"
+      :selection="pickerSelection"
+      @insert="insertFromPicker"
+    />
     <HistoryDialog v-model="historyOpen" :document-id="id" :read-only="status?.readOnly ?? true" />
   </div>
 </template>

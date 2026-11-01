@@ -79,6 +79,33 @@ describe('DocumentView', () => {
     wrapper.unmount()
   })
 
+  it('inserts a link from the picker in place of the selection', async () => {
+    const { wrapper } = await setup()
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-testid="format-toolbar"]').exists()).toBe(true),
+    )
+    const view = (
+      wrapper.findComponent({ name: 'DocumentView' }).vm as unknown as {
+        editorView: () => import('@codemirror/view').EditorView
+      }
+    ).editorView()
+    view.dispatch({ selection: { anchor: 15, head: 22 } })
+    await wrapper.find('[data-testid="format-link"]').trigger('click')
+    await flushPromises()
+    const text = document.querySelector('[data-testid="link-text"] input') as HTMLInputElement
+    expect(text.value).toBe('Lecker.')
+    ;(document.querySelector('[data-testid="link-tab-web"]') as HTMLElement).click()
+    await flushPromises()
+    const url = document.querySelector('[data-testid="link-url"] input') as HTMLInputElement
+    url.value = 'https://example.com'
+    url.dispatchEvent(new Event('input'))
+    await flushPromises()
+    ;(document.querySelector('[data-testid="link-insert-web"]') as HTMLElement).click()
+    await flushPromises()
+    expect(fakes[0]!.session.getText()).toBe('# Apfelkuchen\n\n[Lecker.](https://example.com)')
+    wrapper.unmount()
+  })
+
   it('closes the session when leaving', async () => {
     const { wrapper } = await setup()
     const close = vi.spyOn(fakes[0]!.session, 'close')
