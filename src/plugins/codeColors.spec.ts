@@ -12,10 +12,12 @@ import type { CodePalette } from './codeColors'
 import { DARK, LIGHT } from './vuetify'
 
 const AA = 4.5
+/** Drawn in the gutter or as the caret, never on the code background. */
+const GUTTER = ['lineNumber', 'lineNumberActive', 'cursor']
 
 function textColors(palette: CodePalette): [string, string][] {
   return Object.entries(palette).filter(
-    ([key]) => !(CODE_BACKGROUNDS as readonly string[]).includes(key),
+    ([key]) => !GUTTER.includes(key) && !(CODE_BACKGROUNDS as readonly string[]).includes(key),
   )
 }
 
@@ -46,10 +48,21 @@ describe.each([
     }
   })
 
+  it('keeps line numbers readable in the gutter', () => {
+    for (const color of [palette.lineNumber, palette.lineNumberActive]) {
+      expect(contrastRatio(color, surface)).toBeGreaterThanOrEqual(AA)
+      expect(contrastRatio(color, palette.activeLine)).toBeGreaterThanOrEqual(AA)
+    }
+  })
+
+  it('has a visible cursor', () => {
+    expect(contrastRatio(palette.cursor, surface)).toBeGreaterThanOrEqual(3)
+  })
+
   it('is part of the Vuetify theme', () => {
     expect(codeColorName('activeLine')).toBe('code-active-line')
     const theme = codeThemeColors(palette)
-    expect(theme['code-keyword']).toBe(palette.keyword)
+    expect(theme['code-heading']).toBe(palette.heading)
     expect(Object.keys(theme)).toHaveLength(Object.keys(palette).length)
   })
 })

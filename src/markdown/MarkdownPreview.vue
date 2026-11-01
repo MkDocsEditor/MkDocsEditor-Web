@@ -291,7 +291,7 @@ watch(
 }
 .markdown-preview .hljs-comment,
 .markdown-preview .hljs-quote {
-  color: rgb(var(--v-theme-code-comment));
+  color: rgb(var(--v-theme-code-quote));
   font-style: italic;
 }
 .markdown-preview .hljs-keyword,
@@ -301,19 +301,19 @@ watch(
 .markdown-preview .hljs-bullet,
 .markdown-preview .hljs-char.escape_,
 .markdown-preview .hljs-doctag {
-  color: rgb(var(--v-theme-code-keyword));
+  color: rgb(var(--v-theme-code-heading));
 }
 .markdown-preview .hljs-string,
 .markdown-preview .hljs-regexp,
 .markdown-preview .hljs-template-tag {
-  color: rgb(var(--v-theme-code-string));
+  color: rgb(var(--v-theme-code-code));
 }
 .markdown-preview .hljs-number {
-  color: rgb(var(--v-theme-code-number));
+  color: rgb(var(--v-theme-code-image));
 }
 .markdown-preview .hljs-title.function_,
 .markdown-preview .hljs-function .hljs-title {
-  color: rgb(var(--v-theme-code-function));
+  color: rgb(var(--v-theme-code-link));
 }
 .markdown-preview .hljs-attr,
 .markdown-preview .hljs-variable,
@@ -322,42 +322,43 @@ watch(
 .markdown-preview .hljs-selector-attr,
 .markdown-preview .hljs-selector-class,
 .markdown-preview .hljs-selector-id {
-  color: rgb(var(--v-theme-code-property));
+  color: rgb(var(--v-theme-code-emphasis));
 }
 .markdown-preview .hljs-built_in,
-.markdown-preview .hljs-type,
-.markdown-preview .hljs-variable.language_,
-.markdown-preview .hljs-variable.constant_ {
-  color: rgb(var(--v-theme-code-constant));
+.markdown-preview .hljs-variable.language_ {
+  color: rgb(var(--v-theme-code-link));
 }
 .markdown-preview .hljs-meta,
 .markdown-preview .hljs-meta .hljs-keyword {
-  color: rgb(var(--v-theme-code-annotation));
+  color: rgb(var(--v-theme-code-meta));
 }
 .markdown-preview .hljs-meta .hljs-string {
-  color: rgb(var(--v-theme-code-string));
+  color: rgb(var(--v-theme-code-code));
 }
 .markdown-preview .hljs-tag,
 .markdown-preview .hljs-name,
+.markdown-preview .hljs-type,
+.markdown-preview .hljs-title.class_,
+.markdown-preview .hljs-variable.constant_,
 .markdown-preview .hljs-selector-pseudo {
-  color: rgb(var(--v-theme-code-tag));
+  color: rgb(var(--v-theme-code-html));
 }
 .markdown-preview .hljs-tag .hljs-attr {
-  color: rgb(var(--v-theme-code-attribute));
+  color: rgb(var(--v-theme-code-emphasis));
 }
 .markdown-preview .hljs-tag .hljs-string {
-  color: rgb(var(--v-theme-code-string));
+  color: rgb(var(--v-theme-code-code));
 }
 .markdown-preview .hljs-section {
   color: rgb(var(--v-theme-code-heading));
   font-weight: 700;
 }
 .markdown-preview .hljs-link {
-  color: rgb(var(--v-theme-code-url));
+  color: rgb(var(--v-theme-code-link));
   text-decoration: underline;
 }
 .markdown-preview .hljs-addition {
-  color: rgb(var(--v-theme-code-inserted));
+  color: rgb(var(--v-theme-code-code));
 }
 .markdown-preview .hljs-deletion {
   color: rgb(var(--v-theme-code-deleted));

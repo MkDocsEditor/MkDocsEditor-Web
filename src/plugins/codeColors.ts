@@ -3,7 +3,8 @@
  * preview (highlight.js). The palettes are inspired by the IntelliJ themes ("IntelliJ Light"
  * and the dark New UI / Darcula look), with our own values tuned for WCAG AA (4.5:1) against
  * the editor and code block backgrounds (see `codeColors.spec.ts`). The chrome around them keeps
- * the Android colours in `vuetify.ts`; the Android app uses the same code palette.
+ * the Android colours in `vuetify.ts`. The Android app (`EditorPalette`) uses the same roles and
+ * values, so both clients look alike.
  *
  * Every colour becomes a Vuetify theme colour `code-<name>`, so CSS reads it as
  * `rgb(var(--v-theme-code-<name>))` and it follows the light or dark theme by itself.
@@ -18,95 +19,82 @@ export interface CodePalette {
   /** Search matches, and the current one. */
   searchMatch: string
   searchMatchSelected: string
-  /** Other occurrences of the selected word. */
+  /** Other occurrences of the selected word, matching brackets. */
   selectionMatch: string
   /** Line numbers, and the number of the line with the cursor. */
   lineNumber: string
   lineNumberActive: string
+  cursor: string
 
   /** Plain text. */
   text: string
-  /** Comments, Markdown markup characters (`#`, `**`, backticks) and link titles. */
-  comment: string
-  keyword: string
-  string: string
-  number: string
-  /** Function and method names. */
-  function: string
-  /** Properties, keys (JSON, YAML) and variables. */
-  property: string
-  /** Built-in types and constants. */
-  constant: string
-  /** Annotations, decorators, shebangs and admonition markers. */
-  annotation: string
-  /** HTML and XML tag names. */
-  tag: string
-  /** HTML and XML attribute names. */
-  attribute: string
-  /** Markdown headings. */
+  /** Headings, list markers, horizontal rules; keywords in code. */
   heading: string
-  /** Markdown link text. */
+  /** Bold and italic text; attributes, variables and properties in code. */
+  emphasis: string
+  /** Links and URLs; function names, titles and built-ins in code. */
   link: string
-  /** URLs and link targets. */
-  url: string
-  /** Diff: added and removed lines. */
-  inserted: string
+  /** Images; numbers in code. */
+  image: string
+  /** Inline and fenced code; strings in code. */
+  code: string
+  /** Quotes, strikethrough and markup characters; comments in code. */
+  quote: string
+  /** HTML tags; types, tags and names in code. */
+  html: string
+  /** Admonitions, task boxes, front matter; annotations and meta in code. */
+  meta: string
+  /** Removed lines of a diff. */
   deleted: string
 }
 
+/*
+ * The shared roles (text to meta, line numbers, selection, cursor) have the same values as the
+ * Android app's `EditorPalette`; the rest is web only (CodeMirror needs more states).
+ */
 export const CODE_LIGHT: CodePalette = {
-  background: '#f2f3ea',
+  background: '#eef0e5',
   activeLine: '#f4f4e8',
-  selection: '#c8def9',
+  selection: '#ccddf5',
   searchMatch: '#f6e7a0',
   searchMatchSelected: '#eccd5e',
-  selectionMatch: '#e2e6d6',
-  lineNumber: '#6b6f66',
+  selectionMatch: '#e0e4d4',
+  lineNumber: '#666b60',
   lineNumberActive: '#1a1c18',
+  cursor: '#1a1c18',
 
   text: '#1a1c18',
-  comment: '#676b62',
-  keyword: '#2340a8',
-  string: '#1a7a2d',
-  number: '#1259c3',
-  function: '#00657d',
-  property: '#8a1f96',
-  constant: '#7b3ab0',
-  annotation: '#776500',
-  tag: '#2340a8',
-  attribute: '#1f5bc8',
-  heading: '#2340a8',
-  link: '#1d4fc4',
-  url: '#1a7a2d',
-  inserted: '#1a7a2d',
+  heading: '#a3450c',
+  emphasis: '#86218c',
+  link: '#1a55c4',
+  image: '#00727c',
+  code: '#276f2e',
+  quote: '#5b6155',
+  html: '#7a5a00',
+  meta: '#5e6600',
   deleted: '#b3261e',
 }
 
 export const CODE_DARK: CodePalette = {
-  background: '#252722',
-  activeLine: '#22241f',
-  selection: '#263b57',
-  searchMatch: '#3c5a35',
-  searchMatchSelected: '#5c6b22',
-  selectionMatch: '#353a33',
-  lineNumber: '#8a8f85',
-  lineNumberActive: '#c4c8ba',
+  background: '#24271f',
+  activeLine: '#21231e',
+  selection: '#2e4560',
+  searchMatch: '#3a5634',
+  searchMatchSelected: '#4f5c1f',
+  selectionMatch: '#353a31',
+  lineNumber: '#878d81',
+  lineNumberActive: '#cbcec5',
+  cursor: '#e3e3dc',
 
-  text: '#e3e3dc',
-  comment: '#8f948c',
-  keyword: '#d4895a',
-  string: '#79b46f',
-  number: '#33b0c0',
-  function: '#5aa9f0',
-  property: '#c98bc6',
-  constant: '#b39ddb',
-  annotation: '#bdb76a',
-  tag: '#d6b974',
-  attribute: '#b0bcc8',
-  heading: '#e8a36a',
-  link: '#6fb2f2',
-  url: '#79b46f',
-  inserted: '#79b46f',
+  text: '#cbcec5',
+  heading: '#e8a06e',
+  emphasis: '#d59ad8',
+  link: '#6cb2f7',
+  image: '#4ec3c9',
+  code: '#8bc890',
+  quote: '#9aa094',
+  html: '#e4c070',
+  meta: '#b9bf5e',
   deleted: '#ef7f7a',
 }
 

@@ -18,76 +18,85 @@ import { codeColor as c } from '@/plugins/codeColors'
 const listMark = Tag.define(t.processingInstruction)
 /** The `>` of a quote. */
 const quoteMark = Tag.define(t.processingInstruction)
+/** Images, which get their own colour (links are `t.link`). */
+const image = Tag.define(t.link)
 
-/** Gives list and quote markers their own highlighting tags (the parser lumps all marks). */
+/** Own highlighting tags for list and quote markers and images (the parser lumps them). */
 export const markdownMarkTags = {
-  props: [styleTags({ ListMark: listMark, QuoteMark: quoteMark })],
+  props: [styleTags({ ListMark: listMark, QuoteMark: quoteMark, 'Image/...': image })],
 }
 
 const MONO = 'ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace'
 
 /**
- * Syntax colours of the editor, for Markdown and the code inside fenced blocks. The colours
- * follow the app theme through CSS variables (`plugins/codeColors.ts`).
+ * Syntax colours of the editor, for Markdown and the code inside fenced blocks. The roles match
+ * the Android app: code tokens reuse the Markdown roles (keyword = heading, string = code,
+ * number = image, function = link, property = emphasis, type and tag = html, comment = quote).
+ * The colours follow the app theme through CSS variables (`plugins/codeColors.ts`).
  */
 export const codeHighlightStyle = HighlightStyle.define([
   // Markdown
   { tag: t.heading1, color: c('heading'), fontWeight: '700', fontSize: '1.15em' },
   { tag: t.heading2, color: c('heading'), fontWeight: '700', fontSize: '1.08em' },
-  { tag: [t.heading3, t.heading4, t.heading5, t.heading6], color: c('heading'), fontWeight: '700' },
-  { tag: t.emphasis, fontStyle: 'italic' },
-  { tag: t.strong, fontWeight: '700' },
-  { tag: t.strikethrough, textDecoration: 'line-through' },
+  {
+    tag: [t.heading3, t.heading4, t.heading5, t.heading6],
+    color: c('heading'),
+    fontWeight: '700',
+  },
+  { tag: t.emphasis, color: c('emphasis'), fontStyle: 'italic' },
+  { tag: t.strong, color: c('emphasis'), fontWeight: '700' },
+  { tag: t.strikethrough, color: c('quote'), textDecoration: 'line-through' },
   { tag: t.link, color: c('link') },
-  { tag: t.url, color: c('url'), textDecoration: 'underline' },
-  { tag: t.monospace, color: c('string'), backgroundColor: c('background'), borderRadius: '3px' },
-  { tag: t.quote, color: c('comment'), fontStyle: 'italic' },
-  { tag: [listMark, quoteMark], color: c('keyword'), fontWeight: '700' },
-  { tag: t.processingInstruction, color: c('comment') },
-  { tag: t.labelName, color: c('annotation') },
-  { tag: t.contentSeparator, color: c('comment'), fontWeight: '700' },
-  { tag: t.atom, color: c('keyword') },
-  { tag: [t.escape, t.character], color: c('keyword') },
+  { tag: image, color: c('image') },
+  { tag: t.url, color: c('link'), textDecoration: 'underline' },
+  { tag: t.monospace, color: c('code'), backgroundColor: c('background'), borderRadius: '3px' },
+  { tag: t.quote, color: c('quote'), fontStyle: 'italic' },
+  { tag: [listMark, quoteMark], color: c('heading'), fontWeight: '700' },
+  { tag: t.processingInstruction, color: c('quote') },
+  { tag: t.labelName, color: c('meta') },
+  { tag: t.contentSeparator, color: c('heading'), fontWeight: '700' },
+  { tag: t.atom, color: c('meta') },
+  { tag: [t.escape, t.character], color: c('heading') },
 
   // HTML in Markdown
-  { tag: [t.tagName, t.angleBracket], color: c('tag') },
-  { tag: t.attributeName, color: c('attribute') },
-  { tag: t.attributeValue, color: c('string') },
-  { tag: t.documentMeta, color: c('annotation') },
+  { tag: [t.tagName, t.angleBracket], color: c('html') },
+  { tag: t.attributeName, color: c('emphasis') },
+  { tag: t.attributeValue, color: c('code') },
+  { tag: t.documentMeta, color: c('meta') },
 
-  // Code
+  // Code in fenced blocks
   {
     tag: [t.comment, t.lineComment, t.blockComment, t.docComment],
-    color: c('comment'),
+    color: c('quote'),
     fontStyle: 'italic',
   },
   {
     tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword, t.operatorKeyword],
-    color: c('keyword'),
+    color: c('heading'),
   },
-  { tag: [t.bool, t.null, t.self], color: c('keyword') },
-  { tag: [t.string, t.special(t.string), t.regexp], color: c('string') },
-  { tag: [t.number, t.integer, t.float], color: c('number') },
+  { tag: [t.bool, t.null, t.self], color: c('heading') },
+  { tag: [t.string, t.special(t.string), t.regexp], color: c('code') },
+  { tag: [t.number, t.integer, t.float], color: c('image') },
   {
     tag: [
       t.function(t.variableName),
       t.function(t.propertyName),
       t.function(t.definition(t.variableName)),
+      t.standard(t.variableName),
     ],
-    color: c('function'),
+    color: c('link'),
   },
   {
     tag: [t.propertyName, t.definition(t.propertyName), t.special(t.variableName)],
-    color: c('property'),
+    color: c('emphasis'),
   },
   {
-    tag: [t.standard(t.variableName), t.constant(t.variableName), t.standard(t.typeName)],
-    color: c('constant'),
+    tag: [t.typeName, t.className, t.namespace, t.constant(t.variableName)],
+    color: c('html'),
   },
-  { tag: [t.meta, t.annotation, t.modifier], color: c('annotation') },
-  { tag: t.inserted, color: c('inserted') },
-  { tag: t.deleted, color: c('deleted') },
-  { tag: t.invalid, color: c('deleted') },
+  { tag: [t.meta, t.annotation, t.modifier], color: c('meta') },
+  { tag: t.inserted, color: c('code') },
+  { tag: [t.deleted, t.invalid], color: c('deleted') },
 ])
 
 const codeBlockLine = Decoration.line({ class: 'cm-code-block' })
@@ -162,10 +171,10 @@ const editorTheme = EditorView.theme({
     color: c('text'),
   },
   '.cm-scroller': { fontFamily: MONO, lineHeight: '1.6' },
-  '.cm-content': { padding: '12px 0', caretColor: 'rgb(var(--v-theme-primary))' },
+  '.cm-content': { padding: '12px 0', caretColor: c('cursor') },
   '.cm-line': { padding: '0 16px' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-cursor, .cm-dropCursor': { borderLeft: '2px solid rgb(var(--v-theme-primary))' },
+  '.cm-cursor, .cm-dropCursor': { borderLeft: `2px solid ${c('cursor')}` },
   '.cm-activeLine': { backgroundColor: c('activeLine') },
   '.cm-code-block': { backgroundColor: c('background') },
   '.cm-code-block.cm-activeLine': {
@@ -188,8 +197,8 @@ const editorTheme = EditorView.theme({
   },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 12px', minWidth: '40px' },
   '.cm-activeLineGutter': { backgroundColor: c('activeLine'), color: c('lineNumberActive') },
-  '.cm-admonition': { color: c('annotation'), fontWeight: '700' },
-  '.cm-placeholder': { color: c('comment') },
+  '.cm-admonition': { color: c('meta'), fontWeight: '700' },
+  '.cm-placeholder': { color: c('quote') },
 
   // Search panel and tooltips in the app's colours (CodeMirror's own are light only).
   '.cm-panels': {
