@@ -10,6 +10,7 @@ import {
   describePasskeyError,
   getPasskey,
   isPasskeyCancel,
+  PasskeyProviderError,
   passkeysSupported,
 } from '@/services/passkeys'
 import { useAuthStore } from '@/stores/auth'
@@ -25,6 +26,8 @@ const password = ref('')
 const code = ref('')
 const busy = ref(false)
 const error = ref('')
+/** The provider failed. Asking again would open more of its windows; a reload usually helps. */
+const providerFailed = ref(false)
 
 const needsPassword = computed(() => account.value?.hasPassword ?? true)
 const needsCode = computed(() => account.value?.totpEnabled ?? false)
@@ -80,10 +83,18 @@ async function usePasskey(): Promise<void> {
     await api.reauthPasskeyFinish(ceremony.ceremonyId, credential)
     reauth.finish(true)
   } catch (e) {
-    if (!isPasskeyCancel(e)) error.value = describeAuthError(e) ?? describePasskeyError(e)
+    if (e instanceof PasskeyProviderError) providerFailed.value = true
+    if (!isPasskeyCancel(e)) {
+      const alternative = needsPassword.value ? 'confirm with your password' : undefined
+      error.value = describeAuthError(e) ?? describePasskeyError(e, alternative)
+    }
   } finally {
     busy.value = false
   }
+}
+
+function reload(): void {
+  window.location.reload()
 }
 </script>
 
@@ -98,6 +109,30 @@ async function usePasskey(): Promise<void> {
       <v-form @submit.prevent="submit">
         <v-card-text>
           <p class="mb-4">This change needs your credentials once more.</p>
+          <!-- Above the password field: a password manager's menu opens below that field. -->
+          <v-btn
+            v-if="offerPasskey && providerFailed"
+            variant="outlined"
+            block
+            class="mb-4"
+            :disabled="busy"
+            data-testid="reauth-reload"
+            @click="reload"
+          >
+            Reload the page
+          </v-btn>
+          <v-btn
+            v-else-if="offerPasskey"
+            variant="outlined"
+            block
+            class="mb-4"
+            :prepend-icon="mdiFingerprint"
+            :disabled="busy"
+            data-testid="reauth-passkey"
+            @click="usePasskey"
+          >
+            Confirm with a passkey
+          </v-btn>
           <input
             type="text"
             name="username"
@@ -127,18 +162,6 @@ async function usePasskey(): Promise<void> {
           <v-alert v-if="error" type="error" variant="tonal" density="compact" role="alert">
             {{ error }}
           </v-alert>
-          <v-btn
-            v-if="offerPasskey"
-            variant="outlined"
-            block
-            class="mt-3"
-            :prepend-icon="mdiFingerprint"
-            :disabled="busy"
-            data-testid="reauth-passkey"
-            @click="usePasskey"
-          >
-            Confirm with a passkey
-          </v-btn>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
