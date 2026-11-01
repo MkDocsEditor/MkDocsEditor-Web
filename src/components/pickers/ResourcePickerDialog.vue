@@ -87,7 +87,9 @@ const webValid = computed(() => url.value.trim() !== '')
 function insertWeb(): void {
   if (!webValid.value) return
   const address = cleanUrl(url.value)
-  const alt = escapeLinkText(altText.value.trim() || url.value.trim().split(/[/?#]/).filter(Boolean).pop() || 'image')
+  const alt = escapeLinkText(
+    altText.value.trim() || url.value.trim().split(/[/?#]/).filter(Boolean).pop() || 'image',
+  )
   emit('insert', [`![${alt}](${address})`])
   open.value = false
 }
