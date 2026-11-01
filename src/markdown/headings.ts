@@ -23,17 +23,21 @@ export function slugify(text: string): string {
     .replace(/[-\s]+/g, '-')
 }
 
+/** Removes HTML tags, repeated until none is left (`<<b>b>` must not leave `<b>`). */
+function stripTags(text: string): string {
+  let previous: string
+  let current = text
+  do {
+    previous = current
+    current = current.replace(/<[^<>]*>/g, '')
+  } while (current !== previous)
+  return current
+}
+
 /** Inline Markdown of a heading as plain text (what the slug is made of). */
 function plain(text: string): string {
-  return (
-    text
-      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/[*_~`]/g, '')
-      .replace(/<[^>]*>/g, '')
-      // stray angle brackets too, so no tag can survive (the text is shown as plain text anyway)
-      .replace(/[<>]/g, '')
-      .trim()
-  )
+  const inline = text.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~`]/g, '')
+  return stripTags(inline).trim()
 }
 
 /** The headings of a page with their anchors, skipping code blocks and front matter. */
