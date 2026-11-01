@@ -164,13 +164,13 @@ watch(
   font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.88em;
   color: rgb(var(--v-theme-code-text));
-  background: rgb(var(--v-theme-code-background));
+  background: rgb(var(--v-theme-code-code-background));
   border: 1px solid rgba(var(--v-border-color), 0.08);
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
 .markdown-preview pre {
-  background: rgb(var(--v-theme-code-background));
+  background: rgb(var(--v-theme-code-code-background));
   border: 1px solid rgba(var(--v-border-color), 0.08);
   padding: 12px 14px;
   border-radius: 6px;
@@ -283,7 +283,7 @@ watch(
 
 /*
  * Code highlighting (highlight.js classes) with the code palette of the editor
- * (plugins/codeColors.ts): IntelliJ-like colours that follow the light or dark theme.
+ * (plugins/codeColors.ts), mapped like the Android app's preview (PreviewCodeCss.kt).
  */
 .markdown-preview pre.hljs,
 .markdown-preview pre.hljs code {
@@ -291,7 +291,7 @@ watch(
 }
 .markdown-preview .hljs-comment,
 .markdown-preview .hljs-quote {
-  color: rgb(var(--v-theme-code-quote));
+  color: rgb(var(--v-theme-code-comment));
   font-style: italic;
 }
 .markdown-preview .hljs-keyword,
@@ -301,19 +301,19 @@ watch(
 .markdown-preview .hljs-bullet,
 .markdown-preview .hljs-char.escape_,
 .markdown-preview .hljs-doctag {
-  color: rgb(var(--v-theme-code-heading));
+  color: rgb(var(--v-theme-code-keyword));
 }
 .markdown-preview .hljs-string,
 .markdown-preview .hljs-regexp,
 .markdown-preview .hljs-template-tag {
-  color: rgb(var(--v-theme-code-code));
+  color: rgb(var(--v-theme-code-string));
 }
 .markdown-preview .hljs-number {
-  color: rgb(var(--v-theme-code-image));
+  color: rgb(var(--v-theme-code-number));
 }
 .markdown-preview .hljs-title.function_,
 .markdown-preview .hljs-function .hljs-title {
-  color: rgb(var(--v-theme-code-link));
+  color: rgb(var(--v-theme-code-function));
 }
 .markdown-preview .hljs-attr,
 .markdown-preview .hljs-variable,
@@ -322,43 +322,43 @@ watch(
 .markdown-preview .hljs-selector-attr,
 .markdown-preview .hljs-selector-class,
 .markdown-preview .hljs-selector-id {
-  color: rgb(var(--v-theme-code-emphasis));
+  color: rgb(var(--v-theme-code-property));
 }
 .markdown-preview .hljs-built_in,
-.markdown-preview .hljs-variable.language_ {
-  color: rgb(var(--v-theme-code-link));
+.markdown-preview .hljs-type,
+.markdown-preview .hljs-title.class_,
+.markdown-preview .hljs-variable.language_,
+.markdown-preview .hljs-variable.constant_ {
+  color: rgb(var(--v-theme-code-constant));
 }
 .markdown-preview .hljs-meta,
 .markdown-preview .hljs-meta .hljs-keyword {
-  color: rgb(var(--v-theme-code-meta));
+  color: rgb(var(--v-theme-code-annotation));
 }
 .markdown-preview .hljs-meta .hljs-string {
-  color: rgb(var(--v-theme-code-code));
+  color: rgb(var(--v-theme-code-string));
 }
 .markdown-preview .hljs-tag,
 .markdown-preview .hljs-name,
-.markdown-preview .hljs-type,
-.markdown-preview .hljs-title.class_,
-.markdown-preview .hljs-variable.constant_,
 .markdown-preview .hljs-selector-pseudo {
-  color: rgb(var(--v-theme-code-html));
+  color: rgb(var(--v-theme-code-tag));
 }
 .markdown-preview .hljs-tag .hljs-attr {
-  color: rgb(var(--v-theme-code-emphasis));
+  color: rgb(var(--v-theme-code-attribute));
 }
 .markdown-preview .hljs-tag .hljs-string {
-  color: rgb(var(--v-theme-code-code));
+  color: rgb(var(--v-theme-code-string));
 }
 .markdown-preview .hljs-section {
   color: rgb(var(--v-theme-code-heading));
   font-weight: 700;
 }
 .markdown-preview .hljs-link {
-  color: rgb(var(--v-theme-code-link));
+  color: rgb(var(--v-theme-code-url));
   text-decoration: underline;
 }
 .markdown-preview .hljs-addition {
-  color: rgb(var(--v-theme-code-code));
+  color: rgb(var(--v-theme-code-inserted));
 }
 .markdown-preview .hljs-deletion {
   color: rgb(var(--v-theme-code-deleted));
