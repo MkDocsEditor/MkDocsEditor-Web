@@ -16,7 +16,7 @@ import {
   mdiViewSplitVertical,
 } from '@mdi/js'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
 import { EditorSelection } from '@codemirror/state'
@@ -25,6 +25,7 @@ import type { ResourceModel } from '@/api'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
 import LinkPickerDialog from '@/components/pickers/LinkPickerDialog.vue'
 import ResourcePickerDialog from '@/components/pickers/ResourcePickerDialog.vue'
+import BacklinksList from '@/components/references/BacklinksList.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
@@ -210,6 +211,32 @@ function reveal(reference: TextReference): void {
   view.focus()
   if (mobile.value) filesOpen.value = false
 }
+
+/** `?line=12` (from "linked from" lists): select that line once the text is there. */
+const route = useRoute()
+function revealLine(number: number, attempt = 0): void {
+  const view = editorView()
+  // the editor creates its view a moment after the text is ready
+  if (!view || view.state.doc.length < text.value.length) {
+    if (attempt < 40) setTimeout(() => revealLine(number, attempt + 1), 50)
+    return
+  }
+  const target = view.state.doc.line(Math.min(number, view.state.doc.lines))
+  view.dispatch({ selection: EditorSelection.range(target.from, target.to), scrollIntoView: true })
+  view.focus()
+}
+watch(
+  () => [ready.value, route.query.line] as const,
+  ([isReady, line]) => {
+    const number = Number(line)
+    if (!isReady || !Number.isInteger(number) || number < 1) return
+    if (mode.value === 'preview') mode.value = mobile.value ? 'edit' : 'split'
+    void router.replace({ query: { ...route.query, line: undefined } })
+    revealLine(number)
+  },
+  // after the id watcher below, so a new page's line waits for that page's text
+  { flush: 'post' },
+)
 
 /** Set while following a server-side rename: the session already moved to the new id. */
 let renamedTo: string | null = null
@@ -467,6 +494,8 @@ const connection = computed(() => {
               Insert from anywhere in the wiki
             </v-btn>
           </div>
+          <v-list-subheader class="px-4">Linked from</v-list-subheader>
+          <BacklinksList :id="id" type="document" :reload-key="tree.root" />
         </template>
       </ResourcesPanel>
     </v-navigation-drawer>
