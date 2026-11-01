@@ -161,20 +161,25 @@ watch(
   min-height: 24px;
 }
 .markdown-preview code {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.88em;
-  background: rgba(var(--v-theme-on-surface), 0.06);
-  padding: 0.1em 0.3em;
-  border-radius: 3px;
+  color: rgb(var(--v-theme-code-text));
+  background: rgb(var(--v-theme-code-background));
+  border: 1px solid rgba(var(--v-border-color), 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
 }
 .markdown-preview pre {
-  background: rgba(var(--v-theme-on-surface), 0.05);
+  background: rgb(var(--v-theme-code-background));
+  border: 1px solid rgba(var(--v-border-color), 0.08);
   padding: 12px 14px;
   border-radius: 6px;
   overflow-x: auto;
+  line-height: 1.5;
 }
 .markdown-preview pre code {
   background: none;
+  border: none;
   padding: 0;
 }
 .markdown-preview table {
@@ -276,49 +281,93 @@ watch(
   --admonition-color: #9e9e9e;
 }
 
-/* Code highlighting (highlight.js classes), readable in light and dark themes. */
+/*
+ * Code highlighting (highlight.js classes) with the code palette of the editor
+ * (plugins/codeColors.ts): IntelliJ-like colours that follow the light or dark theme.
+ */
+.markdown-preview pre.hljs,
+.markdown-preview pre.hljs code {
+  color: rgb(var(--v-theme-code-text));
+}
 .markdown-preview .hljs-comment,
 .markdown-preview .hljs-quote {
-  color: #6a737d;
+  color: rgb(var(--v-theme-code-quote));
   font-style: italic;
 }
 .markdown-preview .hljs-keyword,
 .markdown-preview .hljs-selector-tag,
-.markdown-preview .hljs-type {
-  color: #d73a49;
+.markdown-preview .hljs-literal,
+.markdown-preview .hljs-symbol,
+.markdown-preview .hljs-bullet,
+.markdown-preview .hljs-char.escape_,
+.markdown-preview .hljs-doctag {
+  color: rgb(var(--v-theme-code-heading));
 }
 .markdown-preview .hljs-string,
+.markdown-preview .hljs-regexp,
+.markdown-preview .hljs-template-tag {
+  color: rgb(var(--v-theme-code-code));
+}
+.markdown-preview .hljs-number {
+  color: rgb(var(--v-theme-code-image));
+}
+.markdown-preview .hljs-title.function_,
+.markdown-preview .hljs-function .hljs-title {
+  color: rgb(var(--v-theme-code-link));
+}
 .markdown-preview .hljs-attr,
-.markdown-preview .hljs-symbol {
-  color: #22863a;
+.markdown-preview .hljs-variable,
+.markdown-preview .hljs-template-variable,
+.markdown-preview .hljs-property,
+.markdown-preview .hljs-selector-attr,
+.markdown-preview .hljs-selector-class,
+.markdown-preview .hljs-selector-id {
+  color: rgb(var(--v-theme-code-emphasis));
 }
-.markdown-preview .hljs-number,
-.markdown-preview .hljs-literal,
-.markdown-preview .hljs-built_in {
-  color: #005cc5;
+.markdown-preview .hljs-built_in,
+.markdown-preview .hljs-variable.language_ {
+  color: rgb(var(--v-theme-code-link));
 }
-.markdown-preview .hljs-title,
+.markdown-preview .hljs-meta,
+.markdown-preview .hljs-meta .hljs-keyword {
+  color: rgb(var(--v-theme-code-meta));
+}
+.markdown-preview .hljs-meta .hljs-string {
+  color: rgb(var(--v-theme-code-code));
+}
+.markdown-preview .hljs-tag,
+.markdown-preview .hljs-name,
+.markdown-preview .hljs-type,
+.markdown-preview .hljs-title.class_,
+.markdown-preview .hljs-variable.constant_,
+.markdown-preview .hljs-selector-pseudo {
+  color: rgb(var(--v-theme-code-html));
+}
+.markdown-preview .hljs-tag .hljs-attr {
+  color: rgb(var(--v-theme-code-emphasis));
+}
+.markdown-preview .hljs-tag .hljs-string {
+  color: rgb(var(--v-theme-code-code));
+}
 .markdown-preview .hljs-section {
-  color: #6f42c1;
+  color: rgb(var(--v-theme-code-heading));
+  font-weight: 700;
 }
-.v-theme--dark .markdown-preview .hljs-keyword,
-.v-theme--dark .markdown-preview .hljs-selector-tag,
-.v-theme--dark .markdown-preview .hljs-type {
-  color: #ff7b72;
+.markdown-preview .hljs-link {
+  color: rgb(var(--v-theme-code-link));
+  text-decoration: underline;
 }
-.v-theme--dark .markdown-preview .hljs-string,
-.v-theme--dark .markdown-preview .hljs-attr,
-.v-theme--dark .markdown-preview .hljs-symbol {
-  color: #7ee787;
+.markdown-preview .hljs-addition {
+  color: rgb(var(--v-theme-code-code));
 }
-.v-theme--dark .markdown-preview .hljs-number,
-.v-theme--dark .markdown-preview .hljs-literal,
-.v-theme--dark .markdown-preview .hljs-built_in {
-  color: #79c0ff;
+.markdown-preview .hljs-deletion {
+  color: rgb(var(--v-theme-code-deleted));
 }
-.v-theme--dark .markdown-preview .hljs-title,
-.v-theme--dark .markdown-preview .hljs-section {
-  color: #d2a8ff;
+.markdown-preview .hljs-emphasis {
+  font-style: italic;
+}
+.markdown-preview .hljs-strong {
+  font-weight: 700;
 }
 .v-theme--dark .markdown-preview mark {
   background: #6b5a00;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { bracketMatching } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { Compartment, EditorState } from '@codemirror/state'
@@ -18,6 +18,7 @@ import type { DocumentSession } from '@/sync/session'
 
 import { authorship, setAuthorship } from './authorship'
 import { sessionBinding } from './binding'
+import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { remoteCursors, setPeers } from './remoteCursors'
 import { fileUpload } from './upload'
 import type { UploadFiles } from './upload'
@@ -27,6 +28,8 @@ const props = defineProps<{
   showAuthorship?: boolean
   /** Uploads pasted or dropped files and returns their markdown; no uploads without it. */
   upload?: UploadFiles
+  /** Shows line numbers (off on phones, where every column counts). */
+  lineNumbers?: boolean
 }>()
 const emit = defineEmits<{
   /** The first visible source line (0-based), for scrolling the preview along. */
@@ -39,26 +42,7 @@ const host = ref<HTMLElement | null>(null)
 const readOnly = new Compartment()
 let view: EditorView | null = null
 
-const theme = EditorView.theme({
-  '&': {
-    height: '100%',
-    fontSize: '15px',
-    backgroundColor: 'rgb(var(--v-theme-surface))',
-    color: 'rgb(var(--v-theme-on-surface))',
-  },
-  '.cm-scroller': {
-    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-    lineHeight: '1.6',
-  },
-  '.cm-content': { padding: '12px 0', caretColor: 'rgb(var(--v-theme-primary))' },
-  '.cm-line': { padding: '0 16px' },
-  '&.cm-focused': { outline: 'none' },
-  '.cm-activeLine': { backgroundColor: 'rgba(var(--v-theme-on-surface), 0.04)' },
-  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-    backgroundColor: 'rgba(var(--v-theme-primary), 0.25) !important',
-  },
-  '.cm-cursor': { borderLeftColor: 'rgb(var(--v-theme-primary))' },
-})
+const gutter = new Compartment()
 
 function isReadOnly(): boolean {
   return props.session.status.value.readOnly
@@ -80,13 +64,17 @@ onMounted(() => {
       bracketMatching(),
       highlightSelectionMatches(),
       EditorView.lineWrapping,
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      markdown({
+        base: markdownLanguage,
+        codeLanguages: languages,
+        extensions: [markdownMarkTags],
+      }),
+      codeTheme(),
+      gutter.of(props.lineNumbers ? lineNumberGutter() : []),
       keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
       placeholder('Write here …'),
       readOnly.of([EditorState.readOnly.of(isReadOnly()), EditorView.editable.of(!isReadOnly())]),
       EditorView.contentAttributes.of({ 'aria-label': 'Markdown text', spellcheck: 'true' }),
-      theme,
       remoteCursors(),
       authorship(),
       sessionBinding(props.session),
@@ -117,6 +105,10 @@ function pushAuthorship(): void {
 
 watch(() => props.session.peers.value, pushPeers)
 watch([() => props.session.authorship.value, () => props.showAuthorship], pushAuthorship)
+watch(
+  () => props.lineNumbers,
+  (show) => view?.dispatch({ effects: gutter.reconfigure(show ? lineNumberGutter() : []) }),
+)
 watch(
   () => props.session.status.value.readOnly,
   (ro) =>
