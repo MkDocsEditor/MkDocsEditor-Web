@@ -112,12 +112,15 @@ window.addEventListener('keydown', onKeydown)
 
 <template>
   <v-app>
-    <v-app-bar color="primary" density="comfortable" flat>
+    <v-app-bar color="primary-container" density="comfortable" flat class="app-bar">
       <template v-if="showWiki" #prepend>
         <v-app-bar-nav-icon aria-label="Menu" @click="drawer = !drawer" />
       </template>
       <v-app-bar-title>
-        <router-link :to="{ name: 'home' }" class="app-title">MkDocsEditor</router-link>
+        <router-link :to="{ name: 'home' }" class="app-title">
+          <img src="/logo.png" alt="" width="28" height="28" class="app-logo" />
+          MkDocsEditor
+        </router-link>
       </v-app-bar-title>
       <template v-if="showShell" #append>
         <v-btn
@@ -216,8 +219,20 @@ window.addEventListener('keydown', onKeydown)
 </template>
 
 <style scoped>
+/* Like the Android app's top bar: primary container, title and icons in on-surface. */
+.app-bar {
+  color: rgb(var(--v-theme-on-surface)) !important;
+}
+
 .app-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   color: inherit;
   text-decoration: none;
+}
+
+.app-logo {
+  flex: none;
 }
 </style>
