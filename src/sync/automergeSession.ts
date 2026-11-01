@@ -2,12 +2,15 @@ import { ref, shallowRef } from 'vue'
 
 import { ApiError } from '@/api'
 import { urlPath } from '@/api/client'
-import type { ActorInfo, AuthorshipResponse, WsTicket } from '@/api'
+import type { AuthorshipResponse, WsTicket } from '@/api'
 
-import { applyChangesToRuns, runsFromCodePoints } from './authorRuns'
-import type { Run } from './authorRuns'
-import type { Automerge } from './automerge'
+import { createAuthors } from './authors'
+import { sameHeads } from './automerge'
+import type { AmDoc, Automerge, AutomergeApi, DocContent } from './automerge'
 import type { OfflineStore, StoredCopy } from './offlineStore'
+import { createPresence } from './presence'
+import { fromBase64, toBase64 } from './protocol'
+import type { ServerMessage } from './protocol'
 import { rebaseChanges } from './rebase'
 import {
   CLOSE_DELETED,
@@ -20,15 +23,8 @@ import {
 } from './socket'
 import type { SocketLike } from './socket'
 import { diffText } from './session'
-import type {
-  AuthorRun,
-  DocumentSession,
-  Peer,
-  SessionStatus,
-  SessionUser,
-  TextChange,
-  TextSelection,
-} from './session'
+import type { DocumentSession, SessionStatus, SessionUser, TextChange } from './session'
+import { createStoredCopy } from './storedCopy'
 
 /**
  * Live collaborative editing over the backend's document websocket, as specified in
@@ -41,12 +37,6 @@ import type {
  * - the local copy is persisted (with its actor id, epoch and server heads), so edits survive
  *   reloads and offline periods, even when the server starts a new epoch.
  */
-
-interface DocContent {
-  content: string
-}
-type AmDoc = Automerge.Doc<DocContent>
-type AutomergeApi = typeof Automerge
 
 export interface SessionApi {
   wsTicket(): Promise<WsTicket>
@@ -77,47 +67,11 @@ const DEFAULT_TIMING = {
   backoffMs: [500, 1_000, 2_000, 5_000, 10_000, 15_000],
 }
 
-interface RawPresence {
-  clientId: string
-  username: string
-  displayName?: string
-  color?: string
-  actorId?: string
-  selections?: { anchor: string; head: string }[]
-}
-
-interface PeerState {
-  info: RawPresence
-  resolved: TextSelection[]
-}
-
-/** Colour of users the server told nothing about. */
-const UNKNOWN_USER_COLOR = '#9e9e9e'
-
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
 function randomActorId(): string {
   const bytes = new Uint8Array(16)
   crypto.getRandomValues(bytes)
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  }
-  return btoa(binary)
-}
-
-function fromBase64(text: string): Uint8Array {
-  const binary = atob(text)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
-
-function sameHeads(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((h) => b.includes(h))
 }
 
 /** Converts Automerge patches on `content` to sequential TextChanges, or null if unexpected. */
@@ -143,8 +97,6 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let documentId = options.documentId
 
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
-  const peers = shallowRef<Peer[]>([])
-  const authorship = shallowRef<AuthorRun[]>([])
   const me = shallowRef<SessionUser | null>(null)
   const listeners = new Set<(changes: readonly TextChange[]) => void>()
 
@@ -158,9 +110,6 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let synced = false // received initial-content on the current socket
   let closed = false
   let attempt = 0
-  let release: (() => void) | null = null
-  /** Id under which the copy is persisted; stays the old id while a rename cannot take over. */
-  let storedId = documentId
   /** The re-keying of the stored copy after `document-renamed`; the reconnect waits for it. */
   let renaming: Promise<void> = Promise.resolve()
   let lastSent = 0
@@ -168,17 +117,6 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let heartbeat: ReturnType<typeof setInterval> | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let flushTimer: ReturnType<typeof setTimeout> | null = null
-  let persistTimer: ReturnType<typeof setTimeout> | null = null
-  let presenceTimer: ReturnType<typeof setTimeout> | null = null
-  let authorshipTimer: ReturnType<typeof setTimeout> | null = null
-  let pendingSelections: readonly TextSelection[] = []
-  let lastPresenceSent = 0
-  const peerStates = new Map<string, PeerState>()
-  const users = new Map<string, { displayName: string; color: string }>()
-  let runs: Run[] = []
-  /** null until the first fetch tells whether the backend has the authorship endpoint. */
-  let authorshipSupported: boolean | null = null
-
   let resolveReady!: () => void
   let rejectReady!: (error: unknown) => void
   const ready = new Promise<void>((resolve, reject) => {
@@ -189,6 +127,28 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let isReady = false
 
   const text = () => doc?.content ?? ''
+
+  const copy = createStoredCopy({
+    store: options.store,
+    persistMs: timing.persistMs,
+    snapshot: () =>
+      doc && epoch !== null ? { epoch, actorId, bytes: A.save(doc), serverHeads } : null,
+  })
+  const presence = createPresence({
+    automerge: () => A,
+    doc: () => doc,
+    documentId: () => documentId,
+    isSynced: () => synced,
+    send,
+    presenceMs: timing.presenceMs,
+  })
+  const authors = createAuthors({
+    automerge: () => A,
+    doc: () => doc,
+    documentId: () => documentId,
+    getAuthorship: (id) => options.api.getAuthorship(id),
+    refetchMs: timing.authorshipRefetchMs,
+  })
 
   function setStatus(patch: Partial<SessionStatus>): void {
     status.value = { ...status.value, ...patch }
@@ -208,133 +168,6 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (isReady) return
     isReady = true
     resolveReady()
-  }
-
-  // ----- persistence ---------------------------------------------------------------------------
-
-  function schedulePersist(): void {
-    if (!release || persistTimer) return
-    persistTimer = setTimeout(() => {
-      persistTimer = null
-      void persist()
-    }, timing.persistMs)
-  }
-
-  async function persist(): Promise<void> {
-    if (!release || !doc || epoch === null) return
-    await options.store.put({
-      documentId: storedId,
-      epoch,
-      actorId,
-      bytes: A.save(doc),
-      serverHeads,
-      savedAt: Date.now(),
-    })
-  }
-
-  // ----- authorship ----------------------------------------------------------------------------
-
-  function publishAuthorship(): void {
-    authorship.value = runs.flatMap((run) => {
-      if (run.username === null) return []
-      const user = users.get(run.username)
-      return [
-        {
-          from: run.from,
-          to: run.to,
-          username: user?.displayName ?? run.username,
-          color: user?.color ?? UNKNOWN_USER_COLOR,
-        },
-      ]
-    })
-  }
-
-  async function fetchAuthorship(): Promise<void> {
-    if (!doc) return
-    let response: AuthorshipResponse | null
-    try {
-      response = await options.api.getAuthorship(documentId)
-    } catch {
-      return
-    }
-    authorshipSupported = response !== null
-    if (!response || !doc) return
-    if (!sameHeads(response.heads, A.getHeads(doc))) {
-      scheduleAuthorshipRefetch() // our copy moved on meanwhile
-      return
-    }
-    runs = runsFromCodePoints(text(), response.runs)
-    publishAuthorship()
-  }
-
-  function scheduleAuthorshipRefetch(): void {
-    if (authorshipSupported === false) return
-    if (authorshipTimer) clearTimeout(authorshipTimer)
-    authorshipTimer = setTimeout(() => {
-      authorshipTimer = null
-      void fetchAuthorship()
-    }, timing.authorshipRefetchMs)
-  }
-
-  // ----- presence ------------------------------------------------------------------------------
-
-  /**
-   * Presence cursors (protocol section 6): Automerge cursors, plus the reserved strings `start`
-   * (empty text) and `end` (caret after the last character).
-   */
-  function cursorAt(index: number): string {
-    const length = text().length
-    if (length === 0) return 'start'
-    if (index >= length) return 'end'
-    return A.getCursor(doc!, ['content'], Math.max(0, index))
-  }
-
-  function cursorPosition(cursor: string): number {
-    if (cursor === 'start') return 0
-    if (cursor === 'end') return text().length
-    return A.getCursorPosition(doc!, ['content'], cursor)
-  }
-
-  function resolvePeers(): void {
-    if (!doc) return
-    const list: Peer[] = []
-    for (const state of peerStates.values()) {
-      const resolved: TextSelection[] = []
-      let ok = true
-      for (const s of state.info.selections ?? []) {
-        try {
-          resolved.push({
-            anchor: cursorPosition(s.anchor),
-            head: cursorPosition(s.head),
-          })
-        } catch {
-          ok = false // the cursor points into a change we have not received yet
-        }
-      }
-      if (ok) state.resolved = resolved
-      list.push({
-        clientId: state.info.clientId,
-        username: state.info.username,
-        displayName: state.info.displayName ?? state.info.username,
-        color: state.info.color ?? UNKNOWN_USER_COLOR,
-        selections: state.resolved,
-      })
-    }
-    peers.value = list
-  }
-
-  function sendPresence(): void {
-    presenceTimer = null
-    if (!doc || !synced) return
-    lastPresenceSent = Date.now()
-    send({
-      type: 'presence',
-      documentId,
-      selections: pendingSelections.map((s) => ({
-        anchor: cursorAt(s.anchor),
-        head: cursorAt(s.head),
-      })),
-    })
   }
 
   // ----- websocket -----------------------------------------------------------------------------
@@ -403,7 +236,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       if (socket !== ws) return
       lastReceived = Date.now()
       try {
-        handleMessage(JSON.parse(String(event.data)) as Record<string, unknown>)
+        handleMessage(JSON.parse(String(event.data)) as ServerMessage)
       } catch (error) {
         console.error('mkdocseditor: bad sync message', error)
       }
@@ -435,8 +268,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   }
 
   function handleClose(code: number): void {
-    peerStates.clear()
-    peers.value = []
+    presence.clear()
     if (closed) return
     switch (code) {
       case CLOSE_REFUSED:
@@ -458,41 +290,29 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     }
   }
 
-  function handleMessage(message: Record<string, unknown>): void {
+  function handleMessage(message: ServerMessage): void {
     switch (message.type) {
       case 'initial-content':
         onInitialContent(message)
         break
       case 'sync-request':
-        onSyncMessage(String(message.syncMessage ?? ''))
+        onSyncMessage(message.syncMessage ?? '')
         break
-      case 'presence': {
-        const info = message as unknown as RawPresence
-        peerStates.set(info.clientId, {
-          info,
-          resolved: peerStates.get(info.clientId)?.resolved ?? [],
-        })
-        resolvePeers()
+      case 'presence':
+        presence.update(message)
         break
-      }
       case 'presence-snapshot':
-        peerStates.clear()
-        for (const info of (message.peers as RawPresence[] | undefined) ?? [])
-          peerStates.set(info.clientId, { info, resolved: [] })
-        resolvePeers()
+        presence.replaceAll(message.peers ?? [])
         break
       case 'presence-leave':
-        peerStates.delete(String(message.clientId))
-        resolvePeers()
+        presence.remove(message.clientId)
         break
-      case 'actor': {
-        const info = message as unknown as ActorInfo
-        rememberUser(info)
-        publishAuthorship()
+      case 'actor':
+        authors.rememberUser(message)
+        authors.publish()
         break
-      }
       case 'document-renamed': {
-        const next = String(message.newDocumentId ?? '')
+        const next = message.newDocumentId ?? ''
         if (next) {
           const old = documentId
           documentId = next
@@ -515,16 +335,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   }
 
   /**
-   * Moves the persisted copy to the new id (`docs/references.md` section 7). The copy is
-   * written under the new id before the old record goes, so a crash leaves two copies, never
-   * none. If another tab holds the new id, or a copy of another lineage is stored there, this
+   * Moves the persisted copy to the new id (`docs/references.md` section 7). If another tab holds the new id, or a copy of another lineage is stored there, this
    * copy stays under the old id; it syncs with the new id all the same.
    */
   async function followRename(oldId: string, newId: string): Promise<void> {
-    if (!release || storedId !== oldId) return
+    if (!copy.isStoredAs(oldId)) return
     const next = await options.store.claim(newId)
     if (!next) return
-    if (closed || !release) {
+    if (closed || !copy.claimed) {
       next()
       return
     }
@@ -544,12 +362,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       updateUnsynced()
       scheduleFlush()
     }
-    storedId = newId
-    await persist()
-    await options.store.delete(oldId)
-    const previous = release
-    release = next
-    previous()
+    await copy.moveTo(newId, next)
   }
 
   /** Editing works offline on a persisted copy; the server merges it after the reconnect. */
@@ -565,33 +378,25 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     markReady()
   }
 
-  function rememberUser(info: { username: string; displayName?: string; color?: string }): void {
-    if (!info.username) return
-    users.set(info.username, {
-      displayName: info.displayName || info.username,
-      color: info.color ?? users.get(info.username)?.color ?? UNKNOWN_USER_COLOR,
-    })
-  }
-
-  function onInitialContent(message: Record<string, unknown>): void {
-    const serverEpoch = String(message.epoch ?? '')
+  function onInitialContent(message: Extract<ServerMessage, { type: 'initial-content' }>): void {
+    const serverEpoch = message.epoch ?? ''
     readOnly = message.readOnly === true
-    const you = message.you as (SessionUser & { username: string }) | undefined
+    const you = message.you
     if (you) {
       me.value = {
         username: you.username,
         displayName: you.displayName || you.username,
         color: you.color,
       }
-      rememberUser(you)
+      authors.rememberUser(you)
     }
-    for (const actor of (message.actors as ActorInfo[] | undefined) ?? []) rememberUser(actor)
+    for (const actor of message.actors ?? []) authors.rememberUser(actor)
 
     const before = text()
     if (doc && epoch === serverEpoch) {
       // Same lineage: keep our copy (with offline edits) and let the sync loop merge.
     } else {
-      const loaded = A.load<DocContent>(fromBase64(String(message.documentState ?? '')), {
+      const loaded = A.load<DocContent>(fromBase64(message.documentState ?? ''), {
         actor: doc ? randomActorId() : actorId,
       })
       let next = loaded
@@ -610,7 +415,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       serverHeads = A.getHeads(loaded)
       doc = next
       epoch = serverEpoch
-      runs = []
+      authors.reset()
       emit(diffText(before, text()))
     }
 
@@ -625,11 +430,11 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     updateUnsynced()
     markReady()
     flush()
-    schedulePersist()
-    resolvePeers()
-    publishAuthorship()
-    if (authorshipSupported !== false) void fetchAuthorship()
-    if (pendingSelections.length > 0) sendPresence()
+    copy.schedule()
+    presence.resolve()
+    authors.publish()
+    authors.refresh()
+    presence.sendCurrent()
   }
 
   function onSyncMessage(encoded: string): void {
@@ -645,12 +450,12 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       const changes =
         patchesToChanges(A.diff(doc, beforeHeads, afterHeads)) ??
         diffText(before.content, doc.content)
-      runs = applyChangesToRuns(runs, changes, null)
+      authors.follow(changes, null)
       emit(changes)
-      publishAuthorship()
-      scheduleAuthorshipRefetch()
-      resolvePeers()
-      schedulePersist()
+      authors.publish()
+      authors.scheduleRefetch()
+      presence.resolve()
+      copy.schedule()
     }
     updateUnsynced()
     flush()
@@ -670,34 +475,15 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (synced && now - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
   }
 
-  /** Writes a pending change right away when the page is hidden or closed. */
-  function persistNow(): void {
-    if (!persistTimer) return
-    clearTimeout(persistTimer)
-    persistTimer = null
-    void persist()
-  }
-  const onHidden = () => {
-    if (globalThis.document?.visibilityState !== 'visible') persistNow()
-  }
-
   function shutdown(normal: boolean): void {
     closed = true
-    globalThis.removeEventListener?.('pagehide', persistNow)
-    globalThis.removeEventListener?.('beforeunload', persistNow)
-    globalThis.document?.removeEventListener('visibilitychange', onHidden)
-    for (const timer of [reconnectTimer, flushTimer, presenceTimer, authorshipTimer]) {
+    for (const timer of [reconnectTimer, flushTimer]) {
       if (timer) clearTimeout(timer)
     }
+    presence.stop()
+    authors.stop()
     if (heartbeat) clearInterval(heartbeat)
-    if (persistTimer) {
-      clearTimeout(persistTimer)
-      persistTimer = null
-    }
-    void persist().finally(() => {
-      release?.()
-      release = null
-    })
+    copy.close()
     const ws = socket
     socket = null
     if (ws && normal) ws.close(1000)
@@ -713,9 +499,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       return
     }
     try {
-      storedId = documentId
-      release = await options.store.claim(documentId)
-      const stored = release ? await options.store.get(documentId) : undefined
+      const stored = await copy.open(documentId)
       if (stored && !closed) {
         adoptStoredCopy(stored)
       }
@@ -723,9 +507,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       console.error('mkdocseditor: could not load the local copy', error)
     }
     if (closed) return
-    globalThis.addEventListener?.('pagehide', persistNow)
-    globalThis.addEventListener?.('beforeunload', persistNow)
-    globalThis.document?.addEventListener('visibilitychange', onHidden)
+    copy.watchPage()
     heartbeat = setInterval(tick, Math.min(timing.heartbeatMs, 1_000))
     await connect()
   }
@@ -734,8 +516,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   return {
     status,
-    peers,
-    authorship,
+    peers: presence.peers,
+    authorship: authors.authorship,
     me,
     ready,
     getText: text,
@@ -745,19 +527,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       doc = A.change(doc, (d) => {
         for (const c of changes) A.splice(d, ['content'], c.from, c.to - c.from, c.insert)
       })
-      runs = applyChangesToRuns(runs, changes, me.value?.username ?? null)
-      publishAuthorship()
+      authors.follow(changes, me.value?.username ?? null)
+      authors.publish()
       updateUnsynced()
       scheduleFlush()
-      schedulePersist()
-      if (peerStates.size > 0) resolvePeers()
+      copy.schedule()
+      presence.onLocalEdit()
     },
-    setLocalSelections(selections) {
-      pendingSelections = selections
-      if (presenceTimer) return
-      const wait = Math.max(0, timing.presenceMs - (Date.now() - lastPresenceSent))
-      presenceTimer = setTimeout(sendPresence, wait)
-    },
+    setLocalSelections: presence.setLocalSelections,
     onRemoteChanges(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)
