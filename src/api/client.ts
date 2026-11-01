@@ -4,6 +4,8 @@ import type {
   DocumentModel,
   ItemRef,
   MovedTo,
+  MoveRequest,
+  MoveResult,
   ResourceModel,
   Revision,
   SectionModel,
@@ -253,6 +255,11 @@ export class ApiClient {
       'POST',
       `/document/${encodeURIComponent(id)}/history/${encodeURIComponent(revision)}/restore`,
     )
+  }
+
+  /** Moves or renames an item and updates every reference to it; `dryRun` only previews. */
+  async move(request: MoveRequest): Promise<MoveResult> {
+    return this.json<MoveResult>('POST', '/move', { json: request })
   }
 
   /**

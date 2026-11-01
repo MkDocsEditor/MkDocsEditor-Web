@@ -16,12 +16,15 @@ import { useDisplay } from 'vuetify'
 import { ApiError } from '@/api'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
+import MoveDialog from '@/components/move/MoveDialog.vue'
+import { canDropInto, dragged, dropTarget } from '@/components/tree/dragState'
 import NavTree from '@/components/tree/NavTree.vue'
 import SearchDialog from '@/components/tree/SearchDialog.vue'
 import { roleLabel } from '@/services/accountRules'
 import { local, readJson, writeJson } from '@/services/storage'
 import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
+import { useMoveStore } from '@/stores/move'
 import { describeError } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
@@ -93,6 +96,29 @@ const stopFollowing = live.onItemsMoved((moves) => {
   const move = moves.find((m) => m.oldId === id)
   if (move) void router.replace({ name: route.name, params: { id: move.newId } })
 })
+// expanded folders keep their state under their new ids
+const stopRekeying = live.onItemsMoved((moves) => {
+  for (const m of moves) {
+    if (m.type === 'section' && opened.delete(m.oldId)) opened.add(m.newId)
+  }
+})
+onBeforeUnmount(stopRekeying)
+
+// Dropping a tree item on "Wiki" moves it to the top folder.
+const moveStore = useMoveStore()
+function onRootDragOver(event: DragEvent): void {
+  if (!tree.root || !canDropInto(tree, dragged.value, tree.root.id)) return
+  event.preventDefault()
+  dropTarget.value = tree.root.id
+}
+function onRootDrop(event: DragEvent): void {
+  const item = dragged.value
+  dragged.value = null
+  dropTarget.value = null
+  if (!tree.root || !canDropInto(tree, item, tree.root.id)) return
+  event.preventDefault()
+  moveStore.open(item, tree.root.id)
+}
 onBeforeUnmount(stopFollowing)
 
 // The session ended (expired, revoked elsewhere, account disabled): back to the login, then
@@ -205,7 +231,12 @@ window.addEventListener('keydown', onKeydown)
           :active="activeId === tree.root?.id"
           title="Wiki"
           class="font-weight-bold"
+          :class="{ 'app-tree__drop': tree.root && dropTarget === tree.root.id }"
+          data-testid="tree-root"
           @click="mobile && (drawer = false)"
+          @dragover="onRootDragOver"
+          @dragleave="dropTarget = null"
+          @drop="onRootDrop"
         >
           <template #append>
             <v-btn
@@ -250,12 +281,17 @@ window.addEventListener('keydown', onKeydown)
     </v-main>
 
     <SearchDialog v-if="showWiki" v-model="searchOpen" />
+    <MoveDialog v-if="showWiki" />
     <ReauthDialog v-if="showShell" />
     <NotificationHost />
   </v-app>
 </template>
 
 <style scoped>
+.app-tree__drop {
+  outline: 2px dashed rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
 /* Like the Android app's top bar: primary container, title and icons in on-surface. */
 .app-bar {
   color: rgb(var(--v-theme-on-surface)) !important;

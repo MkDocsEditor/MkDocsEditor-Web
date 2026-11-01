@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { mdiContentCopy, mdiDelete, mdiDownload, mdiOpenInNew, mdiPencil } from '@mdi/js'
+import {
+  mdiContentCopy,
+  mdiDelete,
+  mdiDownload,
+  mdiFolderMoveOutline,
+  mdiOpenInNew,
+  mdiPencil,
+} from '@mdi/js'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -12,6 +19,7 @@ import { KIND_LABELS, colorFor, formatSize, iconFor, resourceKind } from '@/serv
 import { openResource } from '@/services/resources'
 import { resourceObjectUrl } from '@/services/resourceUrls'
 import { useMovedRedirect } from '@/services/redirects'
+import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
@@ -19,6 +27,7 @@ const props = defineProps<{ id: string }>()
 
 const tree = useTreeStore()
 const notify = useNotifyStore()
+const moveStore = useMoveStore()
 const router = useRouter()
 
 const resource = computed(() => {
@@ -154,6 +163,14 @@ async function remove(): Promise<void> {
           @click="renameOpen = true"
         >
           Rename
+        </v-btn>
+        <v-btn
+          :prepend-icon="mdiFolderMoveOutline"
+          variant="text"
+          data-testid="resource-move"
+          @click="moveStore.open(resource)"
+        >
+          Move
         </v-btn>
         <v-btn
           :prepend-icon="mdiDelete"
