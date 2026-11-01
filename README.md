@@ -19,6 +19,10 @@ together, in real time, from a phone or a desktop browser. It talks to the
   forgotten password is reset with a single-use link from an admin. No email needed.
 - Account page: profile and colour, password, authenticator app, recovery codes, passkeys,
   and the signed-in devices (sign out one or all others).
+- Connect the Android app: Account → Devices creates a single-use link (5 minutes), shown as
+  a QR code to scan with the phone's camera. On a phone, the first sign-in offers to open the
+  app directly. Links the app does not take land on `/connect`, which explains how to install
+  the app with [Obtainium](https://obtainium.imranr.dev) (with pre-releases turned on).
 - Admin pages: users (role, disable, delete, reset link), invites with QR code, audit log, and
   "second factor required" for everyone.
 - Browse the wiki as a folder tree, search pages and folders (Ctrl+K), create, rename and
@@ -119,6 +123,8 @@ The app reads `config.json` next to `index.html` at start:
 | `backendUrl` | `MKDOCSEDITOR_BACKEND_URL` | Base URL of the backend                                                    |
 | `wikiUrl`    | `MKDOCSEDITOR_WIKI_URL`    | Base URL of the published wiki, for the "View in the wiki" link (optional) |
 
+The Docker image also takes `MKDOCSEDITOR_ASSETLINKS_JSON` for Android App Links (see below).
+
 For local development, copy `public/config.example.json` to `public/config.json` (ignored by
 git), or set `VITE_BACKEND_URL` and `VITE_WIKI_URL`.
 
@@ -136,6 +142,26 @@ start it writes `config.json` from the environment to `/tmp`, so a read-only roo
 system works when `/tmp` is writable. `/healthz` answers `ok` for health checks. Unknown
 paths fall back to `index.html`, so deep links work. Pushes to `master` publish
 `mkdocseditor/mkdocseditor-web:latest` on Docker Hub.
+
+### Android App Links (`assetlinks.json`)
+
+Connect, invite, setup and reset links open the Android app directly when this host publishes
+a Digital Asset Links file. Set `MKDOCSEDITOR_ASSETLINKS_JSON` to the raw JSON; the image
+writes it at start and serves it at `/.well-known/assetlinks.json` with
+`Content-Type: application/json` and no redirect (Android does not follow redirects there).
+Without the variable that path answers 404.
+
+```bash
+-e MKDOCSEDITOR_ASSETLINKS_JSON='[{
+  "relation": ["delegate_permission/common.handle_all_urls",
+               "delegate_permission/common.get_login_creds"],
+  "target": {"namespace": "android_app", "package_name": "<app package>",
+             "sha256_cert_fingerprints": ["<signing certificate SHA-256>"]}
+}]'
+```
+
+`get_login_creds` lets password managers and Android's Credential Manager offer the
+passwords and passkeys saved for the web client in the app as well.
 
 To build the image yourself: `docker build -t mkdocseditor-web .`
 

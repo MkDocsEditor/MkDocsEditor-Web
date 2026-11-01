@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 
 import { useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
+import ConnectAppCard from '@/components/account/ConnectAppCard.vue'
 import PasskeysCard from '@/components/account/PasskeysCard.vue'
 import PasswordCard from '@/components/account/PasswordCard.vue'
 import ProfileCard from '@/components/account/ProfileCard.vue'
@@ -29,6 +30,8 @@ const api = useAuthApi()
 const router = useRouter()
 
 const account = ref<AccountInfo | null>(null)
+/** Reloads the device list after the app was connected. */
+const sessionsVersion = ref(0)
 const error = ref('')
 
 const current = computed({
@@ -140,7 +143,8 @@ onMounted(load)
 
     <!-- the device list loads on its own and does not need the account details -->
     <div v-if="current === 'sessions'" class="d-flex flex-column ga-4">
-      <SessionsCard />
+      <ConnectAppCard @connected="sessionsVersion++" />
+      <SessionsCard :key="sessionsVersion" />
     </div>
     <template v-else-if="account">
       <div v-if="current === 'profile'" class="d-flex flex-column ga-4">

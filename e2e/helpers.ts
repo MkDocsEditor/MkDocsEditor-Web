@@ -23,15 +23,18 @@ export async function login(page: Page, user: User = E2E_USER): Promise<void> {
 }
 
 /**
- * After a password login, accounts without a passkey see the passkey step first. Tests that
- * are not about it choose "Later" and go on to the wiki.
+ * After a password login, the welcome page may come first: the passkey step for accounts
+ * without one, and on phones the Android app hint. Tests that are not about them skip both.
  */
 export async function skipPasskeyStep(page: Page): Promise<void> {
   const title = page.getByTestId('section-title')
-  const step = page.getByTestId('passkey-step')
-  await expect(title.or(step).first()).toBeVisible()
-  if (await step.isVisible()) await page.getByTestId('passkey-step-later').click()
-  await expect(title).toHaveText('Wiki')
+  const later = page.getByTestId('passkey-step-later')
+  const notNow = page.getByTestId('android-hint-dismiss')
+  await expect(async () => {
+    if (await later.isVisible()) await later.click()
+    if (await notNow.isVisible()) await notNow.click()
+    await expect(title).toHaveText('Wiki', { timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
 }
 
 /** A logged-in page in its own browser context (own storage, like another device). */

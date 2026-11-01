@@ -84,7 +84,21 @@ jobs:
           for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz && break; sleep 1; done
           curl -fs http://localhost:8080/config.json | tee /dev/stderr | grep -q '"backendUrl": "https://api.example.com"'
           curl -fs http://localhost:8080/some/client/route | grep -q '<div id="app">'
+          # without MKDOCSEDITOR_ASSETLINKS_JSON there is no assetlinks.json
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/.well-known/assetlinks.json)" = "404"
           test "$(docker inspect --format '{{.Config.User}}' mkdocseditor-web:ci)" = "101"
+          docker rm -f web
+      - name: Smoke-test assetlinks.json
+        run: |
+          docker run -d --name web -p 8080:8080 \
+            -e MKDOCSEDITOR_ASSETLINKS_JSON='[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"org.example.app","sha256_cert_fingerprints":["AA:BB"]}}]' \
+            mkdocseditor-web:ci
+          for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz && break; sleep 1; done
+          headers=$(curl -fsS -D - -o /tmp/assetlinks.json http://localhost:8080/.well-known/assetlinks.json)
+          echo "$headers"
+          echo "$headers" | head -1 | grep -q ' 200'
+          echo "$headers" | grep -qi '^content-type: application/json'
+          grep -q '"package_name":"org.example.app"' /tmp/assetlinks.json
           docker rm -f web
 
   e2e:
