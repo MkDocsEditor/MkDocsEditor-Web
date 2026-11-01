@@ -1,6 +1,22 @@
 import { expect, test } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 import { login, testName } from './helpers'
+
+/**
+ * Opens the actions menu of an entry and picks an action. A live tree update (another test's
+ * edit reaching the disk) can close the menu in between, so this retries until `opens` shows.
+ */
+async function menuAction(page: Page, entry: string, action: string, opens: Locator) {
+  await expect(async () => {
+    await page.getByRole('button', { name: `Actions for ${entry}` }).click()
+    await page
+      .locator('.v-overlay--active')
+      .getByText(action, { exact: true })
+      .click({ timeout: 2000 })
+    await expect(opens).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: 20_000 })
+}
 
 test('rejects a wrong password', async ({ page }) => {
   await page.goto('/')
@@ -38,14 +54,12 @@ test('creates, renames and deletes a folder', async ({ page }, testInfo) => {
   const main = page.locator('main')
   await expect(main.getByText(name, { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: `Actions for ${name}` }).click()
-  await page.getByText('Rename').click()
+  await menuAction(page, name, 'Rename', page.getByTestId('name-input'))
   await page.getByTestId('name-input').locator('input').fill(`${name} neu`)
   await page.getByTestId('name-confirm').click()
   await expect(main.getByText(`${name} neu`, { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: `Actions for ${name} neu` }).click()
-  await page.getByText('Delete').click()
+  await menuAction(page, `${name} neu`, 'Delete', page.getByTestId('confirm-button'))
   await page.getByTestId('confirm-button').click()
   await expect(main.getByText(`${name} neu`, { exact: true })).toHaveCount(0)
 })
