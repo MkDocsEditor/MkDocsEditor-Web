@@ -4,6 +4,7 @@ import {
   mdiDotsVertical,
   mdiOpenInNew,
   mdiFileDocumentPlusOutline,
+  mdiFolderMoveOutline,
   mdiFolderPlusOutline,
   mdiPencil,
   mdiPlus,
@@ -24,6 +25,7 @@ import { stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
 import { useMovedRedirect } from '@/services/redirects'
+import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { sortByName, useTreeStore } from '@/stores/tree'
 
@@ -37,6 +39,7 @@ const router = useRouter()
 const section = computed(() =>
   props.id === undefined ? tree.root : (tree.section(props.id) ?? null),
 )
+const moveStore = useMoveStore()
 const lookingUp = useMovedRedirect(
   () => props.id ?? '',
   'section',
@@ -129,7 +132,7 @@ async function rename(name: string): Promise<void> {
     else if (item.type === 'document')
       await tree.renameDocument(item.id, stripMarkdownExtension(name))
     else await tree.renameResource(item.id, name)
-    notify.success('Umbenannt')
+    notify.success('Renamed')
   } catch (error) {
     notify.error(error, 'Rename failed')
   }
@@ -289,6 +292,12 @@ const deleteText = computed(() => {
                   :prepend-icon="mdiPencil"
                   title="Rename"
                   @click="renameTarget = item"
+                />
+                <v-list-item
+                  :prepend-icon="mdiFolderMoveOutline"
+                  title="Move to…"
+                  data-testid="entry-move"
+                  @click="moveStore.open(item)"
                 />
                 <v-list-item
                   :prepend-icon="mdiDelete"

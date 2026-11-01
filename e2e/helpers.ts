@@ -96,7 +96,8 @@ export async function backendRequest(
  * the failed attempt left in the shared test wiki.
  */
 export function testName(base: string, testInfo: TestInfo): string {
-  return `${base} ${testInfo.project.name}${testInfo.retry > 0 ? ` ${testInfo.retry}` : ''}`
+  const repeat = testInfo.repeatEachIndex > 0 ? ` r${testInfo.repeatEachIndex}` : ''
+  return `${base} ${testInfo.project.name}${repeat}${testInfo.retry > 0 ? ` ${testInfo.retry}` : ''}`
 }
 
 /** Creates a page in the root folder over REST and returns its id. */

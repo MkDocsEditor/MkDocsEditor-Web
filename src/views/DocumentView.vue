@@ -6,6 +6,7 @@ import {
   mdiCloudSyncOutline,
   mdiDotsVertical,
   mdiEyeOutline,
+  mdiFolderMoveOutline,
   mdiFileDocumentEditOutline,
   mdiHistory,
   mdiLockOutline,
@@ -37,6 +38,7 @@ import { initials } from '@/services/names'
 import { local, readJson, writeJson } from '@/services/storage'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
+import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { createDocumentSession } from '@/sync'
@@ -46,6 +48,7 @@ const props = defineProps<{ id: string }>()
 
 const tree = useTreeStore()
 const notify = useNotifyStore()
+const moveStore = useMoveStore()
 const router = useRouter()
 const { mobile } = useDisplay()
 
@@ -356,6 +359,13 @@ const connection = computed(() => {
               :title="showAuthorship ? 'Hide authors' : 'Who wrote what?'"
               :disabled="!session || session.authorship.value.length === 0"
               @click="showAuthorship = !showAuthorship"
+            />
+            <v-list-item
+              v-if="document"
+              :prepend-icon="mdiFolderMoveOutline"
+              title="Move or rename…"
+              data-testid="document-move"
+              @click="moveStore.open(document)"
             />
             <v-list-item
               :prepend-icon="mdiHistory"

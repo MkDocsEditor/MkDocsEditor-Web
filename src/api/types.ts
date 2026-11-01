@@ -64,6 +64,46 @@ export interface MovedItem {
   newPath: string
 }
 
+/** `POST /move/` (`docs/references.md` section 5). */
+export interface MoveRequest {
+  type: ItemType
+  id: string
+  /** Target section; leave out to rename in place. */
+  parent?: string
+  /** New name (documents without `.md`); leave out to keep the name. */
+  name?: string
+  dryRun?: boolean
+  updateReferences?: boolean
+}
+
+/** A changed line: 1-based number in the text before the move. */
+export interface LineEdit {
+  line: number
+  before: string
+  after: string
+}
+
+export interface MoveResult {
+  dryRun: boolean
+  type: ItemType
+  oldId: string
+  newId: string
+  oldPath: string
+  newPath: string
+  /** The item after the move (absent in a dry run). */
+  item?: TreeItem
+  moved: MovedItem[]
+  documents: {
+    documentId: string
+    newDocumentId: string
+    path: string
+    newPath: string
+    edits: LineEdit[]
+  }[]
+  config: (LineEdit & { file: string })[]
+  commit?: string
+}
+
 /** `GET /moved/{id}/`: where an old id points now. */
 export interface MovedTo {
   oldId: string
