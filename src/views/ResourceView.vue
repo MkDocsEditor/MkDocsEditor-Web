@@ -239,7 +239,7 @@ async function remove(): Promise<void> {
   word-break: break-word;
   padding: 12px 14px;
   border-radius: 6px;
-  background: rgb(var(--v-theme-code-background));
+  background: rgb(var(--v-theme-code-code-background));
   color: rgb(var(--v-theme-code-text));
   max-height: 70vh;
   overflow: auto;

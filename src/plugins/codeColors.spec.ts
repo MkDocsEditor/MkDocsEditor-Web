@@ -36,7 +36,7 @@ describe.each([
   it.each(textColors(palette))(
     '%s meets WCAG AA on the editor and code backgrounds',
     (_, color) => {
-      for (const background of [surface, palette.background, palette.activeLine]) {
+      for (const background of [surface, palette.codeBackground, palette.activeLine]) {
         expect(contrastRatio(color, background)).toBeGreaterThanOrEqual(AA)
       }
     },
@@ -57,6 +57,10 @@ describe.each([
 
   it('has a visible cursor', () => {
     expect(contrastRatio(palette.cursor, surface)).toBeGreaterThanOrEqual(3)
+  })
+
+  it('has the Android values for the shared roles', () => {
+    expect(palette.text).toBe(palette === CODE_LIGHT ? '#1a1c18' : '#e3e3dc')
   })
 
   it('is part of the Vuetify theme', () => {

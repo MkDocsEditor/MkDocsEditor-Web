@@ -1,106 +1,132 @@
 /**
  * Colours of the code views: the Markdown editor (CodeMirror) and the code blocks of the
  * preview (highlight.js). The palettes are inspired by the IntelliJ themes ("IntelliJ Light"
- * and the dark New UI / Darcula look), with our own values tuned for WCAG AA (4.5:1) against
- * the editor and code block backgrounds (see `codeColors.spec.ts`). The chrome around them keeps
- * the Android colours in `vuetify.ts`. The Android app (`EditorPalette`) uses the same roles and
- * values, so both clients look alike.
+ * and the dark New UI / Darcula look), tuned for WCAG AA (4.5:1) against the editor and code
+ * block backgrounds (see `codeColors.spec.ts`). The chrome around them keeps the Android colours
+ * in `vuetify.ts`. Roles and values are those of the Android app's `EditorPalette`, so both
+ * clients look alike; keep them in sync.
  *
  * Every colour becomes a Vuetify theme colour `code-<name>`, so CSS reads it as
  * `rgb(var(--v-theme-code-<name>))` and it follows the light or dark theme by itself.
  */
 export interface CodePalette {
-  /** Background of fenced code (editor lines and preview blocks) and inline code. */
-  background: string
-  /** Background of the line with the cursor. */
-  activeLine: string
+  /** Background of inline code and code blocks (editor lines and preview). */
+  codeBackground: string
   /** Background of selected text. */
   selection: string
+  /** Line numbers. */
+  lineNumber: string
+
+  /** Plain text. */
+  text: string
+  /** Comments, quotes, horizontal rules and fence lines. */
+  comment: string
+  /** Keywords; list and quote markers, task boxes. */
+  keyword: string
+  /** Strings; inline code, attribute values. */
+  string: string
+  number: string
+  /** Function and method names. */
+  function: string
+  /** Properties, keys and variables. */
+  property: string
+  /** Built-in types and constants. */
+  constant: string
+  /** Annotations, decorators, admonition markers, front matter. */
+  annotation: string
+  /** HTML and XML tag names. */
+  tag: string
+  /** HTML and XML attribute names. */
+  attribute: string
+  /** Markdown headings. */
+  heading: string
+  /** Markdown link text. */
+  link: string
+  /** URLs and link targets. */
+  url: string
+  /** Diff: added and removed lines. */
+  inserted: string
+  deleted: string
+
+  /* Web only: CodeMirror has more states than the Android editor. */
+  /** Background of the line with the cursor. */
+  activeLine: string
   /** Search matches, and the current one. */
   searchMatch: string
   searchMatchSelected: string
   /** Other occurrences of the selected word, matching brackets. */
   selectionMatch: string
-  /** Line numbers, and the number of the line with the cursor. */
-  lineNumber: string
+  /** The number of the line with the cursor. */
   lineNumberActive: string
   cursor: string
-
-  /** Plain text. */
-  text: string
-  /** Headings, list markers, horizontal rules; keywords in code. */
-  heading: string
-  /** Bold and italic text; attributes, variables and properties in code. */
-  emphasis: string
-  /** Links and URLs; function names, titles and built-ins in code. */
-  link: string
-  /** Images; numbers in code. */
-  image: string
-  /** Inline and fenced code; strings in code. */
-  code: string
-  /** Quotes, strikethrough and markup characters; comments in code. */
-  quote: string
-  /** HTML tags; types, tags and names in code. */
-  html: string
-  /** Admonitions, task boxes, front matter; annotations and meta in code. */
-  meta: string
-  /** Removed lines of a diff. */
-  deleted: string
 }
 
 /*
- * The shared roles (text to meta, line numbers, selection, cursor) have the same values as the
- * Android app's `EditorPalette`; the rest is web only (CodeMirror needs more states).
+ * Everything up to `deleted` has the values of the Android app's `EditorPalette` (Android #79);
+ * the web-only states below are tuned to them. The editor background is the app surface
+ * (`vuetify.ts`), the same as on Android.
  */
 export const CODE_LIGHT: CodePalette = {
-  background: '#eef0e5',
+  codeBackground: '#f2f3ea',
+  selection: '#c8def9',
+  lineNumber: '#6b6f66',
+  text: '#1a1c18',
+  comment: '#676b62',
+  keyword: '#2340a8',
+  string: '#1a7a2d',
+  number: '#1259c3',
+  function: '#00657d',
+  property: '#8a1f96',
+  constant: '#7b3ab0',
+  annotation: '#776500',
+  tag: '#2340a8',
+  attribute: '#1f5bc8',
+  heading: '#2340a8',
+  link: '#1d4fc4',
+  url: '#1a7a2d',
+  inserted: '#1a7a2d',
+  deleted: '#b3261e',
+
   activeLine: '#f4f4e8',
-  selection: '#ccddf5',
   searchMatch: '#f6e7a0',
   searchMatchSelected: '#eccd5e',
   selectionMatch: '#e0e4d4',
-  lineNumber: '#666b60',
   lineNumberActive: '#1a1c18',
   cursor: '#1a1c18',
-
-  text: '#1a1c18',
-  heading: '#a3450c',
-  emphasis: '#86218c',
-  link: '#1a55c4',
-  image: '#00727c',
-  code: '#276f2e',
-  quote: '#5b6155',
-  html: '#7a5a00',
-  meta: '#5e6600',
-  deleted: '#b3261e',
 }
 
 export const CODE_DARK: CodePalette = {
-  background: '#24271f',
+  codeBackground: '#252722',
+  selection: '#263b57',
+  lineNumber: '#8a8f85',
+  text: '#e3e3dc',
+  comment: '#8f948c',
+  keyword: '#d4895a',
+  string: '#79b46f',
+  number: '#33b0c0',
+  function: '#5aa9f0',
+  property: '#c98bc6',
+  constant: '#b39ddb',
+  annotation: '#bdb76a',
+  tag: '#d6b974',
+  attribute: '#b0bcc8',
+  heading: '#e8a36a',
+  link: '#6fb2f2',
+  url: '#79b46f',
+  inserted: '#79b46f',
+  deleted: '#ef7f7a',
+
   activeLine: '#21231e',
-  selection: '#2e4560',
   searchMatch: '#3a5634',
   searchMatchSelected: '#4f5c1f',
   selectionMatch: '#353a31',
-  lineNumber: '#878d81',
-  lineNumberActive: '#cbcec5',
+  lineNumberActive: '#e3e3dc',
   cursor: '#e3e3dc',
-
-  text: '#cbcec5',
-  heading: '#e8a06e',
-  emphasis: '#d59ad8',
-  link: '#6cb2f7',
-  image: '#4ec3c9',
-  code: '#8bc890',
-  quote: '#9aa094',
-  html: '#e4c070',
-  meta: '#b9bf5e',
-  deleted: '#ef7f7a',
 }
 
 /** Background colours of the palette, the rest are text colours. */
 export const CODE_BACKGROUNDS = [
-  'background',
+  'codeBackground',
   'activeLine',
   'selection',
   'searchMatch',
