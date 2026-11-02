@@ -50,7 +50,7 @@ describe('redirects', () => {
         { type: 'document', oldId: 'd-old', newId: 'd-new' },
         { type: 'resource', oldId: 'r-old', newId: 'r-new' },
       ],
-      store,
+      [store],
     )
     expect((await store.keys()).sort()).toEqual(['d-new', 'r-old'])
   })
@@ -66,9 +66,9 @@ describe('redirects', () => {
       'GET /moved/d-gone/': () => json({ code: 'not-found' }, 404),
     })
     setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
-    await rescueStoredCopies((id) => id === 'd-known', store)
+    await rescueStoredCopies((id) => id === 'd-known', [store])
     expect((await store.keys()).sort()).toEqual(['d-gone', 'd-here', 'd-known'])
-    await rescueStoredCopies((id) => id === 'd-known' || id === 'd-here', store)
+    await rescueStoredCopies((id) => id === 'd-known' || id === 'd-here', [store])
     expect(mock.requests.map((r) => new URL(r.url).pathname)).toEqual([
       '/moved/d-moved/',
       '/moved/d-gone/',

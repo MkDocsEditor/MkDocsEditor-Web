@@ -38,7 +38,7 @@ describe('connectEvents', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
-  function setup(wsTicket = vi.fn(async () => ({ ticket: 't-1' }))) {
+  function setup(wsTicket = vi.fn(async (): Promise<{ ticket: string }> => ({ ticket: 't-1' }))) {
     const sockets: FakeSocket[] = []
     const onTreeChanged = vi.fn()
     let online = new Map<string, OnlineUser[]>()
@@ -65,6 +65,7 @@ describe('connectEvents', () => {
       onUnauthorized,
       onItemsMoved,
       connection,
+      wsTicket,
     }
   }
 
@@ -148,5 +149,121 @@ describe('connectEvents', () => {
     expect(sockets).toHaveLength(0)
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
     expect(wsTicket).toHaveBeenCalledTimes(1)
+  })
+
+  describe('staying connected', () => {
+    const open = async (fixture: ReturnType<typeof setup>) => {
+      await vi.advanceTimersByTimeAsync(0)
+      fixture.sockets.at(-1)!.open()
+      fixture.sockets.at(-1)!.receive({ type: 'online', documents: [] })
+    }
+
+    it('answers server messages with heartbeats while its timers do not run', async () => {
+      // like a background tab: timers are throttled, websocket messages still arrive
+      const setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockReturnValue(0 as never)
+      const fixture = setup()
+      await open(fixture)
+      setIntervalSpy.mockRestore()
+      const socket = fixture.sockets[0]!
+      const heartbeats = () => socket.sent.filter((m) => m.type === 'heartbeat')
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(heartbeats()).toHaveLength(0)
+      socket.receive({ type: 'heartbeat' })
+      expect(heartbeats()).toHaveLength(1)
+      socket.receive({ type: 'heartbeat' })
+      expect(heartbeats()).toHaveLength(1)
+      fixture.connection.close()
+    })
+
+    it('reconnects after silence without waiting for the browser to close the socket', async () => {
+      const fixture = setup()
+      await open(fixture)
+      const dead = fixture.sockets[0]!
+      dead.close = () => undefined // the close handshake never finishes
+      await vi.advanceTimersByTimeAsync(16_000 + 1_000)
+      expect(fixture.sockets).toHaveLength(2)
+      expect(fixture.online().size).toBe(0)
+      fixture.connection.close()
+    })
+
+    it('gives up on a ticket request that hangs', async () => {
+      const wsTicket = vi
+        .fn(async () => ({ ticket: 't' }))
+        .mockImplementationOnce(() => new Promise<never>(() => undefined))
+      const fixture = setup(wsTicket)
+      await vi.advanceTimersByTimeAsync(9_000)
+      expect(wsTicket).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(3_100)
+      expect(wsTicket).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fixture.sockets).toHaveLength(1)
+      fixture.connection.close()
+    })
+
+    it('gives up on a socket that never opens and ignores it afterwards', async () => {
+      const fixture = setup()
+      await vi.advanceTimersByTimeAsync(0)
+      const stuck = fixture.sockets[0]!
+      await vi.advanceTimersByTimeAsync(12_100)
+      expect(fixture.sockets).toHaveLength(2)
+      expect(stuck.closedWith).not.toBeNull()
+      fixture.sockets[1]!.open()
+      const before = fixture.onTreeChanged.mock.calls.length
+      stuck.open()
+      stuck.receive({ type: 'tree-changed' })
+      expect(fixture.onTreeChanged).toHaveBeenCalledTimes(before)
+      expect(stuck.sent).toEqual([])
+      fixture.connection.close()
+    })
+
+    it('limits attempts started by the page coming back', async () => {
+      const fixture = setup()
+      await open(fixture)
+      fixture.sockets[0]!.close(1006)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fixture.sockets).toHaveLength(1)
+      // the first attempt was a moment ago, and new attempts are limited to one per 2 s
+      await vi.advanceTimersByTimeAsync(100)
+      globalThis.dispatchEvent(new Event('online'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fixture.sockets).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(fixture.sockets).toHaveLength(2)
+      fixture.connection.close()
+    })
+
+    it('a long backoff ends when the page comes back', async () => {
+      const fixture = setup(vi.fn(async () => Promise.reject(new Error('down'))))
+      await vi.advanceTimersByTimeAsync(20_000)
+      const wsTicket = fixture.wsTicket
+      wsTicket.mockImplementation(async () => ({ ticket: 't-2' }))
+      const calls = wsTicket.mock.calls.length
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(wsTicket.mock.calls.length).toBe(calls + 1)
+      fixture.connection.close()
+    })
+
+    it('a page coming back drops a socket that has been silent too long', async () => {
+      const fixture = setup()
+      await open(fixture)
+      await vi.advanceTimersByTimeAsync(8_500)
+      expect(fixture.sockets).toHaveLength(1)
+      globalThis.dispatchEvent(new Event('focus'))
+      expect(fixture.sockets[0]!.closedWith).not.toBeNull()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fixture.sockets).toHaveLength(2)
+      fixture.connection.close()
+    })
+
+    it('stops watching the page when closed', async () => {
+      const fixture = setup()
+      await open(fixture)
+      fixture.connection.close()
+      await vi.advanceTimersByTimeAsync(3_000)
+      globalThis.dispatchEvent(new Event('online'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fixture.sockets).toHaveLength(1)
+    })
   })
 })

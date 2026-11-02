@@ -8,6 +8,7 @@ import { createAuthors } from './authors'
 import { sameHeads } from './automerge'
 import type { AmDoc, Automerge, AutomergeApi, DocContent } from './automerge'
 import type { OfflineStore, StoredCopy } from './offlineStore'
+import { watchPage } from './pageEvents'
 import { createPresence } from './presence'
 import { fromBase64, toBase64 } from './protocol'
 import type { ServerMessage } from './protocol'
@@ -42,6 +43,7 @@ export interface SessionApi {
   wsTicket(): Promise<WsTicket>
   wsUrl(path: string): string
   getAuthorship(id: string): Promise<AuthorshipResponse | null>
+  getDocument(id: string): Promise<unknown>
 }
 
 export interface AutomergeSessionOptions {
@@ -50,6 +52,8 @@ export interface AutomergeSessionOptions {
   automerge: AutomergeApi | Promise<AutomergeApi>
   api: SessionApi
   store: OfflineStore
+  /** Records of older versions without an owner, used until the server tells whose they are. */
+  unowned?: OfflineStore
   createSocket?: (url: string) => SocketLike
   /** Called when the server reports a rename; the session follows the new id itself. */
   onRenamed?: (newDocumentId: string) => void
@@ -60,12 +64,28 @@ export interface AutomergeSessionOptions {
 const DEFAULT_TIMING = {
   heartbeatMs: 5_000,
   timeoutMs: 15_000,
+  /**
+   * Silence that already means a dead connection when there is a reason to doubt it (the page
+   * woke up, the network changed, the user types): the server sends something every 5 s.
+   */
+  doubtMs: 8_000,
+  /** How long the ticket request, and then the socket until it opens, may take. */
+  connectTimeoutMs: 10_000,
+  /** A wake-up or a keystroke starts a new connection attempt at most this often. */
+  retryNowMs: 2_000,
+  /** How often a tab without the stored copy tries again to claim it, while there are changes. */
+  retryClaimMs: 5_000,
   flushMs: 50,
   presenceMs: 100,
   persistMs: 300,
   authorshipRefetchMs: 3_000,
   backoffMs: [500, 1_000, 2_000, 5_000, 10_000, 15_000],
 }
+
+const SYNC_FAILURES_FORGOTTEN_MS = 60_000
+
+const DELETED_MESSAGE =
+  'This page was deleted. Your text is still here – copy it if you want to keep it.'
 
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
 function randomActorId(): string {
@@ -110,11 +130,28 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let synced = false // received initial-content on the current socket
   let closed = false
   let attempt = 0
+  /** Numbers the connection attempts, so that an abandoned one can tell. */
+  let attemptId = 0
+  /** Since when the current attempt waits for its ticket or its socket; null if it is not. */
+  let connectingSince: number | null = null
+  let lastAttemptAt = 0
+  /** There is a reason to doubt that the open socket still works; any message settles it. */
+  let doubted = false
+  /** Sync messages in a row that could not be applied, counted from 0. */
+  let syncFailures = 0
+  let lastSyncFailureAt = 0
+  /** The error message of the server on the current socket; a fatal one precedes the close. */
+  let serverError: string | undefined
+  /** The server closed with 4003 and did not accept a connection since. */
+  let refused = false
+  /** The next initial content replaces the local copy, because its edits are not ours to send. */
+  let discardLocalEdits = false
   /** The re-keying of the stored copy after `document-renamed`; the reconnect waits for it. */
   let renaming: Promise<void> = Promise.resolve()
   let lastSent = 0
   let lastReceived = 0
   let heartbeat: ReturnType<typeof setInterval> | null = null
+  let stopWatchingPage: (() => void) | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let flushTimer: ReturnType<typeof setTimeout> | null = null
   let resolveReady!: () => void
@@ -130,9 +167,15 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   const copy = createStoredCopy({
     store: options.store,
+    unowned: options.unowned,
     persistMs: timing.persistMs,
+    retryClaimMs: timing.retryClaimMs,
+    documentId: () => documentId,
     snapshot: () =>
-      doc && epoch !== null ? { epoch, actorId, bytes: A.save(doc), serverHeads } : null,
+      doc && epoch !== null && !copy.isUnowned
+        ? { epoch, actorId, bytes: A.save(doc), serverHeads, readOnly }
+        : null,
+    onLateClaim: (existing) => !existing || mergeStoredCopy(existing),
   })
   const presence = createPresence({
     automerge: () => A,
@@ -197,17 +240,35 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     syncState = state
   }
 
+  /**
+   * Browsers throttle the timers of a background tab to one wake-up per minute, but still deliver
+   * websocket messages. So the server's own heartbeats drive ours too; on `tick` alone the server
+   * would close the connection of a background tab after 15 s (`4008`).
+   */
+  function sendHeartbeatIfDue(): void {
+    if (synced && Date.now() - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
+  }
+
   function scheduleFlush(): void {
     flushTimer ??= setTimeout(flush, timing.flushMs)
   }
 
   async function connect(): Promise<void> {
     if (closed) return
+    const id = ++attemptId
+    const abandoned = () => closed || id !== attemptId
+    clearReconnectTimer()
+    connectingSince = lastAttemptAt = Date.now()
     setStatus({ connection: doc || attempt > 0 ? 'offline' : 'connecting' })
+    // the stored copy follows a rename first (its epoch goes into hello)
+    await renaming
+    if (abandoned()) return
     let ticket: WsTicket
     try {
       ticket = await options.api.wsTicket()
     } catch (error) {
+      if (abandoned()) return
+      connectingSince = null
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         fail('Please sign in again to keep editing.')
         return
@@ -215,12 +276,26 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       scheduleReconnect()
       return
     }
-    if (closed) return
+    if (abandoned()) return
 
-    const ws = createSocket(options.api.wsUrl(urlPath`/document/${documentId}/ws`))
+    let ws: SocketLike
+    try {
+      ws = createSocket(options.api.wsUrl(urlPath`/document/${documentId}/ws`))
+    } catch (error) {
+      console.error('mkdocseditor: could not open the websocket', error)
+      connectingSince = null
+      scheduleReconnect()
+      return
+    }
+    connectingSince = Date.now()
     socket = ws
     synced = false
+    serverError = undefined
+    let opened = false
     ws.onopen = () => {
+      if (socket !== ws) return
+      opened = true
+      connectingSince = null
       lastReceived = Date.now()
       const hello: Record<string, unknown> = {
         type: 'hello',
@@ -235,19 +310,66 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     ws.onmessage = (event) => {
       if (socket !== ws) return
       lastReceived = Date.now()
+      doubted = false
+      let message: ServerMessage | undefined
       try {
-        handleMessage(JSON.parse(String(event.data)) as ServerMessage)
+        message = JSON.parse(String(event.data)) as ServerMessage
+        handleMessage(message)
       } catch (error) {
         console.error('mkdocseditor: bad sync message', error)
+        if (message?.type === 'initial-content' || message?.type === 'sync-request') {
+          // The sync loop cannot go on from here, and a new connection starts it over. The
+          // initial content resets the backoff, so failures in a row have to keep it up.
+          const now = Date.now()
+          syncFailures = now - lastSyncFailureAt < SYNC_FAILURES_FORGOTTEN_MS ? syncFailures + 1 : 0
+          lastSyncFailureAt = now
+          attempt = Math.max(attempt, syncFailures)
+          abandonConnection()
+          return
+        }
       }
+      sendHeartbeatIfDue()
     }
     ws.onerror = () => undefined
     ws.onclose = (event) => {
       if (socket !== ws) return
       socket = null
       synced = false
+      connectingSince = null
       handleClose(event.code)
+      // The ticket came, so the server is there, but it refused the upgrade: browsers do not tell
+      // why. Asking is the only way to notice a page that was deleted while we were away.
+      if (!opened && !closed) void checkDocumentExists()
     }
+  }
+
+  async function checkDocumentExists(): Promise<void> {
+    try {
+      await options.api.getDocument(documentId)
+    } catch (error) {
+      if (!closed && error instanceof ApiError && error.status === 404 && !error.movedTo) {
+        fail(doc ? DELETED_MESSAGE : 'This page does not exist any more.')
+      }
+    }
+  }
+
+  /**
+   * The server does not accept the actor id of this copy for this user. Its unsynced edits are
+   * someone else's, so they must not be published here: the next connection starts on the server's
+   * document with a new actor. A record without an owner stays where it is, for its owner. Any
+   * other copy is set aside, where nothing reads it any more.
+   */
+  function forgetActor(): void {
+    if (copy.isUnowned) copy.leaveUnowned()
+    else if (status.value.unsynced) void copy.setAside()
+    actorId = randomActorId()
+    epoch = null
+    discardLocalEdits = true
+  }
+
+  function clearReconnectTimer(): void {
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    reconnectTimer = null
   }
 
   function scheduleReconnect(): void {
@@ -261,6 +383,49 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     }, delay)
   }
 
+  /**
+   * Gives up on the current attempt or socket and reconnects. It does not wait for the browser:
+   * a request or a socket on a dead connection can take minutes to fail, and so can closing one.
+   */
+  function abandonConnection(): void {
+    attemptId++
+    connectingSince = null
+    doubted = false
+    const stale = socket
+    socket = null
+    synced = false
+    if (stale?.readyState === SOCKET_OPEN) stale.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
+    else stale?.close()
+    handleClose(CLOSE_HEARTBEAT_TIMEOUT)
+  }
+
+  /** How long the current socket may stay silent. */
+  function silenceLimit(): number {
+    return doubted ? Math.min(timing.doubtMs, timing.timeoutMs) : timing.timeoutMs
+  }
+
+  /**
+   * Checks the connection instead of waiting for the backoff or for `tick`, whose timers may
+   * have been throttled or stopped. `userWaits` is for a page that came back to the user, which
+   * also ends a long backoff. Keystrokes only retry as often as `retryNowMs` allows.
+   */
+  function checkConnection(userWaits: boolean): void {
+    if (closed) return
+    const now = Date.now()
+    if (socket && connectingSince === null) {
+      doubted = true
+      if (now - lastReceived <= silenceLimit()) return
+      abandonConnection()
+    }
+    if (userWaits) attempt = 0
+    if (now - lastAttemptAt < timing.retryNowMs) {
+      if (connectingSince === null) scheduleReconnect()
+      return
+    }
+    if (connectingSince !== null) abandonConnection()
+    void connect()
+  }
+
   function fail(message: string): void {
     setStatus({ connection: 'closed', readOnly: true, message })
     shutdown(false)
@@ -272,18 +437,26 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (closed) return
     switch (code) {
       case CLOSE_REFUSED:
-        fail('The server refused this connection.')
+        // A changed role also closes with 4003, and the next connection applies it. A second
+        // refusal in a row means that the server really does not want this connection.
+        if (refused) {
+          fail('The server refused this connection.')
+          return
+        }
+        refused = true
+        if (serverError === 'foreign-actor') forgetActor()
+        scheduleReconnect()
         return
       case CLOSE_DELETED:
-        fail('This page was deleted. Your text is still here – copy it if you want to keep it.')
+        fail(DELETED_MESSAGE)
         return
       case CLOSE_PROTOCOL_ERROR:
         fail('Connection error (protocol). Please reload the page.')
         return
       case CLOSE_RENAMED:
-        // reconnect with the new id once the stored copy follows (its epoch goes into hello)
+        // reconnect with the new id
         attempt = 0
-        void renaming.finally(() => connect())
+        void connect()
         return
       default:
         scheduleReconnect()
@@ -327,7 +500,16 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         // the close frame (4004) follows
         break
       case 'error':
-        if (message.code === 'read-only') setStatus({ readOnly: true })
+        serverError = message.code
+        if (message.code === 'read-only') {
+          // It only says so when it gets changes, which stay in this copy (a role that changed
+          // while offline, for example).
+          readOnly = true
+          setStatus({
+            readOnly: true,
+            message: 'You can only read this page. Your changes here were not saved.',
+          })
+        }
         break
       default:
       // heartbeat and unknown types
@@ -351,18 +533,25 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       // No copy under the old id (it was re-keyed already, for example by the tree's rescue of
       // moved copies): continue with the stored copy of the new id, like on start.
       adoptStoredCopy(existing)
-    } else if (existing && existing.epoch !== epoch) {
+    } else if (existing && !mergeStoredCopy(existing)) {
       next()
       return
-    } else if (existing && doc) {
-      // An older copy of the same document under the new id: keep its edits too.
-      const before = text()
-      doc = A.merge(doc, A.load<DocContent>(existing.bytes, { actor: existing.actorId }))
-      emit(diffText(before, text()))
-      updateUnsynced()
-      scheduleFlush()
     }
     await copy.moveTo(newId, next)
+  }
+
+  /**
+   * Merges another stored copy of this document, so that its edits are kept. Returns false for a
+   * copy of another lineage, which stays as it is.
+   */
+  function mergeStoredCopy(existing: StoredCopy): boolean {
+    if (!doc || existing.epoch !== epoch) return false
+    const before = text()
+    doc = A.merge(doc, A.load<DocContent>(existing.bytes, { actor: existing.actorId }))
+    emit(diffText(before, text()))
+    updateUnsynced()
+    scheduleFlush()
+    return true
   }
 
   /** Editing works offline on a persisted copy; the server merges it after the reconnect. */
@@ -371,8 +560,16 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     actorId = stored.actorId
     epoch = stored.epoch
     serverHeads = stored.serverHeads
-    readOnly = false
-    setStatus({ readOnly: false })
+    readOnly = stored.readOnly ?? false
+    setStatus({ readOnly })
+    if (copy.isUnowned) {
+      // Edits here might end up with the wrong account if the record is someone else's.
+      readOnly = true
+      setStatus({
+        readOnly: true,
+        message: 'This local copy comes from an older version. It can be edited once it is online.',
+      })
+    }
     emit(diffText('', text()))
     updateUnsynced()
     markReady()
@@ -400,7 +597,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         actor: doc ? randomActorId() : actorId,
       })
       let next = loaded
-      if (doc) {
+      if (doc && !discardLocalEdits) {
         // The server started a new epoch: re-apply our unsynced edits onto its new document.
         const base = serverHeads.length > 0 ? A.view(doc, serverHeads).content : doc.content
         const unsynced = diffText(base, doc.content)
@@ -416,12 +613,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       doc = next
       epoch = serverEpoch
       authors.reset()
+      discardLocalEdits = false
       emit(diffText(before, text()))
     }
 
     syncState = A.initSyncState()
     synced = true
     attempt = 0
+    refused = false
     setStatus({
       connection: 'online',
       readOnly,
@@ -430,7 +629,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     updateUnsynced()
     markReady()
     flush()
-    copy.schedule()
+    if (copy.isUnowned) void copy.keepUnowned()
+    else copy.schedule()
     presence.resolve()
     authors.publish()
     authors.refresh()
@@ -443,7 +643,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     const [nextDoc, nextState] = A.receiveSyncMessage(doc, syncState, fromBase64(encoded))
     doc = nextDoc
     syncState = nextState
-    serverHeads = [...nextState.sharedHeads]
+    // Empty while the first round of a new sync state runs. That says nothing about the server,
+    // and without heads a new epoch could not tell the unsynced edits any more.
+    if (nextState.sharedHeads.length > 0) serverHeads = [...nextState.sharedHeads]
     const beforeHeads = A.getHeads(before)
     const afterHeads = A.getHeads(doc)
     if (!sameHeads(beforeHeads, afterHeads)) {
@@ -463,16 +665,16 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   function tick(): void {
     const now = Date.now()
-    if (socket?.readyState === SOCKET_OPEN && now - lastReceived > timing.timeoutMs) {
-      // The server went silent: drop the connection and reconnect.
-      const stale = socket
-      socket = null
-      synced = false
-      stale.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
-      handleClose(CLOSE_HEARTBEAT_TIMEOUT)
+    if (connectingSince !== null) {
+      if (now - connectingSince > timing.connectTimeoutMs) abandonConnection()
       return
     }
-    if (synced && now - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
+    if (socket && now - lastReceived > silenceLimit()) {
+      // The server went silent: drop the connection and reconnect.
+      abandonConnection()
+      return
+    }
+    sendHeartbeatIfDue()
   }
 
   function shutdown(normal: boolean): void {
@@ -483,6 +685,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     presence.stop()
     authors.stop()
     if (heartbeat) clearInterval(heartbeat)
+    stopWatchingPage?.()
     copy.close()
     const ws = socket
     socket = null
@@ -498,6 +701,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       console.error(error)
       return
     }
+    if (closed) return
     try {
       const stored = await copy.open(documentId)
       if (stored && !closed) {
@@ -509,6 +713,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (closed) return
     copy.watchPage()
     heartbeat = setInterval(tick, Math.min(timing.heartbeatMs, 1_000))
+    stopWatchingPage = watchPage({
+      onWake: () => checkConnection(true),
+      // a timer would run late in the background
+      onHidden: flush,
+      onOffline: () => {
+        doubted = true
+      },
+    })
     await connect()
   }
 
@@ -533,6 +745,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       scheduleFlush()
       copy.schedule()
       presence.onLocalEdit()
+      checkConnection(false)
     },
     setLocalSelections: presence.setLocalSelections,
     onRemoteChanges(listener) {

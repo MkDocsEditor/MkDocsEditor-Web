@@ -1,3 +1,4 @@
+import { ApiError } from '@/api'
 import type { Automerge } from '@/sync/automerge'
 import type { SessionApi } from '@/sync/automergeSession'
 import type { SocketLike } from '@/sync/socket'
@@ -23,10 +24,12 @@ export class FakeSocket implements SocketLike {
   onclose: ((event: { code: number; reason?: string }) => void) | null = null
   onerror: ((event: unknown) => void) | null = null
   readonly sent: Record<string, unknown>[] = []
+  /** Stays in CONNECTING, like a socket whose network packets get no answer. */
+  keepConnecting = false
 
   constructor(private readonly server: FakeSyncServer) {
     setTimeout(() => {
-      if (this.readyState !== 0) return
+      if (this.readyState !== 0 || this.keepConnecting) return
       this.readyState = 1
       this.onopen?.({})
     }, 0)
@@ -76,7 +79,11 @@ export class FakeSyncServer {
   readonly connections: Connection[] = []
   /** When true, new sockets fail like an unreachable server. */
   offline = false
+  /** The document is gone: the websocket upgrade fails and REST answers 404. */
+  deleted = false
   readOnlyUsers = new Set<string>()
+  /** Actor ids bound to another user: hello is refused like on the real server. */
+  readonly foreignActors = new Set<string>()
   ticketsIssued = 0
   /** Old ids of the document (renames), answered with `document-renamed` after hello. */
   readonly oldIds = new Set<string>()
@@ -112,12 +119,20 @@ export class FakeSyncServer {
       },
       wsUrl: (path) => `ws://fake${path}`,
       getAuthorship: async () => null,
+      getDocument: async (id) => {
+        if (this.deleted) throw new ApiError('not found', 404)
+        return { id }
+      },
     }
   }
 
   socketFactory = (): FakeSocket => {
     const socket = new FakeSocket(this)
-    if (this.offline) {
+    if (this.deleted) {
+      // the real server answers the upgrade with 404; browsers only report a failed socket
+      socket.readyState = 3
+      setTimeout(() => socket.onclose?.({ code: 1006 }), 0)
+    } else if (this.offline) {
       setTimeout(() => socket.serverClose(1006), 0)
       socket.readyState = 3
     }
@@ -133,6 +148,10 @@ export class FakeSyncServer {
         newDocumentId: this.documentId,
       })
       setTimeout(() => socket.serverClose(4009), 0)
+      return
+    }
+    if (message.type === 'hello' && this.foreignActors.has(String(message.actorId))) {
+      this.refuse(socket, 'foreign-actor')
       return
     }
     if (message.type === 'hello') {
@@ -228,6 +247,18 @@ export class FakeSyncServer {
         clientId: connection!.clientId,
       })
     }
+  }
+
+  /** The heartbeat the real server sends every 5 s when it has nothing else to send. */
+  heartbeat(): void {
+    for (const connection of this.connections) connection.socket.deliver({ type: 'heartbeat' })
+  }
+
+  /** An `error` message and close code 4003, like a refused actor or a changed role. */
+  refuse(socket: FakeSocket, code: string): void {
+    socket.deliver({ type: 'error', code, message: code })
+    this.drop(socket)
+    setTimeout(() => socket.serverClose(4003), 0)
   }
 
   /** Closes every connection from the server side. */

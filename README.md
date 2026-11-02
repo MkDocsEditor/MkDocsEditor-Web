@@ -34,7 +34,8 @@ together, in real time, from a phone or a desktop browser. It talks to the
   names and colours, plus a list of who is online.
 - Editing works offline. Changes are kept in the browser and merged after the reconnect, even
   when the server lost its state meanwhile. The connection state is always visible, and text
-  is never thrown away silently.
+  is never thrown away silently. Each account has its own local copies, so unsynced edits only
+  ever sync under the account that made them.
 - "Who wrote what?" highlights who wrote which part of a page.
 - Version history (when the backend has git enabled): see what each version changed, compare
   it with the current text, and restore it.

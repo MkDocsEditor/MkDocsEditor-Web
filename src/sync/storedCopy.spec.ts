@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { memoryStore } from './offlineStore'
+import { loadAutomerge } from './automerge'
+import { accountStore, memoryStore, refusedCopyId, unownedStore } from './offlineStore'
 import type { OfflineStore } from './offlineStore'
+import { rekeyStoredCopy } from './rekey'
 import { createStoredCopy } from './storedCopy'
 
 const contents = { epoch: 'e1', actorId: 'a1', bytes: new Uint8Array([1]), serverHeads: ['h1'] }
@@ -21,7 +23,14 @@ function recordingStore(): { store: OfflineStore; writes: string[] } {
 }
 
 function setup(store: OfflineStore, persistMs = 10_000) {
-  return createStoredCopy({ store, persistMs, snapshot: () => contents })
+  return createStoredCopy({
+    store,
+    persistMs,
+    retryClaimMs: 60_000,
+    documentId: () => 'doc',
+    snapshot: () => contents,
+    onLateClaim: () => true,
+  })
 }
 
 describe('createStoredCopy', () => {
@@ -82,5 +91,50 @@ describe('createStoredCopy', () => {
     await vi.waitFor(() => expect(copy.claimed).toBe(false))
     expect(writes).toEqual(['put doc'])
     expect(await store.claim('doc')).not.toBeNull()
+  })
+})
+
+describe('stored copies per account', () => {
+  const copy = (documentId: string) => ({ ...contents, documentId, savedAt: 0 })
+
+  it('keeps the records of accounts apart', async () => {
+    const raw = memoryStore()
+    const anna = accountStore(raw, 'anna')
+    const ben = accountStore(raw, 'ben')
+    await anna.put(copy('doc'))
+    expect((await anna.get('doc'))?.documentId).toBe('doc')
+    expect(await ben.get('doc')).toBeUndefined()
+    expect(await raw.get('doc')).toBeUndefined()
+    expect(await anna.keys()).toEqual(['doc'])
+    expect(await ben.keys()).toEqual([])
+  })
+
+  it('claims per account', async () => {
+    const raw = memoryStore()
+    const anna = await accountStore(raw, 'anna').claim('doc')
+    expect(anna).not.toBeNull()
+    expect(await accountStore(raw, 'anna').claim('doc')).toBeNull()
+    expect(await accountStore(raw, 'ben').claim('doc')).not.toBeNull()
+    expect(await raw.claim('doc')).not.toBeNull()
+  })
+
+  it('a re-key stays inside the account', async () => {
+    const raw = memoryStore()
+    const anna = accountStore(raw, 'anna')
+    await anna.put(copy('old'))
+    await accountStore(raw, 'ben').put(copy('old'))
+    expect(await rekeyStoredCopy(anna, loadAutomerge, 'old', 'new')).toBe('moved')
+    expect(await anna.keys()).toEqual(['new'])
+    expect(await accountStore(raw, 'ben').keys()).toEqual(['old'])
+  })
+
+  it('lists neither account nor refused records as records without an owner', async () => {
+    const raw = memoryStore()
+    await raw.put(copy('old'))
+    await accountStore(raw, 'anna').put(copy('doc'))
+    await raw.put(copy(refusedCopyId('doc', 'a1')))
+    await accountStore(raw, 'anna').put(copy(refusedCopyId('doc', 'a1')))
+    expect(await unownedStore(raw).keys()).toEqual(['old'])
+    expect(await accountStore(raw, 'anna').keys()).toEqual(['doc'])
   })
 })
