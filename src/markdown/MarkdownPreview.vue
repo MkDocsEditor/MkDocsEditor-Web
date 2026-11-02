@@ -9,6 +9,7 @@ import { resourceObjectUrl } from '@/services/resourceUrls'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
+import './preview.css'
 import { renderMarkdown } from './render'
 
 const props = defineProps<{
@@ -99,271 +100,31 @@ watch(
   height: 100%;
   overflow-y: auto;
   padding: 12px 20px 48px;
-  line-height: 1.6;
-  font-size: 16px;
-  word-wrap: break-word;
-}
-.markdown-preview h1,
-.markdown-preview h2,
-.markdown-preview h3,
-.markdown-preview h4 {
-  line-height: 1.3;
-  margin: 1.2em 0 0.5em;
-  font-weight: 600;
-}
-.markdown-preview h1 {
-  font-size: 1.8em;
-  font-weight: 400;
-  margin-top: 0.4em;
-}
-.markdown-preview h2 {
-  font-size: 1.45em;
-}
-.markdown-preview h3 {
-  font-size: 1.2em;
-}
-.markdown-preview p,
-.markdown-preview ul,
-.markdown-preview ol,
-.markdown-preview table,
-.markdown-preview pre,
-.markdown-preview blockquote,
-.markdown-preview dl {
-  margin: 0 0 1em;
-}
-.markdown-preview ul,
-.markdown-preview ol {
-  padding-left: 1.6em;
-}
-.markdown-preview li.task-list-item {
-  list-style: none;
-}
-.markdown-preview li.task-list-item input {
-  margin: 0 0.4em 0 -1.3em;
-}
-.markdown-preview a {
-  color: rgb(var(--v-theme-primary));
-}
-.markdown-preview img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-}
-.markdown-preview img.preview-image-missing {
-  outline: 2px dashed rgb(var(--v-theme-error));
-  min-width: 48px;
-  min-height: 24px;
-}
-.markdown-preview code {
-  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.88em;
-  color: rgb(var(--v-theme-code-text));
-  background: rgb(var(--v-theme-code-code-background));
-  border: 1px solid rgba(var(--v-border-color), 0.08);
-  padding: 0.1em 0.35em;
-  border-radius: 4px;
-}
-.markdown-preview pre {
-  background: rgb(var(--v-theme-code-code-background));
-  border: 1px solid rgba(var(--v-border-color), 0.08);
-  padding: 12px 14px;
-  border-radius: 6px;
-  overflow-x: auto;
-  line-height: 1.5;
-}
-.markdown-preview pre code {
-  background: none;
-  border: none;
-  padding: 0;
-}
-.markdown-preview table {
-  border-collapse: collapse;
-  display: block;
-  overflow-x: auto;
-}
-.markdown-preview th,
-.markdown-preview td {
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
-  padding: 6px 12px;
-}
-.markdown-preview th {
-  background: rgba(var(--v-theme-on-surface), 0.05);
-}
-.markdown-preview blockquote {
-  border-left: 4px solid rgba(var(--v-theme-on-surface), 0.2);
-  padding-left: 1em;
-  color: rgba(var(--v-theme-on-surface), 0.75);
-}
-.markdown-preview mark {
-  background: #fff3a8;
-  color: inherit;
-}
-.markdown-preview .footnotes {
-  font-size: 0.9em;
-  color: rgba(var(--v-theme-on-surface), 0.75);
-}
 
-/* Admonitions, roughly like mkdocs-material. */
-.markdown-preview .admonition {
-  --admonition-color: #448aff;
-  border-left: 4px solid var(--admonition-color);
-  border-radius: 4px;
-  background: rgba(var(--v-theme-on-surface), 0.03);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  margin: 0 0 1em;
-  padding: 0 12px 1px;
-  overflow: hidden;
+  /* the variables of preview.css, from the Vuetify theme */
+  --md-primary: rgb(var(--v-theme-primary));
+  --md-error: rgb(var(--v-theme-error));
+  --md-mark-background: #fff3a8;
+  --md-on-surface-rgb: var(--v-theme-on-surface);
+  --md-border-color-rgb: var(--v-border-color);
+  --md-code-annotation: rgb(var(--v-theme-code-annotation));
+  --md-code-attribute: rgb(var(--v-theme-code-attribute));
+  --md-code-background: rgb(var(--v-theme-code-code-background));
+  --md-code-comment: rgb(var(--v-theme-code-comment));
+  --md-code-constant: rgb(var(--v-theme-code-constant));
+  --md-code-deleted: rgb(var(--v-theme-code-deleted));
+  --md-code-function: rgb(var(--v-theme-code-function));
+  --md-code-heading: rgb(var(--v-theme-code-heading));
+  --md-code-inserted: rgb(var(--v-theme-code-inserted));
+  --md-code-keyword: rgb(var(--v-theme-code-keyword));
+  --md-code-number: rgb(var(--v-theme-code-number));
+  --md-code-property: rgb(var(--v-theme-code-property));
+  --md-code-string: rgb(var(--v-theme-code-string));
+  --md-code-tag: rgb(var(--v-theme-code-tag));
+  --md-code-text: rgb(var(--v-theme-code-text));
+  --md-code-url: rgb(var(--v-theme-code-url));
 }
-.markdown-preview .admonition-title {
-  margin: 0 -12px 0.8em;
-  padding: 6px 12px;
-  font-weight: 700;
-  background: color-mix(in srgb, var(--admonition-color) 12%, transparent);
-}
-.markdown-preview details.admonition:not([open]) > .admonition-title {
-  margin-bottom: 0;
-}
-.markdown-preview summary.admonition-title {
-  cursor: pointer;
-}
-.markdown-preview .admonition.abstract,
-.markdown-preview .admonition.summary,
-.markdown-preview .admonition.tldr {
-  --admonition-color: #00b0ff;
-}
-.markdown-preview .admonition.info,
-.markdown-preview .admonition.todo {
-  --admonition-color: #00b8d4;
-}
-.markdown-preview .admonition.tip,
-.markdown-preview .admonition.hint,
-.markdown-preview .admonition.important {
-  --admonition-color: #00bfa5;
-}
-.markdown-preview .admonition.success,
-.markdown-preview .admonition.check,
-.markdown-preview .admonition.done {
-  --admonition-color: #00c853;
-}
-.markdown-preview .admonition.question,
-.markdown-preview .admonition.help,
-.markdown-preview .admonition.faq {
-  --admonition-color: #64dd17;
-}
-.markdown-preview .admonition.warning,
-.markdown-preview .admonition.caution,
-.markdown-preview .admonition.attention {
-  --admonition-color: #ff9100;
-}
-.markdown-preview .admonition.failure,
-.markdown-preview .admonition.fail,
-.markdown-preview .admonition.missing {
-  --admonition-color: #ff5252;
-}
-.markdown-preview .admonition.danger,
-.markdown-preview .admonition.error {
-  --admonition-color: #ff1744;
-}
-.markdown-preview .admonition.bug {
-  --admonition-color: #f50057;
-}
-.markdown-preview .admonition.example {
-  --admonition-color: #7c4dff;
-}
-.markdown-preview .admonition.quote,
-.markdown-preview .admonition.cite {
-  --admonition-color: #9e9e9e;
-}
-
-/*
- * Code highlighting (highlight.js classes) with the code palette of the editor
- * (plugins/codeColors.ts), mapped like the Android app's preview (PreviewCodeCss.kt).
- */
-.markdown-preview pre.hljs,
-.markdown-preview pre.hljs code {
-  color: rgb(var(--v-theme-code-text));
-}
-.markdown-preview .hljs-comment,
-.markdown-preview .hljs-quote {
-  color: rgb(var(--v-theme-code-comment));
-  font-style: italic;
-}
-.markdown-preview .hljs-keyword,
-.markdown-preview .hljs-selector-tag,
-.markdown-preview .hljs-literal,
-.markdown-preview .hljs-symbol,
-.markdown-preview .hljs-bullet,
-.markdown-preview .hljs-char.escape_,
-.markdown-preview .hljs-doctag {
-  color: rgb(var(--v-theme-code-keyword));
-}
-.markdown-preview .hljs-string,
-.markdown-preview .hljs-regexp,
-.markdown-preview .hljs-template-tag {
-  color: rgb(var(--v-theme-code-string));
-}
-.markdown-preview .hljs-number {
-  color: rgb(var(--v-theme-code-number));
-}
-.markdown-preview .hljs-title.function_,
-.markdown-preview .hljs-function .hljs-title {
-  color: rgb(var(--v-theme-code-function));
-}
-.markdown-preview .hljs-attr,
-.markdown-preview .hljs-variable,
-.markdown-preview .hljs-template-variable,
-.markdown-preview .hljs-property,
-.markdown-preview .hljs-selector-attr,
-.markdown-preview .hljs-selector-class,
-.markdown-preview .hljs-selector-id {
-  color: rgb(var(--v-theme-code-property));
-}
-.markdown-preview .hljs-built_in,
-.markdown-preview .hljs-type,
-.markdown-preview .hljs-title.class_,
-.markdown-preview .hljs-variable.language_,
-.markdown-preview .hljs-variable.constant_ {
-  color: rgb(var(--v-theme-code-constant));
-}
-.markdown-preview .hljs-meta,
-.markdown-preview .hljs-meta .hljs-keyword {
-  color: rgb(var(--v-theme-code-annotation));
-}
-.markdown-preview .hljs-meta .hljs-string {
-  color: rgb(var(--v-theme-code-string));
-}
-.markdown-preview .hljs-tag,
-.markdown-preview .hljs-name,
-.markdown-preview .hljs-selector-pseudo {
-  color: rgb(var(--v-theme-code-tag));
-}
-.markdown-preview .hljs-tag .hljs-attr {
-  color: rgb(var(--v-theme-code-attribute));
-}
-.markdown-preview .hljs-tag .hljs-string {
-  color: rgb(var(--v-theme-code-string));
-}
-.markdown-preview .hljs-section {
-  color: rgb(var(--v-theme-code-heading));
-  font-weight: 700;
-}
-.markdown-preview .hljs-link {
-  color: rgb(var(--v-theme-code-url));
-  text-decoration: underline;
-}
-.markdown-preview .hljs-addition {
-  color: rgb(var(--v-theme-code-inserted));
-}
-.markdown-preview .hljs-deletion {
-  color: rgb(var(--v-theme-code-deleted));
-}
-.markdown-preview .hljs-emphasis {
-  font-style: italic;
-}
-.markdown-preview .hljs-strong {
-  font-weight: 700;
-}
-.v-theme--dark .markdown-preview mark {
-  background: #6b5a00;
+.v-theme--dark .markdown-preview {
+  --md-mark-background: #6b5a00;
 }
 </style>
