@@ -23,10 +23,12 @@ export class FakeSocket implements SocketLike {
   onclose: ((event: { code: number; reason?: string }) => void) | null = null
   onerror: ((event: unknown) => void) | null = null
   readonly sent: Record<string, unknown>[] = []
+  /** Stays in CONNECTING, like a socket whose network packets get no answer. */
+  keepConnecting = false
 
   constructor(private readonly server: FakeSyncServer) {
     setTimeout(() => {
-      if (this.readyState !== 0) return
+      if (this.readyState !== 0 || this.keepConnecting) return
       this.readyState = 1
       this.onopen?.({})
     }, 0)

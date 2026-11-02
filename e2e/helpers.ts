@@ -215,3 +215,26 @@ export function setBackground(page: Page, on: boolean): Promise<void> {
     on,
   )
 }
+
+/** Lets a test close the websockets of a page like a lost connection would. */
+export async function trackSockets(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const Real = window.WebSocket
+    const sockets: WebSocket[] = []
+    window.WebSocket = new Proxy(Real, {
+      construct(target, args: [string]) {
+        const socket = new target(...args)
+        sockets.push(socket)
+        return socket
+      },
+    })
+    Object.assign(window, { pageSockets: sockets })
+  })
+}
+
+export function dropDocumentSocket(page: Page): Promise<void> {
+  return page.evaluate(() => {
+    const { pageSockets } = window as unknown as { pageSockets: WebSocket[] }
+    pageSockets.findLast((s) => s.url.includes('/document/'))?.close()
+  })
+}

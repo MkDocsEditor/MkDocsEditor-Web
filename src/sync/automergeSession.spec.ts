@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { FakeSyncServer } from '@/test/fakeSyncServer'
+import { FakeSocket, FakeSyncServer } from '@/test/fakeSyncServer'
 
 import { loadAutomerge } from './automerge'
 import type { Automerge } from './automerge'
@@ -22,6 +22,9 @@ const timing = {
   persistMs: 1,
   heartbeatMs: 50,
   timeoutMs: 400,
+  doubtMs: 400,
+  connectTimeoutMs: 400,
+  retryNowMs: 2_000,
   authorshipRefetchMs: 10_000,
   backoffMs: [5, 10, 20],
 }
@@ -305,6 +308,183 @@ describe('Automerge session', () => {
     server.heartbeat()
     await new Promise((r) => setTimeout(r, 20))
     expect(sent.filter((m) => m.type === 'heartbeat')).toHaveLength(1)
+  })
+})
+
+describe('Automerge session: staying connected', () => {
+  const never = () => new Promise<never>(() => undefined)
+
+  it('gives up on a ticket request that hangs', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const api = server.api('anna')
+    const wsTicket = vi.spyOn(api, 'wsTicket').mockImplementationOnce(never)
+    const session = createAutomergeSession({
+      documentId: server.documentId,
+      automerge: A,
+      api,
+      store: memoryStore(),
+      createSocket: server.socketFactory,
+      timing: { ...timing, connectTimeoutMs: 50 },
+    })
+    sessions.push(session)
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('online'))
+    expect(wsTicket).toHaveBeenCalledTimes(2)
+  })
+
+  it('gives up on a socket that never opens and ignores it afterwards', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const stuck = new FakeSocket(server)
+    stuck.keepConnecting = true
+    const close = vi.spyOn(stuck, 'close')
+    const createSocket = vi.fn(server.socketFactory).mockReturnValueOnce(stuck)
+    const session = createAutomergeSession({
+      documentId: server.documentId,
+      automerge: A,
+      api: server.api('anna'),
+      store: memoryStore(),
+      createSocket,
+      timing: { ...timing, connectTimeoutMs: 50 },
+    })
+    sessions.push(session)
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('online'))
+    expect(close).toHaveBeenCalled()
+    const fresh = server.connections[0]!.socket
+    const helloCount = fresh.sent.filter((m) => m.type === 'hello').length
+
+    // the old socket opens and closes late: it must not touch the new connection
+    stuck.readyState = 1
+    stuck.onopen?.({})
+    stuck.onclose?.({ code: 1006 })
+    expect(fresh.sent.filter((m) => m.type === 'hello')).toHaveLength(helloCount)
+    expect(stuck.sent).toEqual([])
+    expect(session.status.value.connection).toBe('online')
+  })
+
+  it('typing ends a long backoff', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { backoffMs: [60_000], retryNowMs: 0 },
+    })
+    await online(anna)
+    server.disconnectAll()
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('offline'))
+    anna.insert('end', '!')
+    await vi.waitFor(() => expect(server.text).toBe('Text!'))
+    await online(anna)
+  })
+
+  it('does not retry on every keystroke', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { backoffMs: [60_000], retryNowMs: 60_000 },
+    })
+    await online(anna)
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('offline'))
+    const tickets = server.ticketsIssued
+    for (const c of 'abc') anna.insert('end', c)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(server.ticketsIssued).toBe(tickets)
+  })
+
+  it.each([
+    ['visibilitychange', () => document.dispatchEvent(new Event('visibilitychange'))],
+    ['resume', () => document.dispatchEvent(new Event('resume'))],
+    ['pageshow', () => globalThis.dispatchEvent(new Event('pageshow'))],
+    ['focus', () => globalThis.dispatchEvent(new Event('focus'))],
+    ['online', () => globalThis.dispatchEvent(new Event('online'))],
+  ])('%s ends a long backoff', async (_name, wake) => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { backoffMs: [60_000], retryNowMs: 0 },
+    })
+    await online(anna)
+    const tickets = server.ticketsIssued
+    server.disconnectAll()
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('offline'))
+    wake()
+    await online(anna)
+    expect(server.ticketsIssued).toBe(tickets + 1)
+  })
+
+  it('a page coming back drops a socket that has been silent too long', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { timeoutMs: 60_000, doubtMs: 30, retryNowMs: 0, backoffMs: [60_000] },
+    })
+    await online(anna)
+    await new Promise((r) => setTimeout(r, 50))
+    const old = server.connections[0]!.socket
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(old.readyState).toBe(3)
+    expect(anna.session.status.value.connection).toBe('offline')
+    await online(anna)
+    expect(server.ticketsIssued).toBe(2)
+  })
+
+  it('a page coming back keeps a working socket', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { timeoutMs: 60_000, doubtMs: 60_000, retryNowMs: 0 },
+    })
+    await online(anna)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(server.ticketsIssued).toBe(1)
+    expect(anna.session.status.value.connection).toBe('online')
+  })
+
+  it('typing on a dead socket reconnects sooner than the normal timeout', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { timeoutMs: 60_000, doubtMs: 100 },
+    })
+    await online(anna)
+    const dead = server.connections[0]!.socket
+    dead.deliver = () => undefined
+    anna.insert('end', '!')
+    await vi.waitFor(() => expect(server.ticketsIssued).toBe(2))
+    await vi.waitFor(() => expect(server.text).toBe('Text!'))
+  })
+
+  it('edits lost on a dying connection arrive after the reconnect', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), { timing: { doubtMs: 100 } })
+    await online(anna)
+    // the socket accepts messages but they never arrive
+    const dead = server.connections[0]!.socket
+    dead.send = () => undefined
+    dead.deliver = () => undefined
+    anna.insert('end', ' eins')
+    await new Promise((r) => setTimeout(r, 20))
+    anna.insert('end', ' zwei')
+    await vi.waitFor(() => expect(server.text).toBe('Text eins zwei'))
+    await vi.waitFor(() => expect(anna.session.status.value.unsynced).toBe(false))
+  })
+
+  it('sends a pending edit at once when the page goes to the background', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { flushMs: 60_000, timeoutMs: 60_000 },
+    })
+    await online(anna)
+    anna.insert('end', '!')
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    visibility.mockRestore()
+    await vi.waitFor(() => expect(server.text).toBe('Text!'))
+  })
+
+  it('stops watching the page when closed', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna')
+    await online(anna)
+    anna.session.close()
+    const tickets = server.ticketsIssued
+    globalThis.dispatchEvent(new Event('online'))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(server.ticketsIssued).toBe(tickets)
   })
 })
 

@@ -8,6 +8,7 @@ import { createAuthors } from './authors'
 import { sameHeads } from './automerge'
 import type { AmDoc, Automerge, AutomergeApi, DocContent } from './automerge'
 import type { OfflineStore, StoredCopy } from './offlineStore'
+import { watchPage } from './pageEvents'
 import { createPresence } from './presence'
 import { fromBase64, toBase64 } from './protocol'
 import type { ServerMessage } from './protocol'
@@ -60,6 +61,15 @@ export interface AutomergeSessionOptions {
 const DEFAULT_TIMING = {
   heartbeatMs: 5_000,
   timeoutMs: 15_000,
+  /**
+   * Silence that already means a dead connection when there is a reason to doubt it (the page
+   * woke up, the network changed, the user types): the server sends something every 5 s.
+   */
+  doubtMs: 8_000,
+  /** How long the ticket request, and then the socket until it opens, may take. */
+  connectTimeoutMs: 10_000,
+  /** A wake-up or a keystroke starts a new connection attempt at most this often. */
+  retryNowMs: 2_000,
   flushMs: 50,
   presenceMs: 100,
   persistMs: 300,
@@ -110,11 +120,19 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let synced = false // received initial-content on the current socket
   let closed = false
   let attempt = 0
+  /** Numbers the connection attempts, so that an abandoned one can tell. */
+  let attemptId = 0
+  /** Since when the current attempt waits for its ticket or its socket; null if it is not. */
+  let connectingSince: number | null = null
+  let lastAttemptAt = 0
+  /** There is a reason to doubt that the open socket still works; any message settles it. */
+  let doubted = false
   /** The re-keying of the stored copy after `document-renamed`; the reconnect waits for it. */
   let renaming: Promise<void> = Promise.resolve()
   let lastSent = 0
   let lastReceived = 0
   let heartbeat: ReturnType<typeof setInterval> | null = null
+  let stopWatchingPage: (() => void) | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let flushTimer: ReturnType<typeof setTimeout> | null = null
   let resolveReady!: () => void
@@ -212,11 +230,20 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   async function connect(): Promise<void> {
     if (closed) return
+    const id = ++attemptId
+    const abandoned = () => closed || id !== attemptId
+    clearReconnectTimer()
+    connectingSince = lastAttemptAt = Date.now()
     setStatus({ connection: doc || attempt > 0 ? 'offline' : 'connecting' })
+    // the stored copy follows a rename first (its epoch goes into hello)
+    await renaming
+    if (abandoned()) return
     let ticket: WsTicket
     try {
       ticket = await options.api.wsTicket()
     } catch (error) {
+      if (abandoned()) return
+      connectingSince = null
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         fail('Please sign in again to keep editing.')
         return
@@ -224,12 +251,23 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       scheduleReconnect()
       return
     }
-    if (closed) return
+    if (abandoned()) return
 
-    const ws = createSocket(options.api.wsUrl(urlPath`/document/${documentId}/ws`))
+    let ws: SocketLike
+    try {
+      ws = createSocket(options.api.wsUrl(urlPath`/document/${documentId}/ws`))
+    } catch (error) {
+      console.error('mkdocseditor: could not open the websocket', error)
+      connectingSince = null
+      scheduleReconnect()
+      return
+    }
+    connectingSince = Date.now()
     socket = ws
     synced = false
     ws.onopen = () => {
+      if (socket !== ws) return
+      connectingSince = null
       lastReceived = Date.now()
       const hello: Record<string, unknown> = {
         type: 'hello',
@@ -244,6 +282,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     ws.onmessage = (event) => {
       if (socket !== ws) return
       lastReceived = Date.now()
+      doubted = false
       try {
         handleMessage(JSON.parse(String(event.data)) as ServerMessage)
       } catch (error) {
@@ -256,8 +295,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       if (socket !== ws) return
       socket = null
       synced = false
+      connectingSince = null
       handleClose(event.code)
     }
+  }
+
+  function clearReconnectTimer(): void {
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    reconnectTimer = null
   }
 
   function scheduleReconnect(): void {
@@ -269,6 +314,49 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       reconnectTimer = null
       void connect()
     }, delay)
+  }
+
+  /**
+   * Gives up on the current attempt or socket and reconnects. It does not wait for the browser:
+   * a request or a socket on a dead connection can take minutes to fail, and so can closing one.
+   */
+  function abandonConnection(): void {
+    attemptId++
+    connectingSince = null
+    doubted = false
+    const stale = socket
+    socket = null
+    synced = false
+    if (stale?.readyState === SOCKET_OPEN) stale.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
+    else stale?.close()
+    handleClose(CLOSE_HEARTBEAT_TIMEOUT)
+  }
+
+  /** How long the current socket may stay silent. */
+  function silenceLimit(): number {
+    return doubted ? Math.min(timing.doubtMs, timing.timeoutMs) : timing.timeoutMs
+  }
+
+  /**
+   * Checks the connection instead of waiting for the backoff or for `tick`, whose timers may
+   * have been throttled or stopped. `userWaits` is for a page that came back to the user, which
+   * also ends a long backoff. Keystrokes only retry as often as `retryNowMs` allows.
+   */
+  function checkConnection(userWaits: boolean): void {
+    if (closed) return
+    const now = Date.now()
+    if (socket && connectingSince === null) {
+      doubted = true
+      if (now - lastReceived <= silenceLimit()) return
+      abandonConnection()
+    }
+    if (userWaits) attempt = 0
+    if (now - lastAttemptAt < timing.retryNowMs) {
+      if (connectingSince === null) scheduleReconnect()
+      return
+    }
+    if (connectingSince !== null) abandonConnection()
+    void connect()
   }
 
   function fail(message: string): void {
@@ -291,9 +379,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         fail('Connection error (protocol). Please reload the page.')
         return
       case CLOSE_RENAMED:
-        // reconnect with the new id once the stored copy follows (its epoch goes into hello)
+        // reconnect with the new id
         attempt = 0
-        void renaming.finally(() => connect())
+        void connect()
         return
       default:
         scheduleReconnect()
@@ -473,13 +561,13 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   function tick(): void {
     const now = Date.now()
-    if (socket?.readyState === SOCKET_OPEN && now - lastReceived > timing.timeoutMs) {
+    if (connectingSince !== null) {
+      if (now - connectingSince > timing.connectTimeoutMs) abandonConnection()
+      return
+    }
+    if (socket && now - lastReceived > silenceLimit()) {
       // The server went silent: drop the connection and reconnect.
-      const stale = socket
-      socket = null
-      synced = false
-      stale.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
-      handleClose(CLOSE_HEARTBEAT_TIMEOUT)
+      abandonConnection()
       return
     }
     sendHeartbeatIfDue()
@@ -493,6 +581,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     presence.stop()
     authors.stop()
     if (heartbeat) clearInterval(heartbeat)
+    stopWatchingPage?.()
     copy.close()
     const ws = socket
     socket = null
@@ -519,6 +608,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (closed) return
     copy.watchPage()
     heartbeat = setInterval(tick, Math.min(timing.heartbeatMs, 1_000))
+    stopWatchingPage = watchPage({
+      onWake: () => checkConnection(true),
+      // a timer would run late in the background
+      onHidden: flush,
+      onOffline: () => {
+        doubted = true
+      },
+    })
     await connect()
   }
 
@@ -543,6 +640,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       scheduleFlush()
       copy.schedule()
       presence.onLocalEdit()
+      checkConnection(false)
     },
     setLocalSelections: presence.setLocalSelections,
     onRemoteChanges(listener) {
