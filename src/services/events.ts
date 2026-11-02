@@ -6,6 +6,7 @@ import {
   browserSocket,
 } from '@/sync/socket'
 import type { SocketLike } from '@/sync/socket'
+import { watchPage } from '@/sync/pageEvents'
 
 /** A user who has a document open. */
 export interface OnlineUser {
@@ -37,6 +38,12 @@ const DEFAULT_TIMING = {
   heartbeatMs: 5_000,
   /** The server sends heartbeats too; silence this long means the connection is dead. */
   timeoutMs: 15_000,
+  /** Silence that already means a dead connection when the page wakes up or the network changes. */
+  doubtMs: 8_000,
+  /** How long the ticket request, and then the socket until it opens, may take. */
+  connectTimeoutMs: 10_000,
+  /** A wake-up starts a new connection attempt at most this often. */
+  retryNowMs: 2_000,
   backoffMs: [1_000, 2_000, 5_000, 10_000, 30_000],
 }
 
@@ -58,11 +65,25 @@ export function connectEvents(options: EventsOptions): EventsConnection {
   let connected = false
   let attempt = 0
   let lastReceived = 0
+  let lastSent = 0
+  /** Numbers the connection attempts, so that an abandoned one can tell. */
+  let attemptId = 0
+  /** Since when the current attempt waits for its ticket or its socket; null if it is not. */
+  let connectingSince: number | null = null
+  let lastAttemptAt = 0
+  /** There is a reason to doubt that the open socket still works; any message settles it. */
+  let doubted = false
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  let ticker: ReturnType<typeof setInterval> | null = null
 
   function send(message: unknown): void {
-    if (socket?.readyState === SOCKET_OPEN) socket.send(JSON.stringify(message))
+    if (socket?.readyState !== SOCKET_OPEN) return
+    socket.send(JSON.stringify(message))
+    lastSent = Date.now()
+  }
+
+  /** The server's messages trigger ours too, because timers of a background tab are throttled. */
+  function sendHeartbeatIfDue(): void {
+    if (Date.now() - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
   }
 
   function scheduleReconnect(): void {
@@ -75,13 +96,70 @@ export function connectEvents(options: EventsOptions): EventsConnection {
     }, delay)
   }
 
-  function stopTicker(): void {
-    if (ticker) clearInterval(ticker)
-    ticker = null
+  function connectionLost(): void {
+    socket = null
+    connected = false
+    connectingSince = null
+    doubted = false
+    options.onOnline(new Map())
+  }
+
+  /** Gives up without waiting for the browser, which can take a minute on a dead connection. */
+  function abandonConnection(): void {
+    attemptId++
+    const stale = socket
+    connectionLost()
+    if (stale?.readyState === SOCKET_OPEN) stale.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
+    else stale?.close()
+    scheduleReconnect()
+  }
+
+  function silenceLimit(): number {
+    return doubted ? Math.min(timing.doubtMs, timing.timeoutMs) : timing.timeoutMs
+  }
+
+  function tick(): void {
+    const now = Date.now()
+    if (connectingSince !== null) {
+      if (now - connectingSince > timing.connectTimeoutMs) abandonConnection()
+    } else if (socket) {
+      if (now - lastReceived > silenceLimit()) abandonConnection()
+      else sendHeartbeatIfDue()
+    }
+  }
+
+  /** The page came back or the network changed: check now, the timers may not have run. */
+  function checkConnection(): void {
+    if (closed) return
+    const now = Date.now()
+    if (socket && connectingSince === null) {
+      doubted = true
+      if (now - lastReceived <= silenceLimit()) return
+      abandonConnection()
+    }
+    attempt = 0
+    if (now - lastAttemptAt < timing.retryNowMs) {
+      if (connectingSince === null) scheduleReconnect()
+      return
+    }
+    if (connectingSince !== null) abandonConnection()
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    reconnectTimer = null
+    void open()
+  }
+
+  /** Ends the connection handling for good. */
+  function stop(): void {
+    closed = true
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    reconnectTimer = null
+    clearInterval(ticker)
+    stopWatchingPage()
   }
 
   function onMessage(data: unknown): void {
     lastReceived = Date.now()
+    doubted = false
     let message: { type?: string; documents?: unknown; moves?: unknown }
     try {
       message = JSON.parse(String(data)) as typeof message
@@ -121,38 +199,41 @@ export function connectEvents(options: EventsOptions): EventsConnection {
 
   async function open(): Promise<void> {
     if (closed) return
+    const id = ++attemptId
+    const abandoned = () => closed || id !== attemptId
+    connectingSince = lastAttemptAt = Date.now()
     let ticket: string
     try {
       ticket = (await options.wsTicket()).ticket
     } catch (error) {
+      if (abandoned()) return
+      connectingSince = null
       if ((error as { isUnauthorized?: boolean }).isUnauthorized) {
-        closed = true
+        stop()
         options.onUnauthorized?.()
       } else scheduleReconnect()
       return
     }
-    if (closed) return
+    if (abandoned()) return
     const ws = createSocket(options.wsUrl('/events/ws/'))
+    connectingSince = Date.now()
     socket = ws
     ws.onopen = () => {
+      if (socket !== ws) return
+      connectingSince = null
       lastReceived = Date.now()
       send({ type: 'hello', ticket, client: options.clientName })
       options.onTreeChanged()
-      stopTicker()
-      ticker = setInterval(() => {
-        if (Date.now() - lastReceived > timing.timeoutMs)
-          ws.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
-        else send({ type: 'heartbeat' })
-      }, timing.heartbeatMs)
     }
-    ws.onmessage = (event) => onMessage(event.data)
+    ws.onmessage = (event) => {
+      if (socket !== ws) return
+      onMessage(event.data)
+      sendHeartbeatIfDue()
+    }
     ws.onerror = () => undefined
     ws.onclose = (event) => {
       if (socket !== ws) return
-      socket = null
-      connected = false
-      stopTicker()
-      options.onOnline(new Map())
+      connectionLost()
       if (event.code === CLOSE_TICKET_REFUSED) {
         // The ticket was refused: get a new one; a real auth problem shows up in wsTicket.
         attempt = Math.max(attempt, 1)
@@ -161,6 +242,14 @@ export function connectEvents(options: EventsOptions): EventsConnection {
     }
   }
 
+  const ticker = setInterval(tick, Math.min(timing.heartbeatMs, 1_000))
+  const stopWatchingPage = watchPage({
+    onWake: checkConnection,
+    onOffline: () => {
+      doubted = true
+    },
+  })
+
   void open()
 
   return {
@@ -168,10 +257,7 @@ export function connectEvents(options: EventsOptions): EventsConnection {
       return connected
     },
     close() {
-      closed = true
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      reconnectTimer = null
-      stopTicker()
+      stop()
       const ws = socket
       socket = null
       ws?.close(1000, 'bye')

@@ -22,10 +22,9 @@ test.describe('a tab in the background', () => {
     const alice = await userPage(browser, USERS.alice, testInfo.project.use)
     const bob = await userPage(browser, USERS.bob, testInfo.project.use)
     await installBackgroundTab(alice, 60_000)
-    const sockets: string[] = []
-    alice.on('websocket', (ws) => {
-      if (ws.url().includes('/document/')) sockets.push(ws.url())
-    })
+    // the document socket and the events socket of the file browser
+    const closed: string[] = []
+    alice.on('websocket', (ws) => ws.on('close', () => closed.push(ws.url())))
     await openEditor(alice, id)
     await openEditor(bob, id)
     await setBackground(alice, true)
@@ -34,7 +33,7 @@ test.describe('a tab in the background', () => {
     await new Promise((r) => setTimeout(r, 20_000))
     await typeAt(bob, 'end', 'Von Bob.')
     await expect.poll(() => editorText(alice), { timeout: 5_000 }).toBe('Von Bob.')
-    expect(sockets).toHaveLength(1)
+    expect(closed).toEqual([])
   })
 })
 
