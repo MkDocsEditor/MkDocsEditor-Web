@@ -13,6 +13,8 @@ export interface StoredCopy {
   bytes: Uint8Array
   /** Heads of the last completed sync with the server. */
   serverHeads: string[]
+  /** Last known answer of the server; the editor stays read-only until it says otherwise. */
+  readOnly?: boolean
   /** For display and debugging. */
   savedAt: number
 }

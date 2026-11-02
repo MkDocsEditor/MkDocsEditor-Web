@@ -163,7 +163,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     store: options.store,
     persistMs: timing.persistMs,
     snapshot: () =>
-      doc && epoch !== null ? { epoch, actorId, bytes: A.save(doc), serverHeads } : null,
+      doc && epoch !== null ? { epoch, actorId, bytes: A.save(doc), serverHeads, readOnly } : null,
   })
   const presence = createPresence({
     automerge: () => A,
@@ -485,7 +485,15 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         break
       case 'error':
         serverError = message.code
-        if (message.code === 'read-only') setStatus({ readOnly: true })
+        if (message.code === 'read-only') {
+          // It only says so when it gets changes, which stay in this copy (a role that changed
+          // while offline, for example).
+          readOnly = true
+          setStatus({
+            readOnly: true,
+            message: 'You can only read this page. Your changes here were not saved.',
+          })
+        }
         break
       default:
       // heartbeat and unknown types
@@ -529,8 +537,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     actorId = stored.actorId
     epoch = stored.epoch
     serverHeads = stored.serverHeads
-    readOnly = false
-    setStatus({ readOnly: false })
+    readOnly = stored.readOnly ?? false
+    setStatus({ readOnly })
     emit(diffText('', text()))
     updateUnsynced()
     markReady()

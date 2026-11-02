@@ -684,6 +684,37 @@ describe('Automerge session: sync robustness', () => {
   })
 })
 
+describe('Automerge session: read-only state', () => {
+  it('stays read-only from the start for a reader with a stored copy', async () => {
+    const server = new FakeSyncServer(A, 'Nur lesen')
+    server.readOnlyUsers.add('carla')
+    const store = memoryStore()
+    const first = client(server, 'carla', store)
+    await online(first)
+    await vi.waitFor(async () => expect(await store.get('doc-1')).toBeDefined())
+    first.session.close()
+    await new Promise((r) => setTimeout(r, 5))
+
+    server.offline = true
+    const again = client(server, 'carla', store)
+    await again.session.ready
+    expect(again.session.status.value.readOnly).toBe(true)
+    again.session.applyLocalChanges([{ from: 0, to: 0, insert: 'X' }])
+    expect(again.session.getText()).toBe('Nur lesen')
+  })
+
+  it('tells the user when the server does not take the changes, and stops taking edits', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna')
+    await online(anna)
+    server.connections[0]!.socket.deliver({ type: 'error', code: 'read-only' })
+    await vi.waitFor(() => expect(anna.session.status.value.readOnly).toBe(true))
+    expect(anna.session.status.value.message).toContain('not saved')
+    anna.session.applyLocalChanges([{ from: 0, to: 0, insert: 'X' }])
+    expect(anna.session.getText()).toBe('Text')
+  })
+})
+
 describe('rebaseChanges', () => {
   it('places changes by their context when the target text moved', () => {
     const base = 'eins\nzwei\n'

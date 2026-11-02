@@ -4,7 +4,10 @@ export interface StoredCopyOptions {
   store: OfflineStore
   persistMs: number
   /** The current copy, or null while there is nothing to persist. */
-  snapshot: () => Pick<StoredCopy, 'epoch' | 'actorId' | 'bytes' | 'serverHeads'> | null
+  snapshot: () => Pick<
+    StoredCopy,
+    'epoch' | 'actorId' | 'bytes' | 'serverHeads' | 'readOnly'
+  > | null
 }
 
 /**
