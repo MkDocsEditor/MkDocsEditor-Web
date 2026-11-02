@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { ApiError } from '@/api'
 import { FakeSocket, FakeSyncServer } from '@/test/fakeSyncServer'
 
 import { loadAutomerge } from './automerge'
@@ -682,6 +683,98 @@ describe('Automerge session: sync robustness', () => {
     socket.deliver({ type: 'presence' })
     await new Promise((r) => setTimeout(r, 20))
     expect(server.ticketsIssued).toBe(1)
+  })
+})
+
+describe('Automerge session: failures of the connection', () => {
+  function withApi(server: FakeSyncServer, wsTicket: () => Promise<{ ticket: string }>) {
+    const session = createAutomergeSession({
+      documentId: server.documentId,
+      automerge: A,
+      api: { ...server.api('anna'), wsTicket },
+      store: memoryStore(),
+      createSocket: server.socketFactory,
+      timing,
+    })
+    sessions.push(session)
+    return session
+  }
+
+  it('asks to sign in again when the ticket is refused', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const wsTicket = vi.fn(() => Promise.reject(new ApiError('unauthenticated', 401)))
+    const session = withApi(server, wsTicket)
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('closed'))
+    expect(session.status.value.message).toContain('sign in')
+    await expect(session.ready).rejects.toThrow('sign in')
+    expect(wsTicket).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([500, 502, 503, 0, 429])('keeps trying after a ticket failure %i', async (status) => {
+    const server = new FakeSyncServer(A, 'Text')
+    const real = server.api('anna')
+    const wsTicket = vi
+      .fn(real.wsTicket)
+      .mockRejectedValueOnce(new ApiError('failed', status))
+      .mockRejectedValueOnce(new Error('network'))
+    const session = withApi(server, wsTicket)
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('online'))
+    expect(wsTicket).toHaveBeenCalledTimes(3)
+  })
+
+  it('gets a new ticket after a refused one (4001)', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna')
+    await online(anna)
+    server.disconnectAll(4001)
+    await vi.waitFor(() => expect(server.ticketsIssued).toBe(2))
+    await online(anna)
+  })
+
+  it('typing during a reconnect does not leave two connections', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), { timing: { retryNowMs: 0 } })
+    await online(anna)
+    server.disconnectAll()
+    await new Promise((r) => setTimeout(r, 1))
+    for (const c of 'abcdef') anna.insert('end', c)
+    await vi.waitFor(() => expect(server.text).toBe('Textabcdef'))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(server.connections).toHaveLength(1)
+  })
+
+  it('waits for the stored copy to follow a rename, also when the socket just drops', async () => {
+    const server = new FakeSyncServer(A, 'Text\n')
+    const store = memoryStore()
+    const realClaim = store.claim
+    let allowClaim!: () => void
+    const blocked = new Promise<void>((resolve) => (allowClaim = resolve))
+    store.claim = async (id) => {
+      if (id === 'doc-2') await blocked
+      return realClaim(id)
+    }
+    const anna = client(server, 'anna', store)
+    await online(anna)
+    const socket = server.connections[0]!.socket
+    socket.deliver({ type: 'document-renamed', newDocumentId: 'doc-2' })
+    await new Promise((r) => setTimeout(r, 5))
+    server.oldIds.add('doc-1')
+    server.documentId = 'doc-2'
+    server.disconnectAll(1006)
+
+    await new Promise((r) => setTimeout(r, 50))
+    const tickets = server.ticketsIssued
+    expect(tickets).toBe(1)
+    allowClaim()
+    await online(anna)
+    await vi.waitFor(() =>
+      expect(server.connections[0]?.socket.sent[0]).toMatchObject({
+        type: 'hello',
+        documentId: 'doc-2',
+        epoch: 'epoch-1',
+      }),
+    )
+    await vi.waitFor(async () => expect(await store.keys()).toEqual(['doc-2']))
   })
 })
 

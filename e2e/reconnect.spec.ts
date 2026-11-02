@@ -113,6 +113,23 @@ test.describe('what the server says at a reconnect', () => {
     await expect.poll(() => documentContent(id)).toBe('Von Alice. Von Bob.')
   })
 
+  test('a session that ends while editing leads to the login', async ({ browser }, testInfo) => {
+    const username = uniqueUsername('gesperrt', testInfo)
+    const user = await createAccount(username)
+    const users = (await (await backendRequest('GET', '/admin/users/')).json()) as {
+      id: string
+      username: string
+    }[]
+    const userId = users.find((u) => u.username === username)!.id
+    const id = await createDocument(testName('Sitzung', testInfo))
+    const page = await userPage(browser, user, testInfo.project.use)
+    await openEditor(page, id)
+
+    const answer = await backendRequest('PATCH', `/admin/users/${userId}/`, { status: 'disabled' })
+    expect(answer.ok).toBe(true)
+    await expect(page).toHaveURL(/\/login/, { timeout: 15_000 })
+  })
+
   test('a page deleted while away is reported as deleted', async ({ browser }, testInfo) => {
     const id = await createDocument(testName('Geloescht', testInfo))
     const page = await userPage(browser, USERS.alice, testInfo.project.use)
