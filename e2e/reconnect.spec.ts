@@ -40,6 +40,29 @@ test.describe('a tab in the background', () => {
   })
 })
 
+test.describe('a frozen tab', () => {
+  test('catches up when it thaws', async ({ browser }, testInfo) => {
+    test.setTimeout(90_000)
+    const id = await createDocument(testName('Eingefroren', testInfo))
+    const alice = await userPage(browser, USERS.alice, testInfo.project.use)
+    const bob = await userPage(browser, USERS.bob, testInfo.project.use)
+    await openEditor(alice, id)
+    await openEditor(bob, id)
+
+    // a real freeze: no script runs, and the server times the connection out after 15 s
+    const cdp = await alice.context().newCDPSession(alice)
+    await cdp.send('Page.setWebLifecycleState', { state: 'frozen' })
+    await new Promise((r) => setTimeout(r, 18_000))
+    await typeAt(bob, 'end', 'Waehrenddessen.')
+    await expect.poll(() => documentContent(id)).toBe('Waehrenddessen.')
+    await cdp.send('Page.setWebLifecycleState', { state: 'active' })
+
+    await expect.poll(() => editorText(alice), { timeout: 5_000 }).toBe('Waehrenddessen.')
+    await typeAt(alice, 'end', ' Aufgetaut.')
+    await expect.poll(() => documentContent(id)).toBe('Waehrenddessen. Aufgetaut.')
+  })
+})
+
 test.describe('after losing the connection', () => {
   test('typing reconnects although the ticket request hangs', async ({ browser }, testInfo) => {
     const id = await createDocument(testName('Haengt', testInfo))
