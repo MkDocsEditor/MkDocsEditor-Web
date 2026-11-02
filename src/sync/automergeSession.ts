@@ -71,6 +71,8 @@ const DEFAULT_TIMING = {
   connectTimeoutMs: 10_000,
   /** A wake-up or a keystroke starts a new connection attempt at most this often. */
   retryNowMs: 2_000,
+  /** How often a tab without the stored copy tries again to claim it, while there are changes. */
+  retryClaimMs: 5_000,
   flushMs: 50,
   presenceMs: 100,
   persistMs: 300,
@@ -162,8 +164,11 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   const copy = createStoredCopy({
     store: options.store,
     persistMs: timing.persistMs,
+    retryClaimMs: timing.retryClaimMs,
+    documentId: () => documentId,
     snapshot: () =>
       doc && epoch !== null ? { epoch, actorId, bytes: A.save(doc), serverHeads, readOnly } : null,
+    onLateClaim: (existing) => !existing || mergeStoredCopy(existing),
   })
   const presence = createPresence({
     automerge: () => A,
@@ -517,18 +522,25 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       // No copy under the old id (it was re-keyed already, for example by the tree's rescue of
       // moved copies): continue with the stored copy of the new id, like on start.
       adoptStoredCopy(existing)
-    } else if (existing && existing.epoch !== epoch) {
+    } else if (existing && !mergeStoredCopy(existing)) {
       next()
       return
-    } else if (existing && doc) {
-      // An older copy of the same document under the new id: keep its edits too.
-      const before = text()
-      doc = A.merge(doc, A.load<DocContent>(existing.bytes, { actor: existing.actorId }))
-      emit(diffText(before, text()))
-      updateUnsynced()
-      scheduleFlush()
     }
     await copy.moveTo(newId, next)
+  }
+
+  /**
+   * Merges another stored copy of this document, so that its edits are kept. Returns false for a
+   * copy of another lineage, which stays as it is.
+   */
+  function mergeStoredCopy(existing: StoredCopy): boolean {
+    if (!doc || existing.epoch !== epoch) return false
+    const before = text()
+    doc = A.merge(doc, A.load<DocContent>(existing.bytes, { actor: existing.actorId }))
+    emit(diffText(before, text()))
+    updateUnsynced()
+    scheduleFlush()
+    return true
   }
 
   /** Editing works offline on a persisted copy; the server merges it after the reconnect. */
@@ -668,6 +680,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       console.error(error)
       return
     }
+    if (closed) return
     try {
       const stored = await copy.open(documentId)
       if (stored && !closed) {

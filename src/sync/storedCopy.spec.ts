@@ -21,7 +21,14 @@ function recordingStore(): { store: OfflineStore; writes: string[] } {
 }
 
 function setup(store: OfflineStore, persistMs = 10_000) {
-  return createStoredCopy({ store, persistMs, snapshot: () => contents })
+  return createStoredCopy({
+    store,
+    persistMs,
+    retryClaimMs: 60_000,
+    documentId: () => 'doc',
+    snapshot: () => contents,
+    onLateClaim: () => true,
+  })
 }
 
 describe('createStoredCopy', () => {

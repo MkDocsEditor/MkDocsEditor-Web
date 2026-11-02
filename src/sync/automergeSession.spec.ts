@@ -25,6 +25,7 @@ const timing = {
   doubtMs: 400,
   connectTimeoutMs: 400,
   retryNowMs: 2_000,
+  retryClaimMs: 60_000,
   authorshipRefetchMs: 10_000,
   backoffMs: [5, 10, 20],
 }
@@ -712,6 +713,75 @@ describe('Automerge session: read-only state', () => {
     expect(anna.session.status.value.message).toContain('not saved')
     anna.session.applyLocalChanges([{ from: 0, to: 0, insert: 'X' }])
     expect(anna.session.getText()).toBe('Text')
+  })
+})
+
+describe('Automerge session: stored copy and other tabs', () => {
+  it('gives up the claim when closed while it is still being claimed', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const store = memoryStore()
+    const first = client(server, 'anna', store)
+    first.session.close()
+    await new Promise((r) => setTimeout(r, 20))
+    const release = await store.claim('doc-1')
+    expect(release).not.toBeNull()
+    release?.()
+  })
+
+  it('a second tab takes over the stored copy when the first one is gone', async () => {
+    const server = new FakeSyncServer(A, 'Text\n')
+    const store = memoryStore()
+    const first = client(server, 'anna', store)
+    await online(first)
+    const second = client(server, 'anna', store, { timing: { retryClaimMs: 0 } })
+    await online(second)
+
+    // the first tab has offline edits when it closes
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(first.session.status.value.connection).toBe('offline'))
+    first.insert('end', 'von Tab 1\n')
+    first.session.close()
+    await vi.waitFor(async () =>
+      expect(A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content).toContain(
+        'von Tab 1',
+      ),
+    )
+
+    // the second tab edits offline too: its copy is persisted now, with both edits
+    second.insert('end', 'von Tab 2\n')
+    await vi.waitFor(async () => {
+      const content = A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content
+      expect(content).toContain('von Tab 1')
+      expect(content).toContain('von Tab 2')
+    })
+    expect(second.mirror).toBe(second.session.getText())
+    server.offline = false
+    await vi.waitFor(() => {
+      expect(server.text).toContain('von Tab 1')
+      expect(server.text).toContain('von Tab 2')
+    })
+  })
+
+  it('a second tab leaves a stored copy of another epoch alone', async () => {
+    const server = new FakeSyncServer(A, 'Text\n')
+    const store = memoryStore()
+    const first = client(server, 'anna', store)
+    await online(first)
+    const second = client(server, 'anna', store, { timing: { retryClaimMs: 0 } })
+    await online(second)
+    first.session.close()
+    await new Promise((r) => setTimeout(r, 5))
+    const stored = (await store.get('doc-1'))!
+    await store.put({ ...stored, epoch: 'another' })
+
+    second.insert('end', 'x')
+    await vi.waitFor(() => expect(server.text).toBe('Text\nx'))
+    await new Promise((r) => setTimeout(r, 10))
+    expect((await store.get('doc-1'))!.epoch).toBe('another')
+    const release = await store.claim('doc-1')
+    expect(release).not.toBeNull()
+    release?.()
   })
 })
 
