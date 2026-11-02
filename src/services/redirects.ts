@@ -6,7 +6,7 @@ import type { Router } from 'vue-router'
 import { useApi } from '@/api'
 import type { MovedItem } from '@/api'
 import { loadAutomerge } from '@/sync/automerge'
-import { getOfflineStore } from '@/sync/offlineStore'
+import { movableCopies } from '@/sync/localCopies'
 import type { OfflineStore } from '@/sync/offlineStore'
 import { rekeyStoredCopy } from '@/sync/rekey'
 
@@ -17,19 +17,22 @@ import { rekeyStoredCopy } from '@/sync/rekey'
  */
 export async function followMoves(
   moves: readonly Pick<MovedItem, 'type' | 'oldId' | 'newId'>[],
-  store: OfflineStore = getOfflineStore(),
+  stores: readonly OfflineStore[] = movableCopies(),
 ): Promise<void> {
   for (const move of moves) {
     if (move.type !== 'document') continue
-    try {
-      await rekeyStoredCopy(store, loadAutomerge, move.oldId, move.newId)
-    } catch (error) {
-      console.error('mkdocseditor: could not move the local copy', move.oldId, error)
+    for (const store of stores) {
+      try {
+        await rekeyStoredCopy(store, loadAutomerge, move.oldId, move.newId)
+      } catch (error) {
+        console.error('mkdocseditor: could not move the local copy', move.oldId, error)
+      }
     }
   }
 }
 
-const checked = new Set<string>()
+/** Per store, because each account has its own copies and may sign in during one page load. */
+let checked = new WeakMap<OfflineStore, Set<string>>()
 
 /**
  * Looks up stored copies whose ids are not in the tree (moves this client missed while it was
@@ -37,24 +40,28 @@ const checked = new Set<string>()
  */
 export async function rescueStoredCopies(
   known: (id: string) => boolean,
-  store: OfflineStore = getOfflineStore(),
+  stores: readonly OfflineStore[] = movableCopies(),
 ): Promise<void> {
-  let ids: string[]
-  try {
-    ids = await store.keys()
-  } catch {
-    return
-  }
-  for (const id of ids) {
-    if (known(id) || checked.has(id)) continue
-    checked.add(id)
+  for (const store of stores) {
+    let ids: string[]
     try {
-      const moved = await useApi().getMoved(id)
-      if (moved?.item.type === 'document')
-        await followMoves([{ type: 'document', oldId: id, newId: moved.item.id }], store)
+      ids = await store.keys()
     } catch {
-      // unreachable: ask again on the next page load
-      checked.delete(id)
+      continue
+    }
+    let seen = checked.get(store)
+    if (!seen) checked.set(store, (seen = new Set()))
+    for (const id of ids) {
+      if (known(id) || seen.has(id)) continue
+      seen.add(id)
+      try {
+        const moved = await useApi().getMoved(id)
+        if (moved?.item.type === 'document')
+          await followMoves([{ type: 'document', oldId: id, newId: moved.item.id }], [store])
+      } catch {
+        // unreachable: ask again on the next page load
+        seen.delete(id)
+      }
     }
   }
 }
@@ -107,5 +114,5 @@ export function followMovedRoute(
 
 /** For tests. */
 export function resetRescued(): void {
-  checked.clear()
+  checked = new WeakMap()
 }

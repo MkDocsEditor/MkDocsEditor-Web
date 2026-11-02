@@ -30,7 +30,7 @@ function fromWhoAmI(who: WhoAmI | UserInfo): SignedInUser {
 /**
  * Sign-in state. The session itself is an HttpOnly cookie of the backend, so the client only
  * keeps who is signed in. A request that finds the session ended (401) signs out locally;
- * unsaved edits stay in the offline store and sync after the next sign-in.
+ * unsaved edits stay in the offline store and sync after the next sign-in of that account.
  */
 export const useAuthStore = defineStore('auth', () => {
   remove(local(), LEGACY_CREDENTIALS_KEY)

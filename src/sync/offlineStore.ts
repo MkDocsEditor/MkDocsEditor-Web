@@ -4,6 +4,10 @@
  * One record per document: the Automerge bytes, the actor id of this copy, the server epoch and
  * the heads the server is known to have. Only one tab at a time owns a document's record (see
  * `claim`), because two live copies must never share an actor id.
+ *
+ * A copy belongs to the account that made it (`accountStore`): the server binds its actor id to
+ * that account, so nobody else can publish its edits. Records of older versions have no owner
+ * yet (`unownedStore`).
  */
 export interface StoredCopy {
   documentId: string
@@ -49,6 +53,47 @@ export function memoryStore(): OfflineStore {
       claimed.add(id)
       return () => claimed.delete(id)
     },
+  }
+}
+
+const ACCOUNT_PREFIX = 'account:'
+const REFUSED_PREFIX = 'refused:'
+
+/**
+ * Where a copy goes whose actor the server refused. Nothing reads it any more, and nothing deletes
+ * it: only a person could still recover its edits from the browser's storage.
+ */
+export function refusedCopyId(documentId: string, actorId: string): string {
+  return `${REFUSED_PREFIX}${actorId}:${documentId}`
+}
+
+/** The copies of one account: their keys and claims are separate from all other accounts. */
+export function accountStore(inner: OfflineStore, accountId: string): OfflineStore {
+  const prefix = `${ACCOUNT_PREFIX}${encodeURIComponent(accountId)}:`
+  return {
+    get: async (id) => {
+      const copy = await inner.get(prefix + id)
+      return copy && { ...copy, documentId: id }
+    },
+    put: (copy) => inner.put({ ...copy, documentId: prefix + copy.documentId }),
+    delete: (id) => inner.delete(prefix + id),
+    keys: async () =>
+      (await inner.keys())
+        .filter((key) => key.startsWith(prefix))
+        .map((key) => key.slice(prefix.length))
+        .filter((id) => !id.startsWith(REFUSED_PREFIX)),
+    claim: (id) => inner.claim(prefix + id),
+  }
+}
+
+/** The records without an owner, under the plain document id. */
+export function unownedStore(inner: OfflineStore): OfflineStore {
+  return {
+    ...inner,
+    keys: async () =>
+      (await inner.keys()).filter(
+        (key) => !key.startsWith(ACCOUNT_PREFIX) && !key.startsWith(REFUSED_PREFIX),
+      ),
   }
 }
 

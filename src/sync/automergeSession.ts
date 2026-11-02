@@ -52,6 +52,8 @@ export interface AutomergeSessionOptions {
   automerge: AutomergeApi | Promise<AutomergeApi>
   api: SessionApi
   store: OfflineStore
+  /** Records of older versions without an owner, used until the server tells whose they are. */
+  unowned?: OfflineStore
   createSocket?: (url: string) => SocketLike
   /** Called when the server reports a rename; the session follows the new id itself. */
   onRenamed?: (newDocumentId: string) => void
@@ -142,6 +144,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let serverError: string | undefined
   /** The server closed with 4003 and did not accept a connection since. */
   let refused = false
+  /** The next initial content replaces the local copy, because its edits are not ours to send. */
+  let discardLocalEdits = false
   /** The re-keying of the stored copy after `document-renamed`; the reconnect waits for it. */
   let renaming: Promise<void> = Promise.resolve()
   let lastSent = 0
@@ -163,11 +167,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   const copy = createStoredCopy({
     store: options.store,
+    unowned: options.unowned,
     persistMs: timing.persistMs,
     retryClaimMs: timing.retryClaimMs,
     documentId: () => documentId,
     snapshot: () =>
-      doc && epoch !== null ? { epoch, actorId, bytes: A.save(doc), serverHeads, readOnly } : null,
+      doc && epoch !== null && !copy.isUnowned
+        ? { epoch, actorId, bytes: A.save(doc), serverHeads, readOnly }
+        : null,
     onLateClaim: (existing) => !existing || mergeStoredCopy(existing),
   })
   const presence = createPresence({
@@ -347,13 +354,17 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   }
 
   /**
-   * The server does not accept the actor id of this copy for this user, for example when another
-   * account used this browser before. The next connection starts on the server's document with a
-   * new actor, and unsynced edits are re-applied like after a new epoch.
+   * The server does not accept the actor id of this copy for this user. Its unsynced edits are
+   * someone else's, so they must not be published here: the next connection starts on the server's
+   * document with a new actor. A record without an owner stays where it is, for its owner. Any
+   * other copy is set aside, where nothing reads it any more.
    */
   function forgetActor(): void {
+    if (copy.isUnowned) copy.leaveUnowned()
+    else if (status.value.unsynced) void copy.setAside()
     actorId = randomActorId()
     epoch = null
+    discardLocalEdits = true
   }
 
   function clearReconnectTimer(): void {
@@ -551,6 +562,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     serverHeads = stored.serverHeads
     readOnly = stored.readOnly ?? false
     setStatus({ readOnly })
+    if (copy.isUnowned) {
+      // Edits here might end up with the wrong account if the record is someone else's.
+      readOnly = true
+      setStatus({
+        readOnly: true,
+        message: 'This local copy comes from an older version. It can be edited once it is online.',
+      })
+    }
     emit(diffText('', text()))
     updateUnsynced()
     markReady()
@@ -578,7 +597,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         actor: doc ? randomActorId() : actorId,
       })
       let next = loaded
-      if (doc) {
+      if (doc && !discardLocalEdits) {
         // The server started a new epoch: re-apply our unsynced edits onto its new document.
         const base = serverHeads.length > 0 ? A.view(doc, serverHeads).content : doc.content
         const unsynced = diffText(base, doc.content)
@@ -594,6 +613,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       doc = next
       epoch = serverEpoch
       authors.reset()
+      discardLocalEdits = false
       emit(diffText(before, text()))
     }
 
@@ -609,7 +629,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     updateUnsynced()
     markReady()
     flush()
-    copy.schedule()
+    if (copy.isUnowned) void copy.keepUnowned()
+    else copy.schedule()
     presence.resolve()
     authors.publish()
     authors.refresh()

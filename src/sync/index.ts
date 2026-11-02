@@ -2,7 +2,7 @@ import { useApi } from '@/api'
 
 import { loadAutomerge } from './automerge'
 import { createAutomergeSession } from './automergeSession'
-import { getOfflineStore } from './offlineStore'
+import { localCopies } from './localCopies'
 import type { DocumentSession } from './session'
 
 export interface SessionOptions {
@@ -12,8 +12,8 @@ export interface SessionOptions {
 
 /**
  * Creates the live session for a document: Automerge over the backend's document websocket
- * (protocol v1, see docs/sync-protocol.md in MkDocsEditor-Backend), with an offline copy in
- * IndexedDB.
+ * (protocol v1, see docs/sync-protocol.md in MkDocsEditor-Backend), with an offline copy per
+ * account in IndexedDB.
  */
 export function createDocumentSession(
   documentId: string,
@@ -23,7 +23,7 @@ export function createDocumentSession(
     documentId,
     automerge: loadAutomerge(),
     api: useApi(),
-    store: getOfflineStore(),
+    ...localCopies(),
     onRenamed: options.onRenamed,
     clientName: `MkDocsEditor-Web/${import.meta.env.VITE_APP_VERSION ?? 'dev'}`,
   })

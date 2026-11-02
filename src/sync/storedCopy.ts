@@ -1,7 +1,10 @@
+import { refusedCopyId } from './offlineStore'
 import type { OfflineStore, StoredCopy } from './offlineStore'
 
 export interface StoredCopyOptions {
   store: OfflineStore
+  /** Records without an owner, to look in when `store` has none for a document. */
+  unowned?: OfflineStore
   persistMs: number
   /** How often to try again for a claim that another tab held; see `retryClaim`. */
   retryClaimMs: number
@@ -31,6 +34,8 @@ export function createStoredCopy(options: StoredCopyOptions) {
   let closed = false
   let claiming = false
   let lastClaimAt = 0
+  /** A record without an owner in use, until the server tells whose it is. */
+  let unowned: { id: string; release: () => void } | null = null
 
   async function persist(): Promise<void> {
     if (!release) return
@@ -84,6 +89,18 @@ export function createStoredCopy(options: StoredCopyOptions) {
     }, options.persistMs)
   }
 
+  async function openUnowned(id: string): Promise<StoredCopy | undefined> {
+    const claim = await options.unowned?.claim(id)
+    if (!claim) return undefined
+    const copy = closed ? undefined : await options.unowned?.get(id)
+    if (!copy) {
+      claim()
+      return undefined
+    }
+    unowned = { id, release: claim }
+    return copy
+  }
+
   const onHidden = () => {
     if (globalThis.document?.visibilityState !== 'visible') persistPending()
   }
@@ -106,7 +123,8 @@ export function createStoredCopy(options: StoredCopyOptions) {
         return undefined
       }
       release = claim
-      return release ? options.store.get(id) : undefined
+      if (!release) return undefined
+      return (await options.store.get(id)) ?? openUnowned(id)
     },
     /**
      * Moves the copy to `newId`, whose claim is `claim`. The copy is written under the new id
@@ -126,6 +144,37 @@ export function createStoredCopy(options: StoredCopyOptions) {
       previous?.()
     },
     schedule,
+    /** The copy from `open` is a record without an owner, and the server has not answered yet. */
+    get isUnowned(): boolean {
+      return unowned !== null
+    },
+    /** The server accepts the actor of the record: it becomes a copy of this account. */
+    async keepUnowned(): Promise<void> {
+      const record = unowned
+      if (!record) return
+      unowned = null
+      try {
+        await persist()
+        await options.unowned?.delete(record.id)
+      } finally {
+        record.release()
+      }
+    },
+    /** The record belongs to someone else: it stays where it is for its owner. */
+    leaveUnowned(): void {
+      unowned?.release()
+      unowned = null
+    },
+    /** Keeps the current copy out of the way, for edits the server will not take from this user. */
+    async setAside(): Promise<void> {
+      const copy = options.snapshot()
+      if (!copy) return
+      await options.store.put({
+        ...copy,
+        documentId: refusedCopyId(storedId, copy.actorId),
+        savedAt: Date.now(),
+      })
+    },
     watchPage(): void {
       globalThis.addEventListener?.('pagehide', persistPending)
       globalThis.addEventListener?.('beforeunload', persistPending)
@@ -142,6 +191,8 @@ export function createStoredCopy(options: StoredCopyOptions) {
       void persist().finally(() => {
         release?.()
         release = null
+        unowned?.release()
+        unowned = null
       })
     },
   }

@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test'
-import type { Browser, Page, TestInfo } from '@playwright/test'
+import type { Browser, Page, TestInfo, WebSocketRoute } from '@playwright/test'
 
 import { BACKEND_URL, E2E_USER } from './ports'
 
@@ -237,4 +237,92 @@ export function dropDocumentSocket(page: Page): Promise<void> {
     const { pageSockets } = window as unknown as { pageSockets: WebSocket[] }
     pageSockets.findLast((s) => s.url.includes('/document/'))?.close()
   })
+}
+
+/**
+ * Lets a test cut the document websockets of a page while REST keeps working, so that edits stay
+ * unsynced and the user can still sign out. Call it before the page opens a document.
+ */
+export async function blockableDocumentSockets(page: Page) {
+  let blocked = false
+  const open = new Set<WebSocketRoute>()
+  await page.routeWebSocket(/\/document\/.*\/ws/, (ws) => {
+    if (blocked) {
+      void ws.close({ code: 1011 })
+      return
+    }
+    ws.connectToServer()
+    open.add(ws)
+  })
+  return {
+    async block(): Promise<void> {
+      blocked = true
+      for (const ws of open) await ws.close({ code: 1011 })
+      open.clear()
+    },
+    unblock(): void {
+      blocked = false
+    },
+  }
+}
+
+/** The keys of the stored copies in the browser. */
+export function storedCopyKeys(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        const open = indexedDB.open('mkdocseditor')
+        open.onerror = () => reject(open.error as Error)
+        open.onsuccess = () => {
+          const request = open.result.transaction('documents').objectStore('documents').getAllKeys()
+          request.onerror = () => reject(request.error as Error)
+          request.onsuccess = () => {
+            open.result.close()
+            resolve(request.result as string[])
+          }
+        }
+      }),
+  )
+}
+
+/** Turns the stored copy of a document into a record of an older version, which has no owner. */
+export function makeStoredCopyOwnerless(page: Page, documentId: string): Promise<void> {
+  return page.evaluate(
+    (id) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('mkdocseditor')
+        open.onerror = () => reject(open.error as Error)
+        open.onsuccess = () => {
+          const transaction = open.result.transaction('documents', 'readwrite')
+          const store = transaction.objectStore('documents')
+          const keys = store.getAllKeys()
+          keys.onsuccess = () => {
+            const key = (keys.result as string[]).find((k) => k.endsWith(id))
+            if (!key) throw new Error(`no stored copy of ${id}`)
+            const read = store.get(key)
+            read.onsuccess = () => {
+              store.delete(key)
+              store.put({ ...read.result, documentId: id })
+            }
+          }
+          transaction.onerror = () => reject(transaction.error as Error)
+          transaction.oncomplete = () => {
+            open.result.close()
+            resolve()
+          }
+        }
+      }),
+    documentId,
+  )
+}
+
+/** Who wrote a piece of text, according to the server. */
+export async function authorOf(id: string, piece: string): Promise<string | undefined> {
+  const text = await documentContent(id)
+  const at = text.indexOf(piece)
+  const response = await backendRequest('GET', `/document/${id}/authorship/`)
+  const { runs } = (await response.json()) as {
+    runs: { start: number; end: number; username: string }[]
+  }
+  return runs.find((run) => run.start <= at && at < run.end)?.username
 }

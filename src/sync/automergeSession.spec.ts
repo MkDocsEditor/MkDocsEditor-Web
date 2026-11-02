@@ -7,7 +7,7 @@ import { loadAutomerge } from './automerge'
 import type { Automerge } from './automerge'
 import { createAutomergeSession } from './automergeSession'
 import { rebaseChanges } from './rebase'
-import { memoryStore } from './offlineStore'
+import { accountStore, memoryStore, refusedCopyId, unownedStore } from './offlineStore'
 import type { OfflineStore } from './offlineStore'
 import type { DocumentSession, TextChange } from './session'
 import { applyChanges } from './session'
@@ -30,6 +30,8 @@ const timing = {
   authorshipRefetchMs: 10_000,
   backoffMs: [5, 10, 20],
 }
+
+const content = (copy: { bytes: Uint8Array }) => A.load<{ content: string }>(copy.bytes).content
 
 const sessions: DocumentSession[] = []
 afterEach(() => {
@@ -522,7 +524,7 @@ describe('Automerge session: answers of the server', () => {
     expect(server.ticketsIssued).toBe(2)
   })
 
-  it('takes a new actor when the server refuses the stored one, keeping unsynced edits', async () => {
+  it('does not publish the edits of a refused actor, and keeps them aside', async () => {
     const server = new FakeSyncServer(A, 'Hallo\n')
     const store = memoryStore()
     const first = client(server, 'anna', store)
@@ -530,27 +532,26 @@ describe('Automerge session: answers of the server', () => {
     server.offline = true
     server.disconnectAll()
     await vi.waitFor(() => expect(first.session.status.value.connection).toBe('offline'))
-    first.insert('end', 'nicht verloren\n')
+    first.insert('end', 'von Anna\n')
     first.session.close()
     await vi.waitFor(async () =>
-      expect(A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content).toBe(
-        'Hallo\nnicht verloren\n',
-      ),
+      expect(content((await store.get('doc-1'))!)).toBe('Hallo\nvon Anna\n'),
     )
     const stored = (await store.get('doc-1'))!
     server.foreignActors.add(stored.actorId)
     server.offline = false
 
-    // another account signs in on this browser
     const ben = client(server, 'ben', store)
+    await vi.waitFor(() => expect(ben.session.getText()).toBe('Hallo\n'))
     await online(ben)
-    await vi.waitFor(() => expect(server.text).toBe('Hallo\nnicht verloren\n'))
-    expect(ben.session.getText()).toBe('Hallo\nnicht verloren\n')
-    expect(ben.mirror).toBe(ben.session.getText())
+    expect(ben.mirror).toBe('Hallo\n')
     ben.insert('end', 'von Ben\n')
-    await vi.waitFor(() => expect(server.text).toBe('Hallo\nnicht verloren\nvon Ben\n'))
+    await vi.waitFor(() => expect(server.text).toBe('Hallo\nvon Ben\n'))
     await vi.waitFor(async () =>
       expect((await store.get('doc-1'))!.actorId).not.toBe(stored.actorId),
+    )
+    expect(content((await store.get(refusedCopyId('doc-1', stored.actorId)))!)).toBe(
+      'Hallo\nvon Anna\n',
     )
   })
 
@@ -683,6 +684,128 @@ describe('Automerge session: sync robustness', () => {
     socket.deliver({ type: 'presence' })
     await new Promise((r) => setTimeout(r, 20))
     expect(server.ticketsIssued).toBe(1)
+  })
+})
+
+describe('Automerge session: records without an owner', () => {
+  /** A record of an older version under the plain id, with an unsynced edit. */
+  async function olderRecord(server: FakeSyncServer, raw: OfflineStore) {
+    const first = client(server, 'anna', raw)
+    await online(first)
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(first.session.status.value.connection).toBe('offline'))
+    first.insert('end', 'von Anna\n')
+    first.session.close()
+    await vi.waitFor(async () =>
+      expect(content((await raw.get('doc-1'))!)).toBe('Hallo\nvon Anna\n'),
+    )
+    await new Promise((r) => setTimeout(r, 5))
+    return (await raw.get('doc-1'))!
+  }
+
+  function open(server: FakeSyncServer, user: string, raw: OfflineStore, documentId?: string) {
+    const session = createAutomergeSession({
+      documentId: documentId ?? server.documentId,
+      automerge: A,
+      api: server.api(user),
+      store: accountStore(raw, user),
+      unowned: unownedStore(raw),
+      createSocket: server.socketFactory,
+      timing,
+    })
+    sessions.push(session)
+    return session
+  }
+
+  it('leaves the record of someone else alone and starts from the server copy', async () => {
+    const server = new FakeSyncServer(A, 'Hallo\n')
+    const raw = memoryStore()
+    const record = await olderRecord(server, raw)
+    server.foreignActors.add(record.actorId)
+    server.offline = false
+
+    const ben = open(server, 'ben', raw)
+    await vi.waitFor(() => expect(ben.status.value.connection).toBe('online'))
+    expect(ben.getText()).toBe('Hallo\n')
+    expect(ben.status.value.readOnly).toBe(false)
+    ben.applyLocalChanges([{ from: 0, to: 0, insert: 'Ben ' }])
+    await vi.waitFor(() => expect(server.text).toBe('Ben Hallo\n'))
+
+    // the record is untouched, and Ben's own copy is a separate one
+    const after = (await raw.get('doc-1'))!
+    expect(after.actorId).toBe(record.actorId)
+    expect(content(after)).toBe('Hallo\nvon Anna\n')
+    await vi.waitFor(async () =>
+      expect(content((await accountStore(raw, 'ben').get('doc-1'))!)).toBe('Ben Hallo\n'),
+    )
+    expect(await raw.keys()).not.toContain(refusedCopyId('doc-1', record.actorId))
+  })
+
+  it('becomes a copy of the account the server accepts it for', async () => {
+    const server = new FakeSyncServer(A, 'Hallo\n')
+    const raw = memoryStore()
+    await olderRecord(server, raw)
+    server.offline = false
+
+    const anna = open(server, 'anna', raw)
+    await anna.ready
+    expect(anna.getText()).toBe('Hallo\nvon Anna\n')
+    await vi.waitFor(() => expect(server.text).toBe('Hallo\nvon Anna\n'))
+    await vi.waitFor(async () => expect(await raw.get('doc-1')).toBeUndefined())
+    expect(content((await accountStore(raw, 'anna').get('doc-1'))!)).toBe('Hallo\nvon Anna\n')
+  })
+
+  it('is read-only while the server cannot tell whose it is', async () => {
+    const server = new FakeSyncServer(A, 'Hallo\n')
+    const raw = memoryStore()
+    const record = await olderRecord(server, raw)
+
+    // still offline
+    const anna = open(server, 'anna', raw)
+    await anna.ready
+    expect(anna.getText()).toBe('Hallo\nvon Anna\n')
+    expect(anna.status.value.readOnly).toBe(true)
+    anna.applyLocalChanges([{ from: 0, to: 0, insert: 'X' }])
+    expect(anna.getText()).toBe('Hallo\nvon Anna\n')
+
+    anna.close()
+    await new Promise((r) => setTimeout(r, 5))
+    expect((await raw.get('doc-1'))!.actorId).toBe(record.actorId)
+    expect(await accountStore(raw, 'anna').get('doc-1')).toBeUndefined()
+    const claim = await raw.claim('doc-1')
+    expect(claim).not.toBeNull()
+    claim?.()
+  })
+
+  it('an own copy wins over a record without an owner', async () => {
+    const server = new FakeSyncServer(A, 'Hallo\n')
+    const raw = memoryStore()
+    const record = await olderRecord(server, raw)
+    server.offline = false
+    const own = accountStore(raw, 'ben')
+    const doc = A.load<{ content: string }>(record.bytes)
+    await own.put({ ...record, bytes: A.save(A.clone(doc)), actorId: '0'.repeat(31) + 'a' })
+    server.foreignActors.add(record.actorId)
+    const ben = open(server, 'ben', raw)
+    await vi.waitFor(() => expect(ben.status.value.connection).toBe('online'))
+    expect((await raw.get('doc-1'))!.actorId).toBe(record.actorId)
+  })
+
+  it('follows a rename and still ends up with its owner', async () => {
+    const server = new FakeSyncServer(A, 'Hallo\n')
+    const raw = memoryStore()
+    await olderRecord(server, raw)
+    server.offline = false
+    server.rename('doc-2')
+
+    const anna = open(server, 'anna', raw, 'doc-1')
+    await vi.waitFor(() => expect(server.text).toBe('Hallo\nvon Anna\n'))
+    expect(anna.getText()).toBe('Hallo\nvon Anna\n')
+    await vi.waitFor(async () => expect(await raw.get('doc-1')).toBeUndefined())
+    await vi.waitFor(async () =>
+      expect(content((await accountStore(raw, 'anna').get('doc-2'))!)).toBe('Hallo\nvon Anna\n'),
+    )
   })
 })
 
