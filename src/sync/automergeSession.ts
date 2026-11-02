@@ -43,6 +43,7 @@ export interface SessionApi {
   wsTicket(): Promise<WsTicket>
   wsUrl(path: string): string
   getAuthorship(id: string): Promise<AuthorshipResponse | null>
+  getDocument(id: string): Promise<unknown>
 }
 
 export interface AutomergeSessionOptions {
@@ -76,6 +77,9 @@ const DEFAULT_TIMING = {
   authorshipRefetchMs: 3_000,
   backoffMs: [500, 1_000, 2_000, 5_000, 10_000, 15_000],
 }
+
+const DELETED_MESSAGE =
+  'This page was deleted. Your text is still here – copy it if you want to keep it.'
 
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
 function randomActorId(): string {
@@ -127,6 +131,10 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let lastAttemptAt = 0
   /** There is a reason to doubt that the open socket still works; any message settles it. */
   let doubted = false
+  /** The error message of the server on the current socket; a fatal one precedes the close. */
+  let serverError: string | undefined
+  /** The server closed with 4003 and did not accept a connection since. */
+  let refused = false
   /** The re-keying of the stored copy after `document-renamed`; the reconnect waits for it. */
   let renaming: Promise<void> = Promise.resolve()
   let lastSent = 0
@@ -265,8 +273,11 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     connectingSince = Date.now()
     socket = ws
     synced = false
+    serverError = undefined
+    let opened = false
     ws.onopen = () => {
       if (socket !== ws) return
+      opened = true
       connectingSince = null
       lastReceived = Date.now()
       const hello: Record<string, unknown> = {
@@ -297,7 +308,30 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       synced = false
       connectingSince = null
       handleClose(event.code)
+      // The ticket came, so the server is there, but it refused the upgrade: browsers do not tell
+      // why. Asking is the only way to notice a page that was deleted while we were away.
+      if (!opened && !closed) void checkDocumentExists()
     }
+  }
+
+  async function checkDocumentExists(): Promise<void> {
+    try {
+      await options.api.getDocument(documentId)
+    } catch (error) {
+      if (!closed && error instanceof ApiError && error.status === 404 && !error.movedTo) {
+        fail(doc ? DELETED_MESSAGE : 'This page does not exist any more.')
+      }
+    }
+  }
+
+  /**
+   * The server does not accept the actor id of this copy for this user, for example when another
+   * account used this browser before. The next connection starts on the server's document with a
+   * new actor, and unsynced edits are re-applied like after a new epoch.
+   */
+  function forgetActor(): void {
+    actorId = randomActorId()
+    epoch = null
   }
 
   function clearReconnectTimer(): void {
@@ -370,10 +404,18 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (closed) return
     switch (code) {
       case CLOSE_REFUSED:
-        fail('The server refused this connection.')
+        // A changed role also closes with 4003, and the next connection applies it. A second
+        // refusal in a row means that the server really does not want this connection.
+        if (refused) {
+          fail('The server refused this connection.')
+          return
+        }
+        refused = true
+        if (serverError === 'foreign-actor') forgetActor()
+        scheduleReconnect()
         return
       case CLOSE_DELETED:
-        fail('This page was deleted. Your text is still here – copy it if you want to keep it.')
+        fail(DELETED_MESSAGE)
         return
       case CLOSE_PROTOCOL_ERROR:
         fail('Connection error (protocol). Please reload the page.')
@@ -425,6 +467,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         // the close frame (4004) follows
         break
       case 'error':
+        serverError = message.code
         if (message.code === 'read-only') setStatus({ readOnly: true })
         break
       default:
@@ -520,6 +563,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     syncState = A.initSyncState()
     synced = true
     attempt = 0
+    refused = false
     setStatus({
       connection: 'online',
       readOnly,

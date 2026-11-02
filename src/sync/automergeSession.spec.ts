@@ -488,6 +488,106 @@ describe('Automerge session: staying connected', () => {
   })
 })
 
+describe('Automerge session: answers of the server', () => {
+  it('reconnects after a changed role and applies it', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna')
+    await online(anna)
+    server.readOnlyUsers.add('anna')
+    server.refuse(server.connections[0]!.socket, 'unauthorized')
+    await vi.waitFor(() => expect(anna.session.status.value.readOnly).toBe(true))
+    await online(anna)
+    expect(anna.session.status.value.message).toContain('only read')
+
+    server.readOnlyUsers.delete('anna')
+    server.refuse(server.connections[0]!.socket, 'unauthorized')
+    await vi.waitFor(() => expect(anna.session.status.value.readOnly).toBe(false))
+    await online(anna)
+    anna.insert('end', '!')
+    await vi.waitFor(() => expect(server.text).toBe('Text!'))
+  })
+
+  it('stops after a second refusal in a row', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna')
+    await online(anna)
+    const original = server.receive.bind(server)
+    server.receive = (socket, message) =>
+      message.type === 'hello' ? server.refuse(socket, 'unauthorized') : original(socket, message)
+    server.refuse(server.connections[0]!.socket, 'unauthorized')
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('closed'))
+    expect(anna.session.status.value.message).toContain('refused')
+    expect(server.ticketsIssued).toBe(2)
+  })
+
+  it('takes a new actor when the server refuses the stored one, keeping unsynced edits', async () => {
+    const server = new FakeSyncServer(A, 'Hallo\n')
+    const store = memoryStore()
+    const first = client(server, 'anna', store)
+    await online(first)
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(first.session.status.value.connection).toBe('offline'))
+    first.insert('end', 'nicht verloren\n')
+    first.session.close()
+    await vi.waitFor(async () =>
+      expect(A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content).toBe(
+        'Hallo\nnicht verloren\n',
+      ),
+    )
+    const stored = (await store.get('doc-1'))!
+    server.foreignActors.add(stored.actorId)
+    server.offline = false
+
+    // another account signs in on this browser
+    const ben = client(server, 'ben', store)
+    await online(ben)
+    await vi.waitFor(() => expect(server.text).toBe('Hallo\nnicht verloren\n'))
+    expect(ben.session.getText()).toBe('Hallo\nnicht verloren\n')
+    expect(ben.mirror).toBe(ben.session.getText())
+    ben.insert('end', 'von Ben\n')
+    await vi.waitFor(() => expect(server.text).toBe('Hallo\nnicht verloren\nvon Ben\n'))
+    await vi.waitFor(async () =>
+      expect((await store.get('doc-1'))!.actorId).not.toBe(stored.actorId),
+    )
+  })
+
+  it('reports a page deleted while the client was away, keeping the text', async () => {
+    const server = new FakeSyncServer(A, 'weg')
+    const anna = client(server, 'anna')
+    await online(anna)
+    server.deleted = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('closed'))
+    expect(anna.session.status.value.message).toContain('deleted')
+    expect(anna.session.getText()).toBe('weg')
+  })
+
+  it('keeps reconnecting when the upgrade fails but the page exists', async () => {
+    const server = new FakeSyncServer(A, 'da')
+    const api = server.api('anna')
+    const getDocument = vi.spyOn(api, 'getDocument')
+    const session = createAutomergeSession({
+      documentId: server.documentId,
+      automerge: A,
+      api,
+      store: memoryStore(),
+      createSocket: server.socketFactory,
+      timing,
+    })
+    sessions.push(session)
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('online'))
+    // the check says that it exists (a proxy problem, for example)
+    getDocument.mockResolvedValue({})
+    server.deleted = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(session.status.value.connection).not.toBe('online'))
+    await vi.waitFor(() => expect(getDocument).toHaveBeenCalled())
+    server.deleted = false
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('online'))
+  })
+})
+
 describe('rebaseChanges', () => {
   it('places changes by their context when the target text moved', () => {
     const base = 'eins\nzwei\n'
