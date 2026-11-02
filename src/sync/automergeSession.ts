@@ -197,6 +197,15 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     syncState = state
   }
 
+  /**
+   * Browsers throttle the timers of a background tab to one wake-up per minute, but still deliver
+   * websocket messages. So the server's own heartbeats drive ours too; on `tick` alone the server
+   * would close the connection of a background tab after 15 s (`4008`).
+   */
+  function sendHeartbeatIfDue(): void {
+    if (synced && Date.now() - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
+  }
+
   function scheduleFlush(): void {
     flushTimer ??= setTimeout(flush, timing.flushMs)
   }
@@ -240,6 +249,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       } catch (error) {
         console.error('mkdocseditor: bad sync message', error)
       }
+      sendHeartbeatIfDue()
     }
     ws.onerror = () => undefined
     ws.onclose = (event) => {
@@ -472,7 +482,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       handleClose(CLOSE_HEARTBEAT_TIMEOUT)
       return
     }
-    if (synced && now - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
+    sendHeartbeatIfDue()
   }
 
   function shutdown(normal: boolean): void {

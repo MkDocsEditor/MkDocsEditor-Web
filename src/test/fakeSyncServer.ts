@@ -230,6 +230,11 @@ export class FakeSyncServer {
     }
   }
 
+  /** The heartbeat the real server sends every 5 s when it has nothing else to send. */
+  heartbeat(): void {
+    for (const connection of this.connections) connection.socket.deliver({ type: 'heartbeat' })
+  }
+
   /** Closes every connection from the server side. */
   disconnectAll(code = 1006): void {
     for (const connection of [...this.connections]) {

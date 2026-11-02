@@ -36,7 +36,11 @@ function client(
   server: FakeSyncServer,
   username: string,
   store: OfflineStore = memoryStore(),
-  options: { documentId?: string; onRenamed?: (id: string) => void } = {},
+  options: {
+    documentId?: string
+    onRenamed?: (id: string) => void
+    timing?: Partial<typeof timing>
+  } = {},
 ) {
   const session = createAutomergeSession({
     documentId: options.documentId ?? server.documentId,
@@ -45,7 +49,7 @@ function client(
     api: server.api(username),
     store,
     createSocket: server.socketFactory,
-    timing,
+    timing: { ...timing, ...options.timing },
   })
   sessions.push(session)
   let mirror = ''
@@ -283,6 +287,24 @@ describe('Automerge session', () => {
     socket.deliver = () => undefined
     await vi.waitFor(() => expect(server.ticketsIssued).toBeGreaterThan(1), { timeout: 3000 })
     await online(anna)
+  })
+
+  it('answers server messages with heartbeats while its timers do not run', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    // like a background tab: timers are throttled, websocket messages still arrive
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockReturnValue(0 as never)
+    const anna = client(server, 'anna', memoryStore(), { timing: { heartbeatMs: 300 } })
+    await online(anna)
+    setIntervalSpy.mockRestore()
+    const sent = server.connections[0]!.socket.sent
+    await new Promise((r) => setTimeout(r, 310))
+    expect(sent.filter((m) => m.type === 'heartbeat')).toEqual([])
+    server.heartbeat()
+    await vi.waitFor(() => expect(sent.filter((m) => m.type === 'heartbeat')).toHaveLength(1))
+    // only as often as heartbeats are due
+    server.heartbeat()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(sent.filter((m) => m.type === 'heartbeat')).toHaveLength(1)
   })
 })
 
