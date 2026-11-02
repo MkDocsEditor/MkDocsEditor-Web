@@ -191,6 +191,10 @@ const editorTheme = EditorView.theme({
   },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
     { backgroundColor: `${c('selection')} !important` },
+  // The layer lies behind the lines by default, where the backgrounds of the active line, of code
+  // blocks and of inline code hide it. On top of the text, the blend keeps the text readable.
+  '.cm-selectionLayer': { zIndex: '1 !important', mixBlendMode: 'multiply' },
+  '.v-theme--dark & .cm-selectionLayer': { mixBlendMode: 'screen' },
   '.cm-searchMatch': { backgroundColor: c('searchMatch'), borderRadius: '2px' },
   '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: c('searchMatchSelected') },
   '.cm-selectionMatch': { backgroundColor: c('selectionMatch') },
