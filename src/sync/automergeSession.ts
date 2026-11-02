@@ -78,6 +78,8 @@ const DEFAULT_TIMING = {
   backoffMs: [500, 1_000, 2_000, 5_000, 10_000, 15_000],
 }
 
+const SYNC_FAILURES_FORGOTTEN_MS = 60_000
+
 const DELETED_MESSAGE =
   'This page was deleted. Your text is still here – copy it if you want to keep it.'
 
@@ -131,6 +133,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let lastAttemptAt = 0
   /** There is a reason to doubt that the open socket still works; any message settles it. */
   let doubted = false
+  /** Sync messages in a row that could not be applied, counted from 0. */
+  let syncFailures = 0
+  let lastSyncFailureAt = 0
   /** The error message of the server on the current socket; a fatal one precedes the close. */
   let serverError: string | undefined
   /** The server closed with 4003 and did not accept a connection since. */
@@ -294,10 +299,22 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       if (socket !== ws) return
       lastReceived = Date.now()
       doubted = false
+      let message: ServerMessage | undefined
       try {
-        handleMessage(JSON.parse(String(event.data)) as ServerMessage)
+        message = JSON.parse(String(event.data)) as ServerMessage
+        handleMessage(message)
       } catch (error) {
         console.error('mkdocseditor: bad sync message', error)
+        if (message?.type === 'initial-content' || message?.type === 'sync-request') {
+          // The sync loop cannot go on from here, and a new connection starts it over. The
+          // initial content resets the backoff, so failures in a row have to keep it up.
+          const now = Date.now()
+          syncFailures = now - lastSyncFailureAt < SYNC_FAILURES_FORGOTTEN_MS ? syncFailures + 1 : 0
+          lastSyncFailureAt = now
+          attempt = Math.max(attempt, syncFailures)
+          abandonConnection()
+          return
+        }
       }
       sendHeartbeatIfDue()
     }
@@ -585,7 +602,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     const [nextDoc, nextState] = A.receiveSyncMessage(doc, syncState, fromBase64(encoded))
     doc = nextDoc
     syncState = nextState
-    serverHeads = [...nextState.sharedHeads]
+    // Empty while the first round of a new sync state runs. That says nothing about the server,
+    // and without heads a new epoch could not tell the unsynced edits any more.
+    if (nextState.sharedHeads.length > 0) serverHeads = [...nextState.sharedHeads]
     const beforeHeads = A.getHeads(before)
     const afterHeads = A.getHeads(doc)
     if (!sameHeads(beforeHeads, afterHeads)) {

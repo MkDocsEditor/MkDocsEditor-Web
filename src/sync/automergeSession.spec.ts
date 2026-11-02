@@ -588,6 +588,102 @@ describe('Automerge session: answers of the server', () => {
   })
 })
 
+describe('Automerge session: sync robustness', () => {
+  it('keeps offline edits when a new epoch interrupts the first sync after a reconnect', async () => {
+    const server = new FakeSyncServer(A, 'Zeile\n')
+    const anna = client(server, 'anna')
+    await online(anna)
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('offline'))
+    anna.insert(0, 'Offline. ')
+    server.externalEdit((t) => t + 'Von Platte.\n')
+    await new Promise((r) => setTimeout(r, 5))
+
+    // the server dies when the client answers its first sync message, and has lost its state
+    const receive = server.receive.bind(server)
+    let syncMessages = 0
+    server.receive = (socket, message) => {
+      if (message.type === 'sync-request' && ++syncMessages === 2) {
+        server.receive = receive
+        server.restartWithNewEpoch()
+        return
+      }
+      receive(socket, message)
+      // like the real server, which starts the sync loop itself after `initial-content`
+      if (message.type === 'hello') server.syncAll()
+    }
+    server.offline = false
+    await vi.waitFor(() => {
+      expect(server.text).toContain('Offline. ')
+      expect(server.text).toContain('Von Platte.')
+      expect(anna.session.getText()).toBe(server.text)
+    })
+  })
+
+  it('reconnects when the initial content cannot be loaded', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const socketFactory = server.socketFactory
+    const deliverBroken = (socket: FakeSocket) => {
+      const deliver = socket.deliver.bind(socket)
+      socket.deliver = (message) =>
+        deliver(
+          message.type === 'initial-content' ? { ...message, documentState: 'AAAA' } : message,
+        )
+      return socket
+    }
+    const createSocket = vi
+      .fn(socketFactory)
+      .mockImplementationOnce(() => deliverBroken(socketFactory()))
+    const session = createAutomergeSession({
+      documentId: server.documentId,
+      automerge: A,
+      api: server.api('anna'),
+      store: memoryStore(),
+      createSocket,
+      timing: { ...timing, timeoutMs: 60_000 },
+    })
+    sessions.push(session)
+    await vi.waitFor(() => expect(session.status.value.connection).toBe('online'))
+    expect(session.getText()).toBe('Text')
+  })
+
+  it('reconnects when a sync message cannot be applied', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), { timing: { timeoutMs: 60_000 } })
+    await online(anna)
+    server.connections[0]!.socket.deliver({ type: 'sync-request', syncMessage: 'AAAA' })
+    await vi.waitFor(() => expect(server.ticketsIssued).toBe(2))
+    await online(anna)
+  })
+
+  it('backs off when sync messages keep failing', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), {
+      timing: { timeoutMs: 60_000, backoffMs: [1, 60_000] },
+    })
+    await online(anna)
+    server.connections[0]!.socket.deliver({ type: 'sync-request', syncMessage: 'AAAA' })
+    await vi.waitFor(() => expect(server.ticketsIssued).toBe(2))
+    await online(anna)
+    server.connections.at(-1)!.socket.deliver({ type: 'sync-request', syncMessage: 'AAAA' })
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('offline'))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(server.ticketsIssued).toBe(2)
+  })
+
+  it('ignores a bad presence message without dropping the connection', async () => {
+    const server = new FakeSyncServer(A, 'Text')
+    const anna = client(server, 'anna', memoryStore(), { timing: { timeoutMs: 60_000 } })
+    await online(anna)
+    const socket = server.connections[0]!.socket
+    socket.onmessage?.({ data: 'kein JSON' })
+    socket.deliver({ type: 'presence' })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(server.ticketsIssued).toBe(1)
+  })
+})
+
 describe('rebaseChanges', () => {
   it('places changes by their context when the target text moved', () => {
     const base = 'eins\nzwei\n'
