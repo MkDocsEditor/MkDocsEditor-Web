@@ -13,6 +13,7 @@ export default defineConfigWithVueTs(
   globalIgnores([
     '**/dist/**',
     '**/dist-e2e/**',
+    '**/dist-preview/**',
     '**/coverage/**',
     '**/playwright-report/**',
     '**/test-results/**',

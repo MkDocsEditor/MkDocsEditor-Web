@@ -61,6 +61,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build-only
+      - run: npm run build:preview
+      - run: npm run check:preview
 
   docker:
     name: docker-build

@@ -1,0 +1,277 @@
+/*
+ * The look of rendered markdown, shared by the web client and the Android app (through
+ * `npm run build:preview`). It styles the content of an element with the class
+ * `markdown-preview`. That element's layout (scrolling, padding) belongs to each client.
+ *
+ * Each client sets these variables on or above that element:
+ * - full colours: --md-primary, --md-error, --md-mark-background, and --md-code-<name> for
+ *   annotation, attribute, background, comment, constant, deleted, function, heading, inserted,
+ *   keyword, number, property, string, tag, text, url
+ * - "r, g, b" channels, used with an alpha value: --md-on-surface-rgb, --md-border-color-rgb
+ */
+.markdown-preview {
+  line-height: 1.6;
+  font-size: 16px;
+  word-wrap: break-word;
+}
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4 {
+  line-height: 1.3;
+  margin: 1.2em 0 0.5em;
+  font-weight: 600;
+}
+.markdown-preview h1 {
+  font-size: 1.8em;
+  font-weight: 400;
+  margin-top: 0.4em;
+}
+.markdown-preview h2 {
+  font-size: 1.45em;
+}
+.markdown-preview h3 {
+  font-size: 1.2em;
+}
+.markdown-preview p,
+.markdown-preview ul,
+.markdown-preview ol,
+.markdown-preview table,
+.markdown-preview pre,
+.markdown-preview blockquote,
+.markdown-preview dl {
+  margin: 0 0 1em;
+}
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 1.6em;
+}
+.markdown-preview li.task-list-item {
+  list-style: none;
+}
+.markdown-preview li.task-list-item input {
+  margin: 0 0.4em 0 -1.3em;
+}
+.markdown-preview a {
+  color: var(--md-primary);
+}
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.markdown-preview img.preview-image-missing {
+  outline: 2px dashed var(--md-error);
+  min-width: 48px;
+  min-height: 24px;
+}
+.markdown-preview code {
+  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  color: var(--md-code-text);
+  background: var(--md-code-background);
+  border: 1px solid rgba(var(--md-border-color-rgb), 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.markdown-preview pre {
+  background: var(--md-code-background);
+  border: 1px solid rgba(var(--md-border-color-rgb), 0.08);
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.markdown-preview pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+.markdown-preview table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid rgba(var(--md-on-surface-rgb), 0.15);
+  padding: 6px 12px;
+}
+.markdown-preview th {
+  background: rgba(var(--md-on-surface-rgb), 0.05);
+}
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid rgba(var(--md-on-surface-rgb), 0.2);
+}
+.markdown-preview blockquote {
+  border-left: 4px solid rgba(var(--md-on-surface-rgb), 0.2);
+  padding-left: 1em;
+  color: rgba(var(--md-on-surface-rgb), 0.75);
+}
+.markdown-preview mark {
+  background: var(--md-mark-background);
+  color: inherit;
+}
+.markdown-preview .footnotes {
+  font-size: 0.9em;
+  color: rgba(var(--md-on-surface-rgb), 0.75);
+}
+
+/* Admonitions, roughly like mkdocs-material. */
+.markdown-preview .admonition {
+  --admonition-color: #448aff;
+  border-left: 4px solid var(--admonition-color);
+  border-radius: 4px;
+  background: rgba(var(--md-on-surface-rgb), 0.03);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  margin: 0 0 1em;
+  padding: 0 12px 1px;
+  overflow: hidden;
+}
+.markdown-preview .admonition-title {
+  margin: 0 -12px 0.8em;
+  padding: 6px 12px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--admonition-color) 12%, transparent);
+}
+.markdown-preview details.admonition:not([open]) > .admonition-title {
+  margin-bottom: 0;
+}
+.markdown-preview summary.admonition-title {
+  cursor: pointer;
+}
+.markdown-preview .admonition.abstract,
+.markdown-preview .admonition.summary,
+.markdown-preview .admonition.tldr {
+  --admonition-color: #00b0ff;
+}
+.markdown-preview .admonition.info,
+.markdown-preview .admonition.todo {
+  --admonition-color: #00b8d4;
+}
+.markdown-preview .admonition.tip,
+.markdown-preview .admonition.hint,
+.markdown-preview .admonition.important {
+  --admonition-color: #00bfa5;
+}
+.markdown-preview .admonition.success,
+.markdown-preview .admonition.check,
+.markdown-preview .admonition.done {
+  --admonition-color: #00c853;
+}
+.markdown-preview .admonition.question,
+.markdown-preview .admonition.help,
+.markdown-preview .admonition.faq {
+  --admonition-color: #64dd17;
+}
+.markdown-preview .admonition.warning,
+.markdown-preview .admonition.caution,
+.markdown-preview .admonition.attention {
+  --admonition-color: #ff9100;
+}
+.markdown-preview .admonition.failure,
+.markdown-preview .admonition.fail,
+.markdown-preview .admonition.missing {
+  --admonition-color: #ff5252;
+}
+.markdown-preview .admonition.danger,
+.markdown-preview .admonition.error {
+  --admonition-color: #ff1744;
+}
+.markdown-preview .admonition.bug {
+  --admonition-color: #f50057;
+}
+.markdown-preview .admonition.example {
+  --admonition-color: #7c4dff;
+}
+.markdown-preview .admonition.quote,
+.markdown-preview .admonition.cite {
+  --admonition-color: #9e9e9e;
+}
+
+/* Code highlighting (highlight.js classes), mapped like the Android app's PreviewCodeCss.kt. */
+.markdown-preview pre.hljs,
+.markdown-preview pre.hljs code {
+  color: var(--md-code-text);
+}
+.markdown-preview .hljs-comment,
+.markdown-preview .hljs-quote {
+  color: var(--md-code-comment);
+  font-style: italic;
+}
+.markdown-preview .hljs-keyword,
+.markdown-preview .hljs-selector-tag,
+.markdown-preview .hljs-literal,
+.markdown-preview .hljs-symbol,
+.markdown-preview .hljs-bullet,
+.markdown-preview .hljs-char.escape_,
+.markdown-preview .hljs-doctag {
+  color: var(--md-code-keyword);
+}
+.markdown-preview .hljs-string,
+.markdown-preview .hljs-regexp,
+.markdown-preview .hljs-template-tag {
+  color: var(--md-code-string);
+}
+.markdown-preview .hljs-number {
+  color: var(--md-code-number);
+}
+.markdown-preview .hljs-title.function_,
+.markdown-preview .hljs-function .hljs-title {
+  color: var(--md-code-function);
+}
+.markdown-preview .hljs-attr,
+.markdown-preview .hljs-variable,
+.markdown-preview .hljs-template-variable,
+.markdown-preview .hljs-property,
+.markdown-preview .hljs-selector-attr,
+.markdown-preview .hljs-selector-class,
+.markdown-preview .hljs-selector-id {
+  color: var(--md-code-property);
+}
+.markdown-preview .hljs-built_in,
+.markdown-preview .hljs-type,
+.markdown-preview .hljs-title.class_,
+.markdown-preview .hljs-variable.language_,
+.markdown-preview .hljs-variable.constant_ {
+  color: var(--md-code-constant);
+}
+.markdown-preview .hljs-meta,
+.markdown-preview .hljs-meta .hljs-keyword {
+  color: var(--md-code-annotation);
+}
+.markdown-preview .hljs-meta .hljs-string {
+  color: var(--md-code-string);
+}
+.markdown-preview .hljs-tag,
+.markdown-preview .hljs-name,
+.markdown-preview .hljs-selector-pseudo {
+  color: var(--md-code-tag);
+}
+.markdown-preview .hljs-tag .hljs-attr {
+  color: var(--md-code-attribute);
+}
+.markdown-preview .hljs-tag .hljs-string {
+  color: var(--md-code-string);
+}
+.markdown-preview .hljs-section {
+  color: var(--md-code-heading);
+  font-weight: 700;
+}
+.markdown-preview .hljs-link {
+  color: var(--md-code-url);
+  text-decoration: underline;
+}
+.markdown-preview .hljs-addition {
+  color: var(--md-code-inserted);
+}
+.markdown-preview .hljs-deletion {
+  color: var(--md-code-deleted);
+}
+.markdown-preview .hljs-emphasis {
+  font-style: italic;
+}
+.markdown-preview .hljs-strong {
+  font-weight: 700;
+}
