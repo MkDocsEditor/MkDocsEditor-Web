@@ -19,6 +19,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
+import SyncStatus from '@/components/tree/SyncStatus.vue'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
 import { openWhileSet } from '@/services/dialogTarget'
 import { colorFor, formatSize, iconFor } from '@/services/icons'
@@ -218,7 +219,8 @@ const deleteText = computed(() => {
   >
     <template v-if="section">
       <ItemBreadcrumbs v-if="!isRoot" :ancestors="ancestors" />
-      <h1 class="text-h5 mb-2" data-testid="section-title">{{ title }}</h1>
+      <h1 class="text-h5 mb-1" data-testid="section-title">{{ title }}</h1>
+      <SyncStatus class="mb-2" />
       <v-progress-linear
         v-if="uploading"
         indeterminate

@@ -1,3 +1,5 @@
+import { plural } from './names'
+
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 const absolute = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -23,4 +25,24 @@ export function formatDate(iso: string): string {
 export function formatTime(iso: string | null | undefined): string {
   const time = iso ? new Date(iso).getTime() : NaN
   return Number.isNaN(time) ? '–' : absolute.format(time)
+}
+
+/** "Synced 3 hours ago", in whole units like the Android app. */
+export function syncedAgo(time: number, now = Date.now()): string {
+  const minutes = Math.floor((now - time) / 60_000)
+  if (minutes < 1) return 'Synced just now'
+  if (minutes < 60) return `Synced ${plural(minutes, 'minute')} ago`
+  if (minutes < 24 * 60) return `Synced ${plural(Math.floor(minutes / 60), 'hour')} ago`
+  return `Synced ${plural(Math.floor(minutes / (24 * 60)), 'day')} ago`
+}
+
+/** The line about how current the shown data is; null if there is nothing to say yet. */
+export function syncStatusText(
+  lastSync: number | null,
+  notConnected: boolean,
+  now = Date.now(),
+): string | null {
+  const synced = lastSync === null ? null : syncedAgo(lastSync, now)
+  if (!notConnected) return synced
+  return synced === null ? 'Not connected' : `Not connected · ${synced}`
 }

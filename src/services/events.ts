@@ -22,6 +22,8 @@ export interface EventsHandlers {
   onItemsMoved?(moves: MovedItem[]): void
   /** The complete list of open documents and their users; replaces the previous one. */
   onOnline(documents: Map<string, OnlineUser[]>): void
+  /** A working connection was lost, or a new one works again after that. */
+  onConnectionChanged?(connected: boolean): void
   /** The connection was refused for good (bad credentials); the caller should log out. */
   onUnauthorized?(): void
 }
@@ -98,6 +100,7 @@ export function connectEvents(options: EventsOptions): EventsConnection {
 
   function connectionLost(): void {
     socket = null
+    if (connected) options.onConnectionChanged?.(false)
     connected = false
     connectingSince = null
     doubted = false
@@ -192,6 +195,7 @@ export function connectEvents(options: EventsOptions): EventsConnection {
         // The first message after hello: the connection works.
         connected = true
         attempt = 0
+        options.onConnectionChanged?.(true)
       }
       options.onOnline(map)
     }

@@ -44,8 +44,10 @@ describe('connectEvents', () => {
     let online = new Map<string, OnlineUser[]>()
     const onUnauthorized = vi.fn()
     const onItemsMoved = vi.fn()
+    const onConnectionChanged = vi.fn()
     const connection = connectEvents({
       onItemsMoved,
+      onConnectionChanged,
       wsTicket,
       wsUrl: (path) => `ws://b${path}`,
       createSocket: (url) => {
@@ -64,10 +66,28 @@ describe('connectEvents', () => {
       online: () => online,
       onUnauthorized,
       onItemsMoved,
+      onConnectionChanged,
       connection,
       wsTicket,
     }
   }
+
+  it('reports a lost connection only after it worked, and when it works again', async () => {
+    const { sockets, onConnectionChanged } = setup()
+    await vi.advanceTimersByTimeAsync(0)
+    sockets[0]!.open()
+    sockets[0]!.close()
+    expect(onConnectionChanged).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    sockets[1]!.open()
+    sockets[1]!.receive({ type: 'online', documents: [] })
+    sockets[1]!.receive({ type: 'online', documents: [] })
+    expect(onConnectionChanged.mock.calls).toEqual([[true]])
+
+    sockets[1]!.close()
+    expect(onConnectionChanged.mock.calls).toEqual([[true], [false]])
+  })
 
   it('passes moved items on', async () => {
     const { sockets, onItemsMoved } = setup()
