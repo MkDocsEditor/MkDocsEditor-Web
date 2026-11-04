@@ -91,6 +91,38 @@ describe('HistoryDialog', () => {
     wrapper.unmount()
   })
 
+  it('stays open and says why when loading a version or restoring fails', async () => {
+    let diffUp = false
+    const { wrapper, open } = await setup({
+      'GET /document/d1/history/': () => json(revisions),
+      'GET /document/d1/history/diff/': () =>
+        diffUp ? new Response('@@ -1 +1 @@\n-alt\n+neu\n') : json({ message: 'panic' }, 500),
+      'GET /document/d1/history/aaaaaaa/content/': () => new Response('erste'),
+      'POST /document/d1/history/aaaaaaa/restore/': () => json({ message: 'panic' }, 500),
+    })
+    ;(qa('[data-testid="history-entry"]')[0] as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="load-error"]')?.textContent).toContain('The server has a problem')
+    diffUp = true
+    ;(q('[data-testid="load-error-retry"]') as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="load-error"]')).toBeNull()
+
+    ;(q('[aria-label="Back to the list"]') as HTMLElement).click()
+    await flushPromises()
+    ;(qa('[data-testid="history-entry"]')[1] as HTMLElement).click()
+    await flushPromises()
+    ;(q('[data-testid="history-restore"]') as HTMLElement).click()
+    await flushPromises()
+    ;(q('[data-testid="confirm-button"]') as HTMLElement).click()
+    await flushPromises()
+    const error = q('[data-testid="history-restore-error"]')
+    expect(error?.textContent).toContain('Restore failed')
+    expect(error?.textContent).not.toContain('panic')
+    expect(open.value).toBe(true)
+    wrapper.unmount()
+  })
+
   it('shows the diff of a version against its predecessor', async () => {
     const { wrapper, requests } = await setup({
       'GET /document/d1/history/': () => json(revisions),

@@ -4,7 +4,7 @@ import { onMounted, ref } from 'vue'
 
 import { useAuthApi } from '@/api'
 import { markAndroidHintSeen } from '@/services/androidHint'
-import { describeAuthError } from '@/services/authErrors'
+import { authErrorText } from '@/services/authErrors'
 import { connectUrlFor, OBTAINIUM_ADD_URL } from '@/services/connectLink'
 import { useAuthStore } from '@/stores/auth'
 import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
@@ -28,7 +28,7 @@ async function open(): Promise<void> {
     const created = await useReauthStore().run(() => api.createDeviceLink())
     window.location.assign(connectUrlFor(created, auth.username))
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) error.value = describeAuthError(e) ?? String(e)
+    if (!(e instanceof ReauthCancelled)) error.value = authErrorText(e)
   } finally {
     busy.value = false
   }

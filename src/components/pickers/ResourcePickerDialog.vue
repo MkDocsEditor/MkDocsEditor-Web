@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue'
 import type { TreeItem } from '@/api'
 import TreeBrowser from '@/components/tree/TreeBrowser.vue'
 import { resourceKind } from '@/services/icons'
-import { useNotifyStore } from '@/stores/notify'
+import { describeError } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
 import { cleanUrl, escapeLinkText, markdownLink } from './markdown'
@@ -24,7 +24,6 @@ const open = defineModel<boolean>({ required: true })
 const emit = defineEmits<{ insert: [snippets: string[]] }>()
 
 const tree = useTreeStore()
-const notify = useNotifyStore()
 const tab = ref<'wiki' | 'upload' | 'web'>('wiki')
 const altText = ref('')
 const imagesOnly = ref(true)
@@ -32,6 +31,7 @@ const browseSection = ref('')
 const uploadSection = ref('')
 const url = ref('')
 const uploading = ref(false)
+const uploadError = ref<unknown>(null)
 
 const pageFolder = computed(() => tree.parentOf(props.documentId)?.id ?? tree.root?.id ?? '')
 
@@ -65,6 +65,7 @@ async function onFilesChosen(event: Event): Promise<void> {
   input.value = ''
   if (files.length === 0) return
   uploading.value = true
+  uploadError.value = null
   try {
     const created = await tree.uploadFiles(uploadSection.value, files)
     const text = files.length === 1 ? altText.value : ''
@@ -74,7 +75,7 @@ async function onFilesChosen(event: Event): Promise<void> {
     )
     open.value = false
   } catch (error) {
-    notify.error(error, 'Upload failed')
+    uploadError.value = error
   } finally {
     uploading.value = false
   }
@@ -102,6 +103,17 @@ function insertWeb(): void {
         <v-tab value="web" data-testid="resource-tab-web">Web address</v-tab>
       </v-tabs>
       <v-card-text class="resource-picker__body">
+        <v-alert
+          v-if="uploadError"
+          type="error"
+          variant="tonal"
+          density="compact"
+          role="alert"
+          class="mb-3"
+          title="Upload failed"
+          :text="describeError(uploadError)"
+          data-testid="picker-upload-error"
+        />
         <v-text-field
           v-model="altText"
           label="Description (alt text)"

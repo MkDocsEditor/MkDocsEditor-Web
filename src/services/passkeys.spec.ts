@@ -53,7 +53,7 @@ describe('passkey ceremonies', () => {
   it('explains a provider error and names the alternative', () => {
     const error = new PasskeyProviderError('Something went wrong.')
     const message = describePasskeyError(error, 'confirm with your password')
-    expect(message).toContain('("Something went wrong.")')
+    expect(message).not.toContain('Something went wrong.')
     expect(message).toContain('reload the page')
     expect(message).toContain('or confirm with your password instead')
     expect(describePasskeyError(error)).not.toContain(' instead')

@@ -5,7 +5,7 @@ import { ApiError, useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import { passwordRule, sameAsRule } from '@/services/accountRules'
-import { describeAuthError } from '@/services/authErrors'
+import { authErrorText } from '@/services/authErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
@@ -48,7 +48,7 @@ async function save(): Promise<void> {
     error.value =
       e instanceof ApiError && e.code === 'invalid-credentials'
         ? 'The current password is wrong.'
-        : (describeAuthError(e) ?? String(e))
+        : authErrorText(e)
   } finally {
     busy.value = false
   }

@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { useAuthApi } from '@/api'
 import type { SessionInfo } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import LoadError from '@/components/common/LoadError.vue'
 import { plural } from '@/services/names'
 import { formatTime } from '@/services/time'
 import { useAuthStore } from '@/stores/auth'
@@ -18,6 +19,7 @@ const router = useRouter()
 
 const sessions = ref<SessionInfo[]>([])
 const loading = ref(true)
+const loadError = ref<unknown>(null)
 const busy = ref(false)
 const confirmOthers = ref(false)
 
@@ -26,10 +28,13 @@ function isPhone(session: SessionInfo): boolean {
 }
 
 async function load(): Promise<void> {
+  if (loadError.value) loading.value = true
+  loadError.value = null
   try {
     sessions.value = await api.sessions()
   } catch (e) {
-    notify.error(e, 'Could not load the devices')
+    if (sessions.value.length > 0) notify.error(e, 'Could not load the devices', () => void load())
+    else loadError.value = e
   } finally {
     loading.value = false
   }
@@ -77,6 +82,12 @@ onMounted(load)
     </v-card-item>
     <v-card-text>
       <v-progress-linear v-if="loading" indeterminate />
+      <LoadError
+        v-else-if="loadError"
+        title="Could not load the devices"
+        :error="loadError"
+        @retry="load"
+      />
       <v-list v-else lines="three" data-testid="session-list">
         <v-list-item
           v-for="session in sessions"

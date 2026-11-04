@@ -83,7 +83,7 @@ async function open(item: TreeItem): Promise<void> {
   try {
     await openResource(item.id)
   } catch (error) {
-    notify.error(error, 'Could not open the file')
+    notify.error(error, 'Could not open the file', () => void open(item))
   }
 }
 
@@ -99,31 +99,23 @@ async function create(name: string): Promise<void> {
   const parent = section.value
   const kind = createKind.value
   if (!parent || !kind) return
-  try {
-    if (kind === 'section') {
-      await tree.createSection(parent.id, name)
-      notify.success(`Created folder “${name}”`)
-    } else {
-      const doc = await tree.createDocument(parent.id, stripMarkdownExtension(name))
-      await router.push({ name: 'document', params: { id: doc.id } })
-    }
-  } catch (error) {
-    notify.error(error, 'Create failed')
+  if (kind === 'section') {
+    await tree.createSection(parent.id, name)
+    notify.success(`Created folder “${name}”`)
+  } else {
+    const doc = await tree.createDocument(parent.id, stripMarkdownExtension(name))
+    await router.push({ name: 'document', params: { id: doc.id } })
   }
 }
 
 async function rename(name: string): Promise<void> {
   const item = renameTarget.value
   if (!item) return
-  try {
-    if (item.type === 'section') await tree.renameSection(item.id, name)
-    else if (item.type === 'document')
-      await tree.renameDocument(item.id, stripMarkdownExtension(name))
-    else await tree.renameResource(item.id, name)
-    notify.success('Renamed')
-  } catch (error) {
-    notify.error(error, 'Rename failed')
-  }
+  if (item.type === 'section') await tree.renameSection(item.id, name)
+  else if (item.type === 'document')
+    await tree.renameDocument(item.id, stripMarkdownExtension(name))
+  else await tree.renameResource(item.id, name)
+  notify.success('Renamed')
 }
 
 // Deleting a page somebody has open fails with 409; the user can then force it.
@@ -139,7 +131,7 @@ async function remove(item = deleteTarget.value, force = false): Promise<void> {
     notify.success(`Deleted “${item.name}”`)
   } catch (error) {
     if (!force && error instanceof ApiError && error.status === 409) forceTarget.value = item
-    else notify.error(error, 'Delete failed')
+    else notify.error(error, 'Delete failed', () => void remove(item, force))
   }
 }
 
@@ -159,7 +151,7 @@ async function upload(files: File[]): Promise<void> {
       created.length === 1 ? `Uploaded “${created[0]!.name}”` : `Uploaded ${created.length} files`,
     )
   } catch (error) {
-    notify.error(error, 'Upload failed')
+    notify.error(error, 'Upload failed', () => void upload(files))
   } finally {
     uploading.value = false
   }
@@ -363,14 +355,14 @@ const deleteText = computed(() => {
       :title="createKind === 'section' ? 'New folder' : 'New page'"
       label="Name"
       confirm-text="Anlegen"
-      @confirm="create"
+      :save="create"
     />
     <NameDialog
       v-model="renameOpen"
       :title="renameTarget ? `Rename ${typeLabel[renameTarget.type].toLowerCase()}` : ''"
       label="New name"
       :initial="renameTarget?.name"
-      @confirm="rename"
+      :save="rename"
     />
     <ConfirmDialog
       v-model="deleteOpen"

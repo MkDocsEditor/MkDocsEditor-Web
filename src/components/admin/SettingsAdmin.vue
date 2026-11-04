@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 
 import { useAuthApi } from '@/api'
 import type { InstanceSettings } from '@/api'
+import LoadError from '@/components/common/LoadError.vue'
 import { useNotifyStore } from '@/stores/notify'
 import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
 
@@ -12,12 +13,15 @@ const notify = useNotifyStore()
 
 const settings = ref<InstanceSettings | null>(null)
 const busy = ref(false)
+const loadError = ref<unknown>(null)
 
 async function load(): Promise<void> {
+  loadError.value = null
   try {
     settings.value = await api.settings()
   } catch (e) {
-    notify.error(e, 'Could not load the settings')
+    if (settings.value) notify.error(e, 'Could not load the settings', () => void load())
+    else loadError.value = e
   }
 }
 
@@ -55,6 +59,9 @@ onMounted(load)
         Every account then needs a passkey or an authenticator app. Accounts without one must set it
         up after their next sign-in before they can continue.
       </p>
+    </v-card-text>
+    <v-card-text v-else-if="loadError">
+      <LoadError title="Could not load the settings" :error="loadError" @retry="load" />
     </v-card-text>
     <v-progress-linear v-else indeterminate />
   </v-card>

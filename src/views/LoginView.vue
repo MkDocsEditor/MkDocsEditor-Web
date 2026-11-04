@@ -7,7 +7,7 @@ import { ApiError, useAuthApi } from '@/api'
 import type { SecondFactorMethod, SessionResponse } from '@/api'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
-import { authErrorText, describeAuthError } from '@/services/authErrors'
+import { authErrorText } from '@/services/authErrors'
 import { useAndroidHint } from '@/services/androidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { passkeyReminderDue } from '@/services/passkeyReminder'
@@ -86,7 +86,7 @@ function showError(e: unknown): void {
     error.value = `The server is not reachable (${getConfig().backendUrl}).`
   } else if (e instanceof ApiError && e.code === 'challenge-expired' && challenge.value) {
     restart()
-    error.value = describeAuthError(e) ?? e.message
+    error.value = authErrorText(e)
   } else if (e instanceof ApiError && e.isUnauthorized && !e.code) {
     error.value = 'Wrong username or password.'
   } else {

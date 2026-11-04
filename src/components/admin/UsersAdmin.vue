@@ -13,6 +13,7 @@ import { useAuthApi } from '@/api'
 import { ROLES } from '@/api/authTypes'
 import type { AdminUser, CreatedLink, LinkInfo, Role } from '@/api'
 import LinkResultDialog from '@/components/admin/LinkResultDialog.vue'
+import LoadError from '@/components/common/LoadError.vue'
 import LinkStatusChip from '@/components/admin/LinkStatusChip.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { roleLabel } from '@/services/accountRules'
@@ -29,6 +30,7 @@ const notify = useNotifyStore()
 const users = ref<AdminUser[]>([])
 const resetLinks = ref<LinkInfo[]>([])
 const loading = ref(true)
+const loadError = ref<unknown>(null)
 const showDeleted = ref(false)
 const busyId = ref('')
 
@@ -57,12 +59,15 @@ function userName(id: string | null | undefined): string {
 }
 
 async function load(): Promise<void> {
+  if (loadError.value) loading.value = true
+  loadError.value = null
   try {
     const [list, resets] = await Promise.all([api.users(), api.resetLinks()])
     users.value = list
     resetLinks.value = resets
   } catch (e) {
-    notify.error(e, 'Could not load the users')
+    if (users.value.length > 0) notify.error(e, 'Could not load the users', () => void load())
+    else loadError.value = e
   } finally {
     loading.value = false
   }
@@ -182,6 +187,9 @@ onMounted(load)
         </template>
       </v-card-item>
       <v-progress-linear v-if="loading" indeterminate />
+      <v-card-text v-if="loadError">
+        <LoadError title="Could not load the users" :error="loadError" @retry="load" />
+      </v-card-text>
       <v-list lines="three">
         <v-list-item
           v-for="user in visible"

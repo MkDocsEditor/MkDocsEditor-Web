@@ -120,7 +120,7 @@ describe('AccountView', () => {
     await flushPromises()
 
     const dialog = byTestId('reauth-dialog')
-    expect(dialog.textContent).toContain('("Something went wrong.")')
+    expect(dialog.textContent).not.toContain('Something went wrong.')
     expect(dialog.textContent).toContain('reload the page')
     expect(dialog.textContent).toContain('confirm with your password')
     // another try would only open more windows of the provider

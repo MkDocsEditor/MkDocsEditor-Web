@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { ApiError, useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
 import PasswordField from '@/components/auth/PasswordField.vue'
-import { describeAuthError } from '@/services/authErrors'
+import { authErrorText, describeAuthError } from '@/services/authErrors'
 import {
   describePasskeyError,
   getPasskey,
@@ -67,7 +67,7 @@ async function submit(): Promise<void> {
     if (e instanceof ApiError && e.code === 'invalid-credentials') {
       error.value = needsCode.value ? 'Wrong password or code.' : 'Wrong password.'
     } else {
-      error.value = describeAuthError(e) ?? String(e)
+      error.value = authErrorText(e)
     }
   } finally {
     busy.value = false

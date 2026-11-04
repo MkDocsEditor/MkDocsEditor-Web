@@ -5,6 +5,13 @@ import { useNotifyStore } from '@/stores/notify'
 
 const notify = useNotifyStore()
 const current = computed(() => notify.queue[0])
+
+function retry(): void {
+  const notification = current.value
+  if (!notification) return
+  notify.dismiss(notification.id)
+  notification.retry?.()
+}
 </script>
 
 <template>
@@ -17,6 +24,9 @@ const current = computed(() => notify.queue[0])
   >
     {{ current?.text }}
     <template #actions>
+      <v-btn v-if="current?.retry" variant="text" data-testid="notification-retry" @click="retry">
+        Retry
+      </v-btn>
       <v-btn variant="text" @click="current && notify.dismiss(current.id)">OK</v-btn>
     </template>
   </v-snackbar>
