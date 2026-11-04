@@ -4,12 +4,14 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { USERS, WEB_PORT } from './ports'
+import { USERS, WEB_PORT, WORKER } from './ports'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const TMP = path.join(here, '.tmp')
-/** The wiki of the backend that global setup starts for all tests. */
-export const MAIN_WIKI = path.join(TMP, 'run', 'wiki')
+/** The wiki of the backend that global setup starts for a worker. */
+export const mainWiki = (worker: number) => path.join(TMP, `run-${worker}`, 'wiki')
+/** The wiki of the backend of the worker this code runs in. */
+export const MAIN_WIKI = mainWiki(WORKER)
 
 /** Runs git in a test wiki with a fixed identity. */
 export function git(wiki: string, args: string[], author = 'E2E <e2e@example.com>'): string {
@@ -96,11 +98,13 @@ export interface ConfigOptions {
   users?: boolean
   /** Real rate limits with this per-IP burst; by default they are off for the tests. */
   perIpBurst?: number
+  /** The port of the app that uses this backend (default: the app of the current worker). */
+  webPort?: number
 }
 
 /**
  * Writes a backend config for a wiki and returns its path. The web client under test runs on
- * `http://localhost:WEB_PORT` and reaches the backend on `http://localhost:port`: same site, so
+ * `http://localhost:webPort` and reaches the backend on `http://localhost:port`: same site, so
  * the session cookie works over plain HTTP, and `localhost` is a valid passkey RP ID.
  */
 export function writeConfig(
@@ -118,7 +122,7 @@ export function writeConfig(
     }
     return value
   }
-  const webOrigin = `http://localhost:${WEB_PORT}`
+  const webOrigin = `http://localhost:${options.webPort ?? WEB_PORT}`
   const users = (options.users === false ? [] : Object.values(USERS)).flatMap((user) => [
     `      - username: "${user.username}"`,
     `        passwordHash: "${hash(user.password)}"`,

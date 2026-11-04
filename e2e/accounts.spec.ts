@@ -17,7 +17,7 @@ import {
 import { addVirtualAuthenticator, totp } from './authenticators'
 import { backendBinary, createWiki, startBackend, TMP, waitForLog, writeConfig } from './backend'
 import { backendRequest, login, skipPasskeyStep } from './helpers'
-import { BACKEND_URL, BROWSER_BACKEND_URL } from './ports'
+import { BACKEND_URL, BROWSER_BACKEND_URL, WEB_PORT } from './ports'
 
 test.describe('accounts', () => {
   test('the setup link creates the first admin', async ({ browser }, testInfo) => {
@@ -351,7 +351,7 @@ test.describe('accounts', () => {
     await confirmIfAsked(page, card.getByTestId('qr-code'), user.password)
     await expect(card.getByTestId('connect-countdown')).toContainText(/Valid for [45]:\d\d/)
     const connectUrl = await card.getByTestId('connect-open').getAttribute('href')
-    expect(connectUrl).toMatch(/^http:\/\/localhost:4174\/connect#[A-Za-z0-9_-]+$/)
+    expect(connectUrl).toMatch(new RegExp(`^http://localhost:${WEB_PORT}/connect#[A-Za-z0-9_-]+$`))
 
     // the page the link opens when the app is not installed: no request carries the payload
     const fragment = connectUrl!.split('#')[1]!

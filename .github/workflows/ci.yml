@@ -122,7 +122,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # headless tests only use the headless shell, so the full browser is not needed
+      - run: npx playwright install --with-deps --only-shell chromium
       - run: npm run test:e2e
         env:
           E2E_BACKEND_LOG: ${{ runner.temp }}/backend.log
