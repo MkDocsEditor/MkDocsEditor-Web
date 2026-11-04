@@ -1,3 +1,5 @@
+import { idbStore } from './idb'
+
 /**
  * Persists local document copies, so edits survive reloads and offline periods.
  *
@@ -100,32 +102,12 @@ export function unownedStore(inner: OfflineStore): OfflineStore {
 const DB_NAME = 'mkdocseditor'
 const STORE = 'documents'
 
-function request<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
 /** IndexedDB store; falls back to memory when IndexedDB is unavailable (private mode). */
 function indexedDbStore(): OfflineStore {
-  let dbPromise: Promise<IDBDatabase> | null = null
-  const open = () =>
-    (dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1)
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'documentId' })
-      req.onsuccess = () => resolve(req.result)
-      req.onerror = () => reject(req.error)
-    }))
+  const withStore = idbStore(DB_NAME, STORE, (database) =>
+    database.createObjectStore(STORE, { keyPath: 'documentId' }),
+  )
   const fallback = memoryStore()
-
-  async function withStore<T>(
-    mode: IDBTransactionMode,
-    fn: (store: IDBObjectStore) => IDBRequest<T>,
-  ): Promise<T> {
-    const db = await open()
-    return request(fn(db.transaction(STORE, mode).objectStore(STORE)))
-  }
 
   return {
     async get(id) {

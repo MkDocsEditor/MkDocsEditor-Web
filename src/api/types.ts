@@ -64,10 +64,10 @@ export interface MovedItem {
   newPath: string
 }
 
-export type ReferenceKind = 'link' | 'image' | 'definition' | 'html'
+type ReferenceKind = 'link' | 'image' | 'definition' | 'html'
 
 /** One reference in a document (`docs/references.md` section 4). */
-export interface Reference {
+interface Reference {
   kind: ReferenceKind
   /** 1-based line and column. */
   line: number
@@ -115,7 +115,7 @@ export interface MoveRequest {
 }
 
 /** A changed line: 1-based number in the text before the move. */
-export interface LineEdit {
+interface LineEdit {
   line: number
   before: string
   after: string
@@ -182,7 +182,7 @@ export interface AuthorshipResponse {
   runs: { start: number; end: number; actorId: string; username: string }[]
 }
 
-export interface RevisionAuthor {
+interface RevisionAuthor {
   name: string
   email: string
   /** Empty for authors who are not configured users. */

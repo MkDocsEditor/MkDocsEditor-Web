@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { mdiCheck, mdiContentCopy } from '@mdi/js'
 
-import { useCopied } from '@/services/copied'
+import { useCopied } from '@/composables/useCopied'
 
 defineProps<{ value: string; label: string; testid?: string }>()
 

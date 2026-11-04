@@ -1,26 +1,19 @@
 <script setup lang="ts">
 import {
   mdiCheck,
-  mdiCloudCheckOutline,
-  mdiCloudOffOutline,
-  mdiCloudSyncOutline,
   mdiDotsVertical,
   mdiEyeOutline,
   mdiFolderMoveOutline,
   mdiFileDocumentEditOutline,
   mdiHistory,
-  mdiLockOutline,
   mdiOpenInNew,
   mdiImageSearchOutline,
   mdiPaperclip,
   mdiViewSplitVertical,
 } from '@mdi/js'
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
-
-import { EditorSelection } from '@codemirror/state'
-import type { EditorView } from '@codemirror/view'
 
 import type { ResourceModel } from '@/api'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
@@ -32,22 +25,22 @@ import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import type { AuthorHighlightMode } from '@/editor/authorship'
-import { insertionFor } from '@/editor/upload'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { isImage, resourceKind } from '@/services/icons'
 import { linkDestination } from '@/services/linkPath'
 import { initials } from '@/services/names'
-import { useStored } from '@/services/storedRef'
-import { usePagesStore } from '@/stores/pages'
-import { accountKey } from '@/sync/wikiCopy'
+import { useStored } from '@/composables/useStored'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
-import { createDocumentSession } from '@/sync'
-import type { DocumentSession } from '@/sync'
+
+import { connectionBadge } from './document/connectionBadge'
+import { useDocumentSession } from './document/useDocumentSession'
+import { useEditorInsertion } from './document/useEditorInsertion'
+import { useSearchText } from './document/useSearchText'
 
 const props = defineProps<{ id: string }>()
 
@@ -100,34 +93,24 @@ function closeFilesOnPhone(): void {
 }
 const historyOpen = ref(false)
 
-const session = shallowRef<DocumentSession | null>(null)
-const text = ref('')
-const ready = ref(false)
+const { session, text, ready, status, onlineUsers } = useDocumentSession(
+  () => props.id,
+  (newId) => {
+    void tree.load().catch(() => undefined)
+    void router.replace({ name: 'document', params: { id: newId } })
+  },
+)
+useSearchText(() => props.id, text, ready)
+const connection = computed(() => connectionBadge(status.value))
 
-// Search finds what was just typed here, before the server's copy of the page is fetched again.
-const pages = usePagesStore()
-const account = accountKey()
-let unstoredText: { id: string; text: string } | null = null
-let storeTimer: ReturnType<typeof setTimeout> | undefined
-
-function storeText(): void {
-  clearTimeout(storeTimer)
-  // after a sign-out this text is not for whoever comes next
-  if (unstoredText && accountKey() === account) pages.edited(unstoredText.id, unstoredText.text)
-  unstoredText = null
-}
-
-watch(text, (value) => {
-  if (!ready.value) return
-  unstoredText = { id: props.id, text: value }
-  clearTimeout(storeTimer)
-  storeTimer = setTimeout(storeText, 1_000)
-})
-watch(() => props.id, storeText, { flush: 'sync' })
-onBeforeUnmount(storeText)
 const topLine = ref(0)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const editorView = () => editor.value?.getView() ?? null
+const { selectedText, replaceSelection, insertSnippets, reveal, revealLine } = useEditorInsertion(
+  editorView,
+  () => text.value,
+  showEditor,
+)
 
 /** Pasted or dropped files go into the folder of the page. */
 const uploading = ref(0)
@@ -151,13 +134,6 @@ const linkOpen = ref(false)
 const resourceOpen = ref(false)
 const pickerSelection = ref('')
 
-function selectedText(): string {
-  const view = editorView()
-  if (!view) return ''
-  const { from, to } = view.state.selection.main
-  return view.state.sliceDoc(from, to)
-}
-
 function openLinkPicker(): void {
   pickerSelection.value = selectedText()
   linkOpen.value = true
@@ -175,37 +151,9 @@ const shortcutOverride = {
   image: () => (openResourcePicker(), true),
 }
 
-/** Replaces a range with text as user input and puts the cursor after it. */
-function insertText(view: EditorView, from: number, to: number, insert: string): void {
-  view.dispatch({
-    changes: { from, to, insert },
-    selection: { anchor: from + insert.length },
-    userEvent: 'input.insert',
-    scrollIntoView: true,
-  })
-  view.focus()
-}
-
-/** Replaces the selection (or inserts at the cursor). */
-function replaceSelection(insert: string): void {
-  const view = editorView()
-  if (!view || view.state.readOnly) return
-  const { from, to } = view.state.selection.main
-  insertText(view, from, to, insert)
-}
-
 function insertFromPicker(snippets: string[]): void {
   if (snippets.length === 1) replaceSelection(snippets[0]!)
   else insertSnippets(snippets)
-}
-
-/** Inserts snippets at the cursor, on lines of their own (like pasted files). */
-function insertSnippets(snippets: string[]): void {
-  const view = editorView()
-  if (!view || snippets.length === 0 || view.state.readOnly) return
-  showEditor()
-  const at = view.state.selection.main.head
-  insertText(view, at, at, insertionFor(view.state.doc, at, snippets))
 }
 
 /** Markdown for a resource, relative to this page. */
@@ -227,36 +175,13 @@ async function uploadAndInsert(files: File[]): Promise<void> {
   }
 }
 
-function reveal(reference: TextReference): void {
-  const view = editorView()
-  if (!view) return
-  showEditor()
-  const length = view.state.doc.length
-  view.dispatch({
-    selection: EditorSelection.range(
-      Math.min(reference.from, length),
-      Math.min(reference.to, length),
-    ),
-    scrollIntoView: true,
-  })
-  view.focus()
+function revealReference(reference: TextReference): void {
+  reveal(reference)
   closeFilesOnPhone()
 }
 
 /** `?line=12` (from "linked from" lists): select that line once the text is there. */
 const route = useRoute()
-let revealTimer: ReturnType<typeof setTimeout> | undefined
-function revealLine(number: number, attempt = 0): void {
-  const view = editorView()
-  // the editor creates its view a moment after the text is ready
-  if (!view || view.state.doc.length < text.value.length) {
-    if (attempt < 40) revealTimer = setTimeout(() => revealLine(number, attempt + 1), 50)
-    return
-  }
-  const target = view.state.doc.line(Math.min(number, view.state.doc.lines))
-  view.dispatch({ selection: EditorSelection.range(target.from, target.to), scrollIntoView: true })
-  view.focus()
-}
 watch(
   () => [ready.value, route.query.line] as const,
   ([isReady, line]) => {
@@ -269,81 +194,6 @@ watch(
   // after the id watcher below, so a new page's line waits for that page's text
   { flush: 'post' },
 )
-
-/** Set while following a server-side rename: the session already moved to the new id. */
-let renamedTo: string | null = null
-
-function onRenamed(newId: string): void {
-  renamedTo = newId
-  void tree.load().catch(() => undefined)
-  void router.replace({ name: 'document', params: { id: newId } })
-}
-
-watch(
-  () => props.id,
-  (id) => {
-    if (id === renamedTo) {
-      renamedTo = null
-      return
-    }
-    session.value?.close()
-    const next = createDocumentSession(id, { onRenamed })
-    session.value = next
-    ready.value = false
-    text.value = next.getText()
-    next.ready
-      .then(() => {
-        if (session.value === next) {
-          text.value = next.getText()
-          ready.value = true
-        }
-      })
-      .catch(() => {
-        // status.message is shown
-      })
-  },
-  { immediate: true },
-)
-onBeforeUnmount(() => {
-  clearTimeout(revealTimer)
-  session.value?.close()
-})
-
-const status = computed(() => session.value?.status.value)
-const peers = computed(() => session.value?.peers.value ?? [])
-/** Online users: distinct usernames (one user can have several tabs or devices). */
-const onlineUsers = computed(() => {
-  const seen = new Map<string, { name: string; color: string }>()
-  for (const peer of peers.value) {
-    if (!seen.has(peer.username))
-      seen.set(peer.username, { name: peer.displayName || peer.username, color: peer.color })
-  }
-  return [...seen.values()]
-})
-
-const connection = computed(() => {
-  const s = status.value
-  if (!s) return null
-  switch (s.connection) {
-    case 'online':
-      return s.unsynced
-        ? { icon: mdiCloudSyncOutline, color: 'info', text: 'Saving …' }
-        : { icon: mdiCloudCheckOutline, color: 'success', text: 'Saved' }
-    case 'connecting':
-      return { icon: mdiCloudSyncOutline, color: 'info', text: 'Connecting …' }
-    case 'offline':
-      return {
-        icon: mdiCloudOffOutline,
-        color: 'warning',
-        text: s.unsynced ? 'Offline – changes stay here' : 'Offline',
-      }
-    case 'snapshot':
-      return { icon: mdiLockOutline, color: 'default', text: 'Read only' }
-    case 'closed':
-      return { icon: mdiCloudOffOutline, color: 'error', text: 'Disconnected' }
-  }
-  return null
-})
 </script>
 
 <template>
@@ -519,7 +369,7 @@ const connection = computed(() => {
         :uploading="uploading > 0"
         @insert="insertResource"
         @upload="uploadAndInsert"
-        @reveal="reveal"
+        @reveal="revealReference"
       >
         <template #footer>
           <div class="pa-4">

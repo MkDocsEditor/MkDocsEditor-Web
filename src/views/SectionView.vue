@@ -27,11 +27,11 @@ import { plural, stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
 import { useBreakWarning } from '@/components/references/backlinks'
-import { useMovedRedirect } from '@/services/redirects'
+import { useMovedRedirect } from '@/composables/useMovedRedirect'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
-import { sortByName } from '@/stores/treeIndex'
+import { sortByName } from '@/services/treeIndex'
 
 const props = defineProps<{ id?: string }>()
 
@@ -354,7 +354,7 @@ const deleteText = computed(() => {
       v-model="createOpen"
       :title="createKind === 'section' ? 'New folder' : 'New page'"
       label="Name"
-      confirm-text="Anlegen"
+      confirm-text="Create"
       :save="create"
     />
     <NameDialog

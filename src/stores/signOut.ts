@@ -1,9 +1,10 @@
 import { useAuthStore } from '@/stores/auth'
 import { usePagesStore } from '@/stores/pages'
 import { useTreeStore } from '@/stores/tree'
-import { accountKey, wikiCopy } from '@/sync/wikiCopy'
+import { accountKey } from '@/sync/account'
+import { wikiCopy } from '@/sync/wikiCopy'
 
-import { clearRecentSearches } from './recentSearches'
+import { clearRecentSearches } from '@/sync/recentSearches'
 
 /**
  * Signs out on purpose. This also removes what search and browsing keep on this device, because it

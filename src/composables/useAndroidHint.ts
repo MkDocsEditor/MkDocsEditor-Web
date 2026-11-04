@@ -1,7 +1,7 @@
 import { useDisplay } from 'vuetify'
 
-import { mayUseAndroidApp } from './connectLink'
-import { local } from './storage'
+import { mayUseAndroidApp } from '@/services/connectLink'
+import { local } from '@/services/storage'
 
 /** The "Use the Android app" hint shows once per browser, on phone-sized screens. */
 const KEY = 'mkdocseditor.androidHintShown'

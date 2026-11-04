@@ -1,5 +1,7 @@
 import type { SectionModel } from '@/api'
-import { useAuthStore } from '@/stores/auth'
+
+import { accountKey } from './account'
+import { idbStore } from './idb'
 
 /** The text of a page as this client last got it. */
 export interface StoredPage {
@@ -8,7 +10,7 @@ export interface StoredPage {
   modtime: string
 }
 
-export interface StoredTree {
+interface StoredTree {
   root: SectionModel
   /** When it was loaded, in milliseconds. */
   syncedAt: number
@@ -60,28 +62,7 @@ const STORE = 'records'
 /** Falls back to memory when IndexedDB is unavailable or full: the copy is then lost on reload. */
 function indexedDbRecords(): Records {
   const fallback = memoryRecords()
-  let database: Promise<IDBDatabase> | null = null
-  const open = () =>
-    (database ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1)
-      request.onupgradeneeded = () => request.result.createObjectStore(STORE)
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    }))
-
-  /** Resolves once the transaction is committed: a full disk only fails at that point. */
-  async function transact<T>(
-    mode: IDBTransactionMode,
-    work: (store: IDBObjectStore) => IDBRequest<T>,
-  ): Promise<T> {
-    const transaction = (await open()).transaction(STORE, mode)
-    return new Promise<T>((resolve, reject) => {
-      const request = work(transaction.objectStore(STORE))
-      transaction.oncomplete = () => resolve(request.result)
-      transaction.onabort = () => reject(transaction.error)
-      transaction.onerror = () => reject(transaction.error)
-    })
-  }
+  const transact = idbStore(DB_NAME, STORE, (database) => database.createObjectStore(STORE))
   const range = (prefix: string) => IDBKeyRange.bound(prefix, `${prefix}\uffff`)
 
   // A value is in memory only when IndexedDB refused it, so memory is always the newer one.
@@ -134,12 +115,6 @@ function indexedDbRecords(): Records {
 }
 
 let records: Records | null = null
-
-/** Who is signed in now, for keeping local data apart; empty on a server without login. */
-export function accountKey(): string {
-  const user = useAuthStore().user
-  return encodeURIComponent(user ? (user.id ?? user.username) : '')
-}
 
 /**
  * The copy of whoever is signed in now. Whatever finishes later, such as a load in progress, has to

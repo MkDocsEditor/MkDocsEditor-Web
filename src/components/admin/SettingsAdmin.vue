@@ -4,8 +4,9 @@ import { onMounted, ref } from 'vue'
 import { useAuthApi } from '@/api'
 import type { InstanceSettings } from '@/api'
 import LoadError from '@/components/common/LoadError.vue'
+import { useLoad } from '@/composables/useLoad'
 import { useNotifyStore } from '@/stores/notify'
-import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
+import { useReauthStore } from '@/stores/reauth'
 
 const api = useAuthApi()
 const reauth = useReauthStore()
@@ -13,17 +14,14 @@ const notify = useNotifyStore()
 
 const settings = ref<InstanceSettings | null>(null)
 const busy = ref(false)
-const loadError = ref<unknown>(null)
 
-async function load(): Promise<void> {
-  loadError.value = null
-  try {
+const { loadError, load } = useLoad({
+  failure: 'Could not load the settings',
+  hasData: () => settings.value !== null,
+  fetch: async () => {
     settings.value = await api.settings()
-  } catch (e) {
-    if (settings.value) notify.error(e, 'Could not load the settings', () => void load())
-    else loadError.value = e
-  }
-}
+  },
+})
 
 async function setRequire2FA(value: boolean | null): Promise<void> {
   if (!settings.value) return
@@ -32,7 +30,7 @@ async function setRequire2FA(value: boolean | null): Promise<void> {
     settings.value = await reauth.run(() => api.updateSettings({ require2FA: value === true }))
     notify.success('Saved')
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e)
+    notify.error(e)
     await load()
   } finally {
     busy.value = false

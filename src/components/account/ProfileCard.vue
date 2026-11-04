@@ -5,7 +5,7 @@ import { useAuthApi } from '@/api'
 import type { AccountInfo, AccountPatch } from '@/api'
 import { colorRule, displayNameRule, roleLabel, usernameRule } from '@/services/accountRules'
 import { useNotifyStore } from '@/stores/notify'
-import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
+import { useReauthStore } from '@/stores/reauth'
 
 const props = defineProps<{ account: AccountInfo }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -48,7 +48,7 @@ async function save(): Promise<void> {
     notify.success('Profile saved')
     emit('changed')
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e, 'Could not save')
+    notify.error(e, 'Could not save')
   } finally {
     busy.value = false
   }

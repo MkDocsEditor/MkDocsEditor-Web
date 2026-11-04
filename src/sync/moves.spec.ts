@@ -12,7 +12,7 @@ import { sampleTree } from '@/test/fixtures'
 import { mountWithPlugins } from '@/test/mount'
 import SectionView from '@/views/SectionView.vue'
 
-import { followMoves, rescueStoredCopies, resetRescued } from './redirects'
+import { followMoves, rescueStoredCopies, resetRescued } from './moves'
 
 let A: typeof Automerge
 beforeAll(async () => {

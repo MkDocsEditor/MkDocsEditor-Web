@@ -6,7 +6,7 @@ import type { ItemType, SectionModel, TreeItem } from '@/api'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
 import { colorFor, formatSize, iconFor } from '@/services/icons'
 import { useTreeStore } from '@/stores/tree'
-import { sortByName } from '@/stores/treeIndex'
+import { sortByName } from '@/services/treeIndex'
 
 /**
  * Browses the wiki folder by folder, or searches it, for the pickers and the move dialog.

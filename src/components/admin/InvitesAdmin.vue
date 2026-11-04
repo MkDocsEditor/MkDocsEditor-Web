@@ -8,6 +8,7 @@ import type { CreatedLink, LinkInfo, Role } from '@/api'
 import LinkResultDialog from '@/components/admin/LinkResultDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
 import LinkStatusChip from '@/components/admin/LinkStatusChip.vue'
+import { useLoad } from '@/composables/useLoad'
 import { roleLabel } from '@/services/accountRules'
 import { formatTime } from '@/services/time'
 import { useNotifyStore } from '@/stores/notify'
@@ -16,8 +17,6 @@ const api = useAuthApi()
 const notify = useNotifyStore()
 
 const invites = ref<LinkInfo[]>([])
-const loading = ref(true)
-const loadError = ref<unknown>(null)
 const showAll = ref(false)
 
 const role = ref<Role>('editor')
@@ -36,18 +35,13 @@ const expiryItems = [
 
 const visible = computed(() => invites.value.filter((i) => showAll.value || i.status === 'pending'))
 
-async function load(): Promise<void> {
-  if (loadError.value) loading.value = true
-  loadError.value = null
-  try {
+const { loading, loadError, load } = useLoad({
+  failure: 'Could not load the invites',
+  hasData: () => invites.value.length > 0,
+  fetch: async () => {
     invites.value = await api.invites()
-  } catch (e) {
-    if (invites.value.length > 0) notify.error(e, 'Could not load the invites', () => void load())
-    else loadError.value = e
-  } finally {
-    loading.value = false
-  }
-}
+  },
+})
 
 async function create(): Promise<void> {
   busy.value = true

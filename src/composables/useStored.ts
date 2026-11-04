@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 
-import { local, readJson, writeJson } from './storage'
+import { local, readJson, writeJson } from '@/services/storage'
 
 /** A setting that survives reloads: a ref backed by Local Storage. */
 export function useStored<T>(key: string, fallback: T): Ref<T> {

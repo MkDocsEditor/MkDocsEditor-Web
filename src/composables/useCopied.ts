@@ -1,6 +1,6 @@
 import { onBeforeUnmount, ref } from 'vue'
 
-import { copyText } from './clipboard'
+import { copyText } from '@/services/clipboard'
 
 /** Copies text; `copied` stays true for two seconds after a successful copy. */
 export function useCopied() {

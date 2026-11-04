@@ -6,8 +6,9 @@ import { useAuthApi } from '@/api'
 import type { AccountInfo, Passkey } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
+import { useLoad } from '@/composables/useLoad'
 import { formatTime } from '@/services/time'
-import { addPasskey } from '@/services/addPasskey'
+import { addPasskey } from '@/stores/addPasskey'
 import { describeAuthError } from '@/services/authErrors'
 import { describePasskeyError, isPasskeyCancel, passkeysSupported } from '@/services/passkeys'
 import { useAuthStore } from '@/stores/auth'
@@ -23,8 +24,6 @@ const reauth = useReauthStore()
 const notify = useNotifyStore()
 
 const passkeys = ref<Passkey[]>([])
-const loading = ref(true)
-const loadError = ref<unknown>(null)
 const busy = ref(false)
 const renaming = ref<Passkey | null>(null)
 const newName = ref('')
@@ -32,18 +31,13 @@ const deleting = ref<Passkey | null>(null)
 
 const available = computed(() => auth.passkeysEnabled && passkeysSupported())
 
-async function load(): Promise<void> {
-  if (loadError.value) loading.value = true
-  loadError.value = null
-  try {
+const { loading, loadError, load } = useLoad({
+  failure: 'Could not load the passkeys',
+  hasData: () => passkeys.value.length > 0,
+  fetch: async () => {
     passkeys.value = await api.passkeys()
-  } catch (e) {
-    if (passkeys.value.length > 0) notify.error(e, 'Could not load the passkeys', () => void load())
-    else loadError.value = e
-  } finally {
-    loading.value = false
-  }
-}
+  },
+})
 
 async function add(): Promise<void> {
   busy.value = true
@@ -86,7 +80,7 @@ async function remove(passkey: Passkey): Promise<void> {
     await load()
     emit('changed')
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e)
+    notify.error(e)
   } finally {
     busy.value = false
   }

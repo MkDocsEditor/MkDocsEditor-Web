@@ -1,8 +1,8 @@
 import type { DocumentModel, ResourceModel, SectionModel } from '@/api'
 import { headingsOf } from '@/markdown/headings'
 import type { Heading } from '@/markdown/headings'
-import { ancestorsOf, normalize } from '@/stores/treeIndex'
-import type { TreeIndex } from '@/stores/treeIndex'
+import { ancestorsOf, normalize } from '@/services/treeIndex'
+import type { TreeIndex } from '@/services/treeIndex'
 
 /** Shorter terms would match nearly everything. */
 export const MIN_SEARCH_LENGTH = 2

@@ -6,7 +6,7 @@ import type { SectionModel, TreeItem } from '@/api'
 import { colorFor, iconFor } from '@/services/icons'
 import { useMoveStore } from '@/stores/move'
 import { useTreeStore } from '@/stores/tree'
-import { sortByName } from '@/stores/treeIndex'
+import { sortByName } from '@/services/treeIndex'
 
 import { canDropInto, dragged, dropTarget } from './dragState'
 

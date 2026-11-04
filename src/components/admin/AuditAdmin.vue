@@ -4,16 +4,13 @@ import { onMounted, ref, watch } from 'vue'
 import { useAuthApi } from '@/api'
 import type { AuditEvent } from '@/api'
 import LoadError from '@/components/common/LoadError.vue'
+import { useLoad } from '@/composables/useLoad'
 import { formatTime } from '@/services/time'
-import { useNotifyStore } from '@/stores/notify'
 
 const api = useAuthApi()
-const notify = useNotifyStore()
 
 const events = ref<AuditEvent[]>([])
 const next = ref<number | null>(null)
-const loading = ref(false)
-const loadError = ref<unknown>(null)
 const type = ref<string | null>(null)
 
 /** Readable names of the audit event types (`docs/auth.md` section 2). */
@@ -67,10 +64,10 @@ function detailText(event: AuditEvent): string {
     .join(', ')
 }
 
-async function load(more = false): Promise<void> {
-  loading.value = true
-  loadError.value = null
-  try {
+const { loading, loadError, load } = useLoad<[more?: boolean]>({
+  failure: 'Could not load the audit log',
+  hasData: (more) => more === true || events.value.length > 0,
+  fetch: async (more) => {
     const page = await api.audit({
       limit: 100,
       before: more ? (next.value ?? undefined) : undefined,
@@ -78,14 +75,9 @@ async function load(more = false): Promise<void> {
     })
     events.value = more ? [...events.value, ...page.events] : page.events
     next.value = page.next
-  } catch (e) {
-    if (more || events.value.length > 0)
-      notify.error(e, 'Could not load the audit log', () => void load(more))
-    else loadError.value = e
-  } finally {
-    loading.value = false
-  }
-}
+  },
+  alwaysShowProgress: true,
+})
 
 watch(type, () => void load())
 onMounted(() => void load())

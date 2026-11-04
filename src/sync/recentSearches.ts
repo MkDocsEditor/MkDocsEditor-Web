@@ -1,6 +1,6 @@
-import { accountKey } from '@/sync/wikiCopy'
+import { local, readJson, remove, writeJson } from '@/services/storage'
 
-import { local, readJson, remove, writeJson } from './storage'
+import { accountKey } from './account'
 
 const LIMIT = 10
 

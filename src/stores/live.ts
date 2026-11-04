@@ -3,9 +3,9 @@ import { ref, shallowRef } from 'vue'
 
 import { useApi } from '@/api'
 import type { MovedItem } from '@/api'
-import { connectEvents } from '@/services/events'
-import type { EventsConnection, OnlineUser } from '@/services/events'
-import { followMoves, rescueStoredCopies } from '@/services/redirects'
+import { connectEvents } from '@/sync/events'
+import type { EventsConnection, OnlineUser } from '@/sync/events'
+import { followMoves, rescueStoredCopies } from '@/sync/moves'
 import type { SocketLike } from '@/sync/socket'
 
 import { useTreeStore } from './tree'

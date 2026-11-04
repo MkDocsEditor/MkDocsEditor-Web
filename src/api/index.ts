@@ -1,4 +1,4 @@
-import { getConfig } from '@/services/config'
+import { getConfig } from '@/config'
 
 import { AuthApi } from './auth'
 import { ApiClient } from './client'

@@ -16,11 +16,12 @@ import LinkResultDialog from '@/components/admin/LinkResultDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
 import LinkStatusChip from '@/components/admin/LinkStatusChip.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import { useLoad } from '@/composables/useLoad'
 import { roleLabel } from '@/services/accountRules'
 import { formatTime } from '@/services/time'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
-import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
+import { useReauthStore } from '@/stores/reauth'
 
 const api = useAuthApi()
 const auth = useAuthStore()
@@ -29,8 +30,6 @@ const notify = useNotifyStore()
 
 const users = ref<AdminUser[]>([])
 const resetLinks = ref<LinkInfo[]>([])
-const loading = ref(true)
-const loadError = ref<unknown>(null)
 const showDeleted = ref(false)
 const busyId = ref('')
 
@@ -58,20 +57,15 @@ function userName(id: string | null | undefined): string {
   return found ? found.displayName || found.username : (id ?? '–')
 }
 
-async function load(): Promise<void> {
-  if (loadError.value) loading.value = true
-  loadError.value = null
-  try {
+const { loading, loadError, load } = useLoad({
+  failure: 'Could not load the users',
+  hasData: () => users.value.length > 0,
+  fetch: async () => {
     const [list, resets] = await Promise.all([api.users(), api.resetLinks()])
     users.value = list
     resetLinks.value = resets
-  } catch (e) {
-    if (users.value.length > 0) notify.error(e, 'Could not load the users', () => void load())
-    else loadError.value = e
-  } finally {
-    loading.value = false
-  }
-}
+  },
+})
 
 async function act(user: AdminUser, action: () => Promise<unknown>, done: string): Promise<void> {
   busyId.value = user.id
@@ -80,7 +74,7 @@ async function act(user: AdminUser, action: () => Promise<unknown>, done: string
     notify.success(done)
     await load()
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e)
+    notify.error(e)
   } finally {
     busyId.value = ''
   }
@@ -153,7 +147,7 @@ async function createReset(): Promise<void> {
     resetFor.value = null
     await load()
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e)
+    notify.error(e)
   } finally {
     busyId.value = ''
   }

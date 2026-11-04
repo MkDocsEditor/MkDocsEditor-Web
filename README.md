@@ -192,15 +192,21 @@ Automerge, markdown-it.
 
 ### Code layout
 
-| Path                            | Contents                                                                         |
-| ------------------------------- | -------------------------------------------------------------------------------- |
-| `src/api/`                      | REST client and types, account and admin endpoints                               |
-| `src/stores/`                   | Pinia stores: auth, step-up, tree, live updates, notifications                   |
-| `src/sync/`                     | Automerge session: sync protocol, offline copy (IndexedDB), presence, authorship |
-| `src/editor/`                   | CodeMirror editor, its binding to the session, remote cursors, uploads           |
-| `src/markdown/`                 | Preview rendering (markdown-it with MkDocs extensions)                           |
-| `src/views/`, `src/components/` | Pages and UI components (`auth/`, `account/`, `admin/` for the account system)   |
-| `e2e/`                          | Playwright tests and the test backend setup                                      |
+The layers, from the bottom up. Each one only uses those below it, which ESLint enforces
+(`no-restricted-imports` in `eslint.config.ts`):
+
+| Path                            | Contents                                                                                |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `src/config.ts`                 | Runtime configuration                                                                   |
+| `src/api/`                      | REST client and types, account and admin endpoints                                      |
+| `src/services/`                 | Plain helpers without state of the app: search, tree index, names, passkeys, formatting |
+| `src/markdown/`                 | Preview rendering (markdown-it with MkDocs extensions), also bundled alone for Android  |
+| `src/sync/`                     | Connections and data on this device: Automerge session, live events, IndexedDB copies   |
+| `src/stores/`                   | Pinia stores: auth, step-up, tree, pages, live updates, notifications                   |
+| `src/composables/`              | Shared `use*` functions for components                                                  |
+| `src/editor/`                   | CodeMirror editor, its binding to the session, remote cursors, uploads                  |
+| `src/views/`, `src/components/` | Pages and UI components (`auth/`, `account/`, `admin/` for the account system)          |
+| `e2e/`                          | Playwright tests and the test backend setup                                             |
 
 ### End-to-end tests
 

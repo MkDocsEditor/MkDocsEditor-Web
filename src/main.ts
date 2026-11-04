@@ -4,7 +4,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import vuetify from './plugins/vuetify'
 import router from './router'
-import { loadConfig } from './services/config'
+import { loadConfig } from './config'
 
 async function bootstrap(): Promise<void> {
   await loadConfig()

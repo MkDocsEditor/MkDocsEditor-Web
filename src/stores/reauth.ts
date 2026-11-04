@@ -6,7 +6,7 @@ import { ApiError } from '@/api'
 /** The user closed the confirmation dialog: the action did not run. */
 export class ReauthCancelled extends Error {
   constructor() {
-    super('Abgebrochen')
+    super('Cancelled')
     this.name = 'ReauthCancelled'
   }
 }

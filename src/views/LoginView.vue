@@ -8,10 +8,10 @@ import type { SecondFactorMethod, SessionResponse } from '@/api'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import { authErrorText } from '@/services/authErrors'
-import { useAndroidHint } from '@/services/androidHint'
+import { useAndroidHint } from '@/composables/useAndroidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { passkeyReminderDue } from '@/services/passkeyReminder'
-import { getConfig } from '@/services/config'
+import { getConfig } from '@/config'
 import {
   cancelPasskeyRequest,
   describePasskeyError,

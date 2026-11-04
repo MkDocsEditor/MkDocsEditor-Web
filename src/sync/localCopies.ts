@@ -1,5 +1,4 @@
-import { useAuthStore } from '@/stores/auth'
-
+import { currentAccount } from './account'
 import { accountStore, getOfflineStore, unownedStore } from './offlineStore'
 import type { OfflineStore } from './offlineStore'
 
@@ -17,8 +16,7 @@ const accounts = new Map<string, LocalCopies>()
  * are no accounts to keep apart, and copies have no owner.
  */
 export function localCopies(): LocalCopies {
-  const user = useAuthStore().user
-  const account = user ? (user.id ?? user.username) : null
+  const account = currentAccount()
   const raw = getOfflineStore()
   if (account === null) return { store: unownedStore(raw) }
   let copies = accounts.get(account)

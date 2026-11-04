@@ -16,7 +16,7 @@ import {
   resolveRelative,
   searchTree,
   sortByName,
-} from './treeIndex'
+} from '@/services/treeIndex'
 
 describe('tree helpers', () => {
   const index = indexTree(sampleTree())

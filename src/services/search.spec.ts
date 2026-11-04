@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { indexTree } from '@/stores/treeIndex'
+import { indexTree } from '@/services/treeIndex'
 import { sampleTree } from '@/test/fixtures'
 
 import {

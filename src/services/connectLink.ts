@@ -1,6 +1,6 @@
 import type { CreatedDeviceLink } from '@/api'
 
-import { getConfig } from './config'
+import { getConfig } from '@/config'
 
 /**
  * Connect links pair the Android app with an account (`docs/auth.md`, device pairing):
