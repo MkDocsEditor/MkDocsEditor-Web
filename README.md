@@ -211,13 +211,17 @@ start extra backends (setup mode, strict rate limits) and use Chrome's virtual a
 for passkeys. The app reaches the test backend as `http://localhost:17414` (same site as the
 app on `http://localhost:4174`).
 
+Test files run in parallel. Every worker has its own backend, wiki and users, and its own port
+of the app: the first worker uses the ports above, the next one `17415` and `4175`, and so on.
+
 | Variable           | Default            | Meaning                                                     |
 | ------------------ | ------------------ | ----------------------------------------------------------- |
 | `E2E_BACKEND_BIN`  |                    | Use this backend binary instead of building one             |
 | `E2E_BACKEND_DIR`  | `e2e/.tmp/backend` | Backend checkout to build (cloned from GitHub when missing) |
-| `E2E_BACKEND_LOG`  |                    | Write the backend log to this file                          |
-| `E2E_BACKEND_PORT` | `17414`            | Port of the test backend                                    |
-| `E2E_WEB_PORT`     | `4174`             | Port of the app under test                                  |
+| `E2E_BACKEND_LOG`  |                    | Write the logs of the backends to this file                 |
+| `E2E_BACKEND_PORT` | `17414`            | Port of the test backend of the first worker                |
+| `E2E_WEB_PORT`     | `4174`             | Port of the app under test of the first worker              |
+| `E2E_WORKERS`      | `4`                | How many workers run at once, at most 6                     |
 
 CI runs the same tests against the backend's `master`.
 
