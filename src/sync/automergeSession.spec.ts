@@ -442,7 +442,8 @@ describe('Automerge session: staying connected', () => {
   it('typing on a dead socket reconnects sooner than the normal timeout', async () => {
     const server = new FakeSyncServer(A, 'Text')
     const anna = client(server, 'anna', memoryStore(), {
-      timing: { timeoutMs: 60_000, doubtMs: 100 },
+      // the check runs at most every second by default, as long as `vi.waitFor` waits
+      timing: { timeoutMs: 60_000, doubtMs: 100, heartbeatMs: 50 },
     })
     await online(anna)
     const dead = server.connections[0]!.socket

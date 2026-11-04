@@ -1,27 +1,18 @@
 import { ref, shallowRef } from 'vue'
 
 import { ApiError } from '@/api'
-import { urlPath } from '@/api/client'
 import type { AuthorshipResponse, WsTicket } from '@/api'
 
 import { createAuthors } from './authors'
+import { createConnection } from './connection'
 import { sameHeads } from './automerge'
 import type { AmDoc, Automerge, AutomergeApi, DocContent } from './automerge'
 import type { OfflineStore, StoredCopy } from './offlineStore'
-import { watchPage } from './pageEvents'
 import { createPresence } from './presence'
 import { fromBase64, toBase64 } from './protocol'
 import type { ServerMessage } from './protocol'
 import { rebaseChanges } from './rebase'
-import {
-  CLOSE_DELETED,
-  CLOSE_HEARTBEAT_TIMEOUT,
-  CLOSE_PROTOCOL_ERROR,
-  CLOSE_REFUSED,
-  CLOSE_RENAMED,
-  SOCKET_OPEN,
-  browserSocket,
-} from './socket'
+import { CLOSE_DELETED, CLOSE_PROTOCOL_ERROR, CLOSE_REFUSED, CLOSE_RENAMED } from './socket'
 import type { SocketLike } from './socket'
 import { diffText } from './session'
 import type { DocumentSession, SessionStatus, SessionUser, TextChange } from './session'
@@ -113,7 +104,6 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   // Assigned in start(); every use happens after a document exists.
   let A!: AutomergeApi
   const timing = { ...DEFAULT_TIMING, ...options.timing }
-  const createSocket = options.createSocket ?? browserSocket
   let documentId = options.documentId
 
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
@@ -126,17 +116,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let serverHeads: string[] = []
   let syncState: Automerge.SyncState | null = null
   let readOnly = false
-  let socket: SocketLike | null = null
-  let synced = false // received initial-content on the current socket
   let closed = false
-  let attempt = 0
-  /** Numbers the connection attempts, so that an abandoned one can tell. */
-  let attemptId = 0
-  /** Since when the current attempt waits for its ticket or its socket; null if it is not. */
-  let connectingSince: number | null = null
-  let lastAttemptAt = 0
-  /** There is a reason to doubt that the open socket still works; any message settles it. */
-  let doubted = false
   /** Sync messages in a row that could not be applied, counted from 0. */
   let syncFailures = 0
   let lastSyncFailureAt = 0
@@ -148,11 +128,6 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let discardLocalEdits = false
   /** The re-keying of the stored copy after `document-renamed`; the reconnect waits for it. */
   let renaming: Promise<void> = Promise.resolve()
-  let lastSent = 0
-  let lastReceived = 0
-  let heartbeat: ReturnType<typeof setInterval> | null = null
-  let stopWatchingPage: (() => void) | null = null
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let flushTimer: ReturnType<typeof setTimeout> | null = null
   let resolveReady!: () => void
   let rejectReady!: (error: unknown) => void
@@ -177,11 +152,39 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         : null,
     onLateClaim: (existing) => !existing || mergeStoredCopy(existing),
   })
+  const connection = createConnection({
+    timing,
+    createSocket: options.createSocket,
+    api: options.api,
+    documentId: () => documentId,
+    hasDocument: () => doc !== null,
+    beforeConnect: () => renaming,
+    hello: (ticket) => {
+      const hello: Record<string, unknown> = {
+        type: 'hello',
+        documentId,
+        actorId,
+        ticket,
+        client: options.clientName ?? 'MkDocsEditor-Web',
+      }
+      if (doc && epoch) hello.epoch = epoch
+      return hello
+    },
+    onState: (state) => setStatus({ connection: state }),
+    onNewSocket: () => {
+      serverError = undefined
+    },
+    onMessage: receive,
+    onClose: handleClose,
+    onSignedOut: () => fail('Please sign in again to keep editing.'),
+    onUpgradeRefused: () => void checkDocumentExists(),
+  })
+  const send = connection.send
   const presence = createPresence({
     automerge: () => A,
     doc: () => doc,
     documentId: () => documentId,
-    isSynced: () => synced,
+    isSynced: () => connection.synced,
     send,
     presenceMs: timing.presenceMs,
   })
@@ -213,20 +216,12 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     resolveReady()
   }
 
-  // ----- websocket -----------------------------------------------------------------------------
-
-  function send(message: Record<string, unknown>): void {
-    if (socket?.readyState !== SOCKET_OPEN) return
-    socket.send(JSON.stringify(message))
-    lastSent = Date.now()
-  }
-
   function flush(): void {
     if (flushTimer) {
       clearTimeout(flushTimer)
       flushTimer = null
     }
-    if (!doc || !syncState || !synced) return
+    if (!doc || !syncState || !connection.synced) return
     let state: Automerge.SyncState = syncState
     for (;;) {
       const [nextState, message]: [Automerge.SyncState, Uint8Array | null] = A.generateSyncMessage(
@@ -240,107 +235,31 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     syncState = state
   }
 
-  /**
-   * Browsers throttle the timers of a background tab to one wake-up per minute, but still deliver
-   * websocket messages. So the server's own heartbeats drive ours too; on `tick` alone the server
-   * would close the connection of a background tab after 15 s (`4008`).
-   */
-  function sendHeartbeatIfDue(): void {
-    if (synced && Date.now() - lastSent >= timing.heartbeatMs) send({ type: 'heartbeat' })
-  }
-
   function scheduleFlush(): void {
     flushTimer ??= setTimeout(flush, timing.flushMs)
   }
 
-  async function connect(): Promise<void> {
-    if (closed) return
-    const id = ++attemptId
-    const abandoned = () => closed || id !== attemptId
-    clearReconnectTimer()
-    connectingSince = lastAttemptAt = Date.now()
-    setStatus({ connection: doc || attempt > 0 ? 'offline' : 'connecting' })
-    // the stored copy follows a rename first (its epoch goes into hello)
-    await renaming
-    if (abandoned()) return
-    let ticket: WsTicket
+  /**
+   * Handles what the server sent. Returns false when the sync loop cannot go on from here, and a
+   * new connection has to start it over.
+   */
+  function receive(data: unknown): boolean {
+    let message: ServerMessage | undefined
     try {
-      ticket = await options.api.wsTicket()
+      message = JSON.parse(String(data)) as ServerMessage
+      handleMessage(message)
     } catch (error) {
-      if (abandoned()) return
-      connectingSince = null
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        fail('Please sign in again to keep editing.')
-        return
+      console.error('mkdocseditor: bad sync message', error)
+      if (message?.type === 'initial-content' || message?.type === 'sync-request') {
+        // The initial content resets the backoff, so failures in a row have to keep it up.
+        const now = Date.now()
+        syncFailures = now - lastSyncFailureAt < SYNC_FAILURES_FORGOTTEN_MS ? syncFailures + 1 : 0
+        lastSyncFailureAt = now
+        connection.holdBackoff(syncFailures)
+        return false
       }
-      scheduleReconnect()
-      return
     }
-    if (abandoned()) return
-
-    let ws: SocketLike
-    try {
-      ws = createSocket(options.api.wsUrl(urlPath`/document/${documentId}/ws`))
-    } catch (error) {
-      console.error('mkdocseditor: could not open the websocket', error)
-      connectingSince = null
-      scheduleReconnect()
-      return
-    }
-    connectingSince = Date.now()
-    socket = ws
-    synced = false
-    serverError = undefined
-    let opened = false
-    ws.onopen = () => {
-      if (socket !== ws) return
-      opened = true
-      connectingSince = null
-      lastReceived = Date.now()
-      const hello: Record<string, unknown> = {
-        type: 'hello',
-        documentId,
-        actorId,
-        ticket: ticket.ticket,
-        client: options.clientName ?? 'MkDocsEditor-Web',
-      }
-      if (doc && epoch) hello.epoch = epoch
-      send(hello)
-    }
-    ws.onmessage = (event) => {
-      if (socket !== ws) return
-      lastReceived = Date.now()
-      doubted = false
-      let message: ServerMessage | undefined
-      try {
-        message = JSON.parse(String(event.data)) as ServerMessage
-        handleMessage(message)
-      } catch (error) {
-        console.error('mkdocseditor: bad sync message', error)
-        if (message?.type === 'initial-content' || message?.type === 'sync-request') {
-          // The sync loop cannot go on from here, and a new connection starts it over. The
-          // initial content resets the backoff, so failures in a row have to keep it up.
-          const now = Date.now()
-          syncFailures = now - lastSyncFailureAt < SYNC_FAILURES_FORGOTTEN_MS ? syncFailures + 1 : 0
-          lastSyncFailureAt = now
-          attempt = Math.max(attempt, syncFailures)
-          abandonConnection()
-          return
-        }
-      }
-      sendHeartbeatIfDue()
-    }
-    ws.onerror = () => undefined
-    ws.onclose = (event) => {
-      if (socket !== ws) return
-      socket = null
-      synced = false
-      connectingSince = null
-      handleClose(event.code)
-      // The ticket came, so the server is there, but it refused the upgrade: browsers do not tell
-      // why. Asking is the only way to notice a page that was deleted while we were away.
-      if (!opened && !closed) void checkDocumentExists()
-    }
+    return true
   }
 
   async function checkDocumentExists(): Promise<void> {
@@ -367,65 +286,6 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     discardLocalEdits = true
   }
 
-  function clearReconnectTimer(): void {
-    if (reconnectTimer) clearTimeout(reconnectTimer)
-    reconnectTimer = null
-  }
-
-  function scheduleReconnect(): void {
-    if (closed || reconnectTimer) return
-    setStatus({ connection: doc ? 'offline' : 'connecting' })
-    const delay = timing.backoffMs[Math.min(attempt, timing.backoffMs.length - 1)]!
-    attempt++
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null
-      void connect()
-    }, delay)
-  }
-
-  /**
-   * Gives up on the current attempt or socket and reconnects. It does not wait for the browser:
-   * a request or a socket on a dead connection can take minutes to fail, and so can closing one.
-   */
-  function abandonConnection(): void {
-    attemptId++
-    connectingSince = null
-    doubted = false
-    const stale = socket
-    socket = null
-    synced = false
-    if (stale?.readyState === SOCKET_OPEN) stale.close(CLOSE_HEARTBEAT_TIMEOUT, 'heartbeat timeout')
-    else stale?.close()
-    handleClose(CLOSE_HEARTBEAT_TIMEOUT)
-  }
-
-  /** How long the current socket may stay silent. */
-  function silenceLimit(): number {
-    return doubted ? Math.min(timing.doubtMs, timing.timeoutMs) : timing.timeoutMs
-  }
-
-  /**
-   * Checks the connection instead of waiting for the backoff or for `tick`, whose timers may
-   * have been throttled or stopped. `userWaits` is for a page that came back to the user, which
-   * also ends a long backoff. Keystrokes only retry as often as `retryNowMs` allows.
-   */
-  function checkConnection(userWaits: boolean): void {
-    if (closed) return
-    const now = Date.now()
-    if (socket && connectingSince === null) {
-      doubted = true
-      if (now - lastReceived <= silenceLimit()) return
-      abandonConnection()
-    }
-    if (userWaits) attempt = 0
-    if (now - lastAttemptAt < timing.retryNowMs) {
-      if (connectingSince === null) scheduleReconnect()
-      return
-    }
-    if (connectingSince !== null) abandonConnection()
-    void connect()
-  }
-
   function fail(message: string): void {
     setStatus({ connection: 'closed', readOnly: true, message })
     shutdown(false)
@@ -445,7 +305,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         }
         refused = true
         if (serverError === 'foreign-actor') forgetActor()
-        scheduleReconnect()
+        connection.scheduleReconnect()
         return
       case CLOSE_DELETED:
         fail(DELETED_MESSAGE)
@@ -455,11 +315,10 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         return
       case CLOSE_RENAMED:
         // reconnect with the new id
-        attempt = 0
-        void connect()
+        connection.reconnectNow()
         return
       default:
-        scheduleReconnect()
+        connection.scheduleReconnect()
     }
   }
 
@@ -618,8 +477,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     }
 
     syncState = A.initSyncState()
-    synced = true
-    attempt = 0
+    connection.markSynced()
     refused = false
     setStatus({
       connection: 'online',
@@ -663,34 +521,13 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     flush()
   }
 
-  function tick(): void {
-    const now = Date.now()
-    if (connectingSince !== null) {
-      if (now - connectingSince > timing.connectTimeoutMs) abandonConnection()
-      return
-    }
-    if (socket && now - lastReceived > silenceLimit()) {
-      // The server went silent: drop the connection and reconnect.
-      abandonConnection()
-      return
-    }
-    sendHeartbeatIfDue()
-  }
-
   function shutdown(normal: boolean): void {
     closed = true
-    for (const timer of [reconnectTimer, flushTimer]) {
-      if (timer) clearTimeout(timer)
-    }
+    if (flushTimer) clearTimeout(flushTimer)
     presence.stop()
     authors.stop()
-    if (heartbeat) clearInterval(heartbeat)
-    stopWatchingPage?.()
     copy.close()
-    const ws = socket
-    socket = null
-    if (ws && normal) ws.close(1000)
-    else ws?.close()
+    connection.stop(normal)
   }
 
   async function start(): Promise<void> {
@@ -712,16 +549,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     }
     if (closed) return
     copy.watchPage()
-    heartbeat = setInterval(tick, Math.min(timing.heartbeatMs, 1_000))
-    stopWatchingPage = watchPage({
-      onWake: () => checkConnection(true),
-      // a timer would run late in the background
-      onHidden: flush,
-      onOffline: () => {
-        doubted = true
-      },
-    })
-    await connect()
+    // a timer would run late in the background
+    await connection.start({ onHidden: flush })
   }
 
   void start()
@@ -745,7 +574,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       scheduleFlush()
       copy.schedule()
       presence.onLocalEdit()
-      checkConnection(false)
+      connection.check(false)
     },
     setLocalSelections: presence.setLocalSelections,
     onRemoteChanges(listener) {
