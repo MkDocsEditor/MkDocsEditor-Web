@@ -3,8 +3,8 @@ import type { Passkey } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useReauthStore } from '@/stores/reauth'
 
-import { createPasskey } from './passkeys'
-import { clearPasskeyReminder } from './passkeyReminder'
+import { createPasskey } from '@/services/passkeys'
+import { clearPasskeyReminder } from '@/services/passkeyReminder'
 
 /**
  * Registers a passkey for the signed-in account. Right after a sign-in the backend accepts

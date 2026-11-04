@@ -20,7 +20,7 @@ export interface TextSelection {
   head: number
 }
 
-export type ConnectionState =
+type ConnectionState =
   /** Opening the connection or loading the document. */
   | 'connecting'
   /** Connected and in sync (or syncing). */

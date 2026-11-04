@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AndroidAppHint from '@/components/auth/AndroidAppHint.vue'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import PasskeyStep from '@/components/auth/PasskeyStep.vue'
-import { useAndroidHint } from '@/services/androidHint'
+import { useAndroidHint } from '@/composables/useAndroidHint'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 

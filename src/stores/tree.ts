@@ -15,8 +15,8 @@ import {
   pathOf,
   resolveRelative,
   searchTree,
-} from './treeIndex'
-import type { SearchHit, TreeIndex } from './treeIndex'
+} from '@/services/treeIndex'
+import type { SearchHit, TreeIndex } from '@/services/treeIndex'
 
 /** The section/document/resource tree of the wiki. */
 export const useTreeStore = defineStore('tree', () => {

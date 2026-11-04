@@ -4,11 +4,11 @@ import { computed, ref } from 'vue'
 
 import type { ResourceModel } from '@/api'
 import { findReferences } from '@/markdown/references'
-import { useDebounced } from '@/services/debounced'
+import { useDebounced } from '@/composables/useDebounced'
 import type { TextReference } from '@/markdown/references'
 import { formatSize } from '@/services/icons'
 import { useTreeStore } from '@/stores/tree'
-import { sortByName } from '@/stores/treeIndex'
+import { sortByName } from '@/services/treeIndex'
 
 import ResourceThumb from './ResourceThumb.vue'
 

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 
 import { ApiClient, setApiClient } from '@/api'
-import { rememberSearch } from '@/services/recentSearches'
+import { rememberSearch } from '@/sync/recentSearches'
 import { usePagesStore } from '@/stores/pages'
 import { useTreeStore } from '@/stores/tree'
 import { createFetchMock, json } from '@/test/fetchMock'

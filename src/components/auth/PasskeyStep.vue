@@ -2,7 +2,7 @@
 import { mdiFingerprint } from '@mdi/js'
 import { ref } from 'vue'
 
-import { addPasskey } from '@/services/addPasskey'
+import { addPasskey } from '@/stores/addPasskey'
 import { describeAuthError } from '@/services/authErrors'
 import { snoozePasskeyReminder } from '@/services/passkeyReminder'
 import { describePasskeyError, isPasskeyCancel } from '@/services/passkeys'

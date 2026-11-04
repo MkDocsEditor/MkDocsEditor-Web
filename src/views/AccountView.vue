@@ -11,7 +11,7 @@ import PasswordCard from '@/components/account/PasswordCard.vue'
 import ProfileCard from '@/components/account/ProfileCard.vue'
 import SessionsCard from '@/components/account/SessionsCard.vue'
 import TotpCard from '@/components/account/TotpCard.vue'
-import { addPasskey } from '@/services/addPasskey'
+import { addPasskey } from '@/stores/addPasskey'
 import { describeAuthError } from '@/services/authErrors'
 import {
   passkeyReminderDue,

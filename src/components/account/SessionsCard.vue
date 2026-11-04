@@ -7,8 +7,9 @@ import { useAuthApi } from '@/api'
 import type { SessionInfo } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
+import { useLoad } from '@/composables/useLoad'
 import { plural } from '@/services/names'
-import { signOut } from '@/services/signOut'
+import { signOut } from '@/stores/signOut'
 import { formatTime } from '@/services/time'
 import { useNotifyStore } from '@/stores/notify'
 
@@ -17,8 +18,6 @@ const notify = useNotifyStore()
 const router = useRouter()
 
 const sessions = ref<SessionInfo[]>([])
-const loading = ref(true)
-const loadError = ref<unknown>(null)
 const busy = ref(false)
 const confirmOthers = ref(false)
 
@@ -26,18 +25,13 @@ function isPhone(session: SessionInfo): boolean {
   return /android|iphone|ipad|mobile/i.test(`${session.deviceName} ${session.userAgent ?? ''}`)
 }
 
-async function load(): Promise<void> {
-  if (loadError.value) loading.value = true
-  loadError.value = null
-  try {
+const { loading, loadError, load } = useLoad({
+  failure: 'Could not load the devices',
+  hasData: () => sessions.value.length > 0,
+  fetch: async () => {
     sessions.value = await api.sessions()
-  } catch (e) {
-    if (sessions.value.length > 0) notify.error(e, 'Could not load the devices', () => void load())
-    else loadError.value = e
-  } finally {
-    loading.value = false
-  }
-}
+  },
+})
 
 async function revoke(session: SessionInfo): Promise<void> {
   busy.value = true

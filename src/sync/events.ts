@@ -1,12 +1,7 @@
 import type { MovedItem } from '@/api'
-import {
-  CLOSE_HEARTBEAT_TIMEOUT,
-  CLOSE_TICKET_REFUSED,
-  SOCKET_OPEN,
-  browserSocket,
-} from '@/sync/socket'
-import type { SocketLike } from '@/sync/socket'
-import { watchPage } from '@/sync/pageEvents'
+import { CLOSE_HEARTBEAT_TIMEOUT, CLOSE_TICKET_REFUSED, SOCKET_OPEN, browserSocket } from './socket'
+import type { SocketLike } from './socket'
+import { watchPage } from './pageEvents'
 
 /** A user who has a document open. */
 export interface OnlineUser {
@@ -15,7 +10,7 @@ export interface OnlineUser {
   color?: string
 }
 
-export interface EventsHandlers {
+interface EventsHandlers {
   /** The tree changed, or events may have been missed (after every connect): fetch it again. */
   onTreeChanged(): void
   /** Items were moved or renamed and have new ids; `tree-changed` follows. */

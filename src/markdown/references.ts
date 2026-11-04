@@ -7,7 +7,7 @@ import { isExternalUrl } from '@/services/linkPath'
  * out. The client uses it for the open page, while it is being typed (and offline).
  */
 
-export type ReferenceKind = 'link' | 'image' | 'definition' | 'html'
+type ReferenceKind = 'link' | 'image' | 'definition' | 'html'
 
 export interface TextReference {
   kind: ReferenceKind

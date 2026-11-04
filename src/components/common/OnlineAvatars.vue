@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { OnlineUser } from '@/services/events'
+import type { OnlineUser } from '@/sync/events'
 import { initials } from '@/services/names'
 
 const props = withDefaults(defineProps<{ users: OnlineUser[]; max?: number; size?: number }>(), {

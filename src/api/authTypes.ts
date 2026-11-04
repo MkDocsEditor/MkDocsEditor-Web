@@ -44,7 +44,7 @@ export interface SessionResponse {
 
 export type SecondFactorMethod = 'totp' | 'recovery-code' | 'passkey'
 
-export interface SecondFactorRequired {
+interface SecondFactorRequired {
   status: 'second-factor-required'
   challenge: string
   methods: SecondFactorMethod[]
@@ -106,7 +106,7 @@ export interface Passkey {
   transports?: string[]
 }
 
-export type UserStatus = 'active' | 'disabled' | 'deleted'
+type UserStatus = 'active' | 'disabled' | 'deleted'
 
 /** An entry of `GET /admin/users/`. */
 export interface AdminUser extends UserInfo {
@@ -131,7 +131,7 @@ export interface AdminUserPatch {
 
 export type LinkStatus = 'pending' | 'used' | 'expired' | 'revoked'
 
-export interface UserRef {
+interface UserRef {
   id: string
   username: string
 }
@@ -186,7 +186,7 @@ export interface AuditQuery {
   account?: string
 }
 
-export type DeviceLinkStatus = 'pending' | 'redeemed' | 'expired' | 'revoked'
+type DeviceLinkStatus = 'pending' | 'redeemed' | 'expired' | 'revoked'
 
 /** A pairing link for the Android app (`docs/auth.md`, device pairing). */
 export interface DeviceLink {

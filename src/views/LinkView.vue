@@ -17,7 +17,7 @@ import {
   usernameRule,
 } from '@/services/accountRules'
 import { formatTime } from '@/services/time'
-import { useAndroidHint } from '@/services/androidHint'
+import { useAndroidHint } from '@/composables/useAndroidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { authErrorText, describeAuthError } from '@/services/authErrors'
 import {

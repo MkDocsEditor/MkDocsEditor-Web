@@ -11,7 +11,7 @@ import RecoveryCodes from '@/components/auth/RecoveryCodes.vue'
 import { totpRule } from '@/services/accountRules'
 import { authErrorText } from '@/services/authErrors'
 import { useNotifyStore } from '@/stores/notify'
-import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
+import { useReauthStore } from '@/stores/reauth'
 
 const props = defineProps<{ account: AccountInfo }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -44,7 +44,7 @@ async function begin(): Promise<void> {
     enrollment.value = await reauth.run(() => api.totpBegin())
     code.value = ''
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e)
+    notify.error(e)
   } finally {
     busy.value = false
   }
@@ -82,7 +82,7 @@ async function disable(): Promise<void> {
     notify.success('Authenticator app removed')
     emit('changed')
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e)
+    notify.error(e)
   } finally {
     busy.value = false
   }
@@ -94,7 +94,7 @@ async function regenerate(): Promise<void> {
     codes.value = (await reauth.run(() => api.regenerateRecoveryCodes())).recoveryCodes
     emit('changed')
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) notify.error(e)
+    notify.error(e)
   } finally {
     busy.value = false
   }

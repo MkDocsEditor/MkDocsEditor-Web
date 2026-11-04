@@ -3,7 +3,7 @@ import { mdiAndroid } from '@mdi/js'
 import { onMounted, ref } from 'vue'
 
 import { useAuthApi } from '@/api'
-import { markAndroidHintSeen } from '@/services/androidHint'
+import { markAndroidHintSeen } from '@/composables/useAndroidHint'
 import { authErrorText } from '@/services/authErrors'
 import { connectUrlFor, OBTAINIUM_ADD_URL } from '@/services/connectLink'
 import { useAuthStore } from '@/stores/auth'

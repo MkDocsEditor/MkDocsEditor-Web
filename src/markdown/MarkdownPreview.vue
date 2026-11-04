@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { useDebounced } from '@/services/debounced'
+import { useDebounced } from '@/composables/useDebounced'
 import { isExternalUrl } from '@/services/linkPath'
 import { openResource } from '@/services/resources'
 import { resourceObjectUrl } from '@/services/resourceUrls'

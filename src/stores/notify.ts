@@ -4,6 +4,8 @@ import { ref } from 'vue'
 import { authErrorText } from '@/services/authErrors'
 import { canRetry } from '@/services/errors'
 
+import { ReauthCancelled } from './reauth'
+
 export interface Notification {
   id: number
   text: string
@@ -34,13 +36,18 @@ export const useNotifyStore = defineStore('notify', () => {
     queue,
     push,
     success: (text: string) => push(text, 'success'),
-    /** `retry` is only offered if trying again can work. */
-    error: (error: unknown, prefix?: string, retry?: () => void) =>
+    /**
+     * `retry` is only offered if trying again can work. Closing the step-up dialog is no failure,
+     * so it shows nothing.
+     */
+    error: (error: unknown, prefix?: string, retry?: () => void) => {
+      if (error instanceof ReauthCancelled) return
       push(
         prefix ? `${prefix}: ${describeError(error)}` : describeError(error),
         'error',
         canRetry(error) ? retry : undefined,
-      ),
+      )
+    },
     dismiss: (id: number) => {
       queue.value = queue.value.filter((n) => n.id !== id)
     },
