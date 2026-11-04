@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 
-import { useApi } from '@/api'
+import { ApiError, useApi } from '@/api'
 import type { DocumentModel, ResourceModel, SectionModel, TreeItem } from '@/api'
 import type { LinkTarget } from '@/services/linkPath'
 import { sanitizeFileName, shrinkImage, uniqueName } from '@/services/upload'
+import { wikiCopy } from '@/sync/wikiCopy'
+import type { WikiCopy } from '@/sync/wikiCopy'
 
 import {
   ancestorsOf,
@@ -28,21 +30,42 @@ export const useTreeStore = defineStore('tree', () => {
   )
 
   let pending: Promise<void> | null = null
+  /** Goes up on `reset`: a load still running then belongs to the previous account. */
+  let generation = 0
+
+  /** Without an answer from the server, the stored tree is better than nothing. */
+  async function restore(failure: unknown, copy: WikiCopy, current: number): Promise<void> {
+    if (root.value) return
+    if (!(failure instanceof ApiError) || !(failure.isNetworkError || failure.status >= 500)) return
+    const stored = await copy.tree()
+    if (!stored || root.value || current !== generation) return
+    root.value = stored.root
+    lastSync.value = stored.syncedAt
+  }
 
   /** Loads the tree. Concurrent calls share one request. */
   function load(): Promise<void> {
     pending ??= (async () => {
+      const current = generation
+      const copy = wikiCopy()
       loading.value = true
       try {
-        root.value = await useApi().getTree()
+        const loaded = await useApi().getTree()
+        if (current !== generation) return
+        root.value = loaded
         error.value = null
         lastSync.value = Date.now()
+        void copy.putTree({ root: loaded, syncedAt: lastSync.value })
       } catch (e) {
+        if (current !== generation) return
         error.value = e
+        await restore(e, copy, current)
         throw e
       } finally {
-        loading.value = false
-        pending = null
+        if (current === generation) {
+          loading.value = false
+          pending = null
+        }
       }
     })()
     return pending
@@ -128,6 +151,9 @@ export const useTreeStore = defineStore('tree', () => {
   }
 
   function reset(): void {
+    generation++
+    pending = null
+    loading.value = false
     root.value = null
     lastSync.value = null
     error.value = null
@@ -135,6 +161,7 @@ export const useTreeStore = defineStore('tree', () => {
 
   return {
     root,
+    index,
     loading,
     error,
     lastSync,

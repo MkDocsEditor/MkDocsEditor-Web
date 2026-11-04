@@ -25,7 +25,7 @@ together, in real time, from a phone or a desktop browser. It talks to the
   the app with [Obtainium](https://obtainium.imranr.dev) (with pre-releases turned on).
 - Admin pages: users (role, disable, delete, reset link), invites with QR code, audit log, and
   "second factor required" for everyone.
-- Browse the wiki as a folder tree, search pages and folders (Ctrl+K), create, rename and
+- Browse the wiki as a folder tree, search names and page text (Ctrl+K), create, rename and
   delete pages and folders.
 - Upload files into a folder (menu or drag and drop). Paste or drop an image into the editor
   and it is uploaded next to the page and embedded.

@@ -84,7 +84,8 @@ export interface SearchHit {
   path: string[]
 }
 
-function normalize(text: string): string {
+/** `text` for comparing: without case and accents. */
+export function normalize(text: string): string {
   return text.toLocaleLowerCase('en').normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
