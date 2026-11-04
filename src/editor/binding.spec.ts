@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { applyChanges, diffText } from '@/sync/session'
 import { createFakeSession } from '@/test/fakeSession'
 
-import { authorship, authorshipDecorations, setAuthorship } from './authorship'
+import { authorship, authorshipDecorations, lineShares, setAuthorship } from './authorship'
 import { fromChangeSet, sessionBinding, toChangeSet } from './binding'
 import { peerDecorations, remoteCursors, setPeers, withAlpha } from './remoteCursors'
 
@@ -157,18 +157,84 @@ describe('authorship', () => {
     { from: 5, to: 10, username: 'ben', color: '#e8590c' },
   ]
 
-  it('marks runs only when visible', () => {
-    expect(authorshipDecorations({ runs, visible: false }, 10).size).toBe(0)
-    expect(authorshipDecorations({ runs, visible: true }, 10).size).toBe(2)
-    expect(authorshipDecorations({ runs, visible: true }, 7).size).toBe(2)
-    expect(authorshipDecorations({ runs, visible: true }, 3).size).toBe(1)
+  it('keeps only runs inside the text, and none when off', () => {
+    expect(authorshipDecorations({ runs, mode: 'off' }, 10).size).toBe(0)
+    expect(authorshipDecorations({ runs, mode: 'marker' }, 10).size).toBe(2)
+    expect(authorshipDecorations({ runs, mode: 'strip' }, 7).size).toBe(2)
+    expect(authorshipDecorations({ runs, mode: 'marker' }, 3).size).toBe(1)
   })
 
-  it('renders author titles in the editor', () => {
+  it('renders the marker with 14 % alpha and the author as title', () => {
     const { view } = editor('HalloWelt!')
-    view.dispatch({ effects: setAuthorship.of({ runs, visible: true }) })
-    const titles = [...view.dom.querySelectorAll('.cm-author')].map((e) => e.getAttribute('title'))
-    expect(titles).toEqual(['anna', 'ben'])
+    view.dispatch({ effects: setAuthorship.of({ runs, mode: 'marker' }) })
+    const marks = [...view.dom.querySelectorAll<HTMLElement>('.cm-author')]
+    expect(marks.map((e) => e.title)).toEqual(['anna', 'ben'])
+    expect(marks[0]!.style.backgroundColor).toBe('rgba(25, 113, 194, 0.14)')
     view.destroy()
+  })
+
+  it('shows strip and marker per mode, and takes no room when off', () => {
+    const { view } = editor('HalloWelt!')
+    const parts = () => view.dom.querySelectorAll('.cm-author-strip > div').length
+    const gutter = () => view.dom.querySelector('.cm-author-gutter')
+    expect(gutter()).toBeNull()
+
+    view.dispatch({ effects: setAuthorship.of({ runs, mode: 'marker' }) })
+    expect(view.dom.querySelectorAll('.cm-author')).toHaveLength(2)
+    expect(parts()).toBe(2)
+
+    view.dispatch({ effects: setAuthorship.of({ runs, mode: 'strip' }) })
+    expect(view.dom.querySelectorAll('.cm-author')).toHaveLength(0)
+    expect(parts()).toBe(2)
+
+    view.dispatch({ effects: setAuthorship.of({ runs, mode: 'off' }) })
+    expect(view.dom.querySelectorAll('.cm-author')).toHaveLength(0)
+    expect(gutter()).toBeNull()
+    view.destroy()
+  })
+
+  it('takes no room when no text has an author', () => {
+    const { view } = editor('HalloWelt!')
+    view.dispatch({ effects: setAuthorship.of({ runs: [], mode: 'marker' }) })
+    expect(view.dom.querySelector('.cm-author-gutter')).toBeNull()
+    view.destroy()
+  })
+
+  it('splits the strip by the share of each author on the line', () => {
+    const { view } = editor('HalloWelt!\nzwei\ndrei')
+    view.dispatch({
+      effects: setAuthorship.of({
+        runs: [
+          { from: 0, to: 5, username: 'anna', color: '#1971c2' },
+          { from: 5, to: 13, username: 'ben', color: '#e8590c' },
+        ],
+        mode: 'strip',
+      }),
+    })
+    const strips = [...view.dom.querySelectorAll('.cm-author-strip')].map((strip) =>
+      [...strip.children].map((part) => [
+        (part as HTMLElement).title,
+        (part as HTMLElement).style.height,
+      ]),
+    )
+    expect(strips).toEqual([
+      [
+        ['anna', '50%'],
+        ['ben', '50%'],
+      ],
+      [['ben', '50%']],
+    ])
+    view.destroy()
+  })
+
+  it('leaves text without an author out of the shares, and empty lines without any', () => {
+    const spans = authorshipDecorations(
+      { runs: [{ from: 1, to: 2, username: 'anna', color: '#1971c2' }], mode: 'strip' },
+      10,
+    )
+    expect(lineShares(spans, 0, 4)).toEqual([
+      { username: 'anna', color: '#1971c2', fraction: 0.25 },
+    ])
+    expect(lineShares(spans, 2, 2)).toEqual([])
   })
 })

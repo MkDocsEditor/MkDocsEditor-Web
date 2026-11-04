@@ -36,6 +36,18 @@ describe('DocumentView', () => {
     fakes.length = 0
   })
 
+  it('shows strip and marker by default and remembers the chosen highlight mode', async () => {
+    const first = await setup()
+    const mode = (wrapper: typeof first.wrapper) =>
+      wrapper.findComponent({ name: 'MarkdownEditor' }).props('authorHighlight')
+    expect(mode(first.wrapper)).toBe('marker')
+    first.wrapper.unmount()
+
+    localStorage.setItem('mkdocseditor.authorHighlight', JSON.stringify('strip'))
+    const second = await setup()
+    expect(mode(second.wrapper)).toBe('strip')
+  })
+
   it('shows editor and preview of the session text and follows remote edits', async () => {
     const { wrapper } = await setup()
     expect(wrapper.find('[data-testid="document-title"]').text()).toBe('Apfelkuchen')

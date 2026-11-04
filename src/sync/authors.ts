@@ -11,6 +11,11 @@ import type { AuthorRun, TextChange } from './session'
 /** Colour of users the server told nothing about. */
 export const UNKNOWN_USER_COLOR = '#9e9e9e'
 
+/** The backend imports text under names like ":disk" and ":server", with a normal actor id. */
+function hasAuthor(username: string | null): username is string {
+  return username !== null && username.trim() !== '' && !username.startsWith(':')
+}
+
 export interface AuthorsOptions {
   automerge: () => AutomergeApi
   doc: () => AmDoc | null
@@ -33,7 +38,7 @@ export function createAuthors(options: AuthorsOptions) {
 
   function publish(): void {
     authorship.value = runs.flatMap((run) => {
-      if (run.username === null) return []
+      if (!hasAuthor(run.username)) return []
       const user = users.get(run.username)
       return [
         {
