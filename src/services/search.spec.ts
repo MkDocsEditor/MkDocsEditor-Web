@@ -7,13 +7,32 @@ import { findExcerpts, findMatches, isSearchable, searchWiki, sortByRelevance } 
 import type { SearchResult } from './search'
 
 describe('findMatches', () => {
-  it('takes the term literally and ignores case', () => {
-    expect(findMatches('Äpfel und äpfel', 'ÄPFEL')).toEqual([
-      [0, 5],
-      [10, 15],
+  it('ignores case and accents, and marks the original text', () => {
+    expect(findMatches('Kürbis und KURBIS', 'kurbis')).toEqual([
+      [0, 6],
+      [11, 17],
     ])
+    expect(findMatches('Kurbis', 'kürbis')).toEqual([[0, 6]])
+  })
+
+  it('includes a separate accent in the match', () => {
+    const text = 'Ku\u0308rbis!'
+    expect(findMatches(text, 'kurbis')).toEqual([[0, 7]])
+    expect(findMatches('Ku\u0308', 'ku')).toEqual([[0, 3]])
+  })
+
+  it('finds each word in any order and merges overlaps', () => {
+    expect(findMatches('Kuchen mit Apfel', 'apfel kuchen')).toEqual([
+      [0, 6],
+      [11, 16],
+    ])
+    expect(findMatches('abcd', 'abc bcd')).toEqual([[0, 4]])
+  })
+
+  it('takes special characters literally', () => {
     expect(findMatches('a.b axb', 'a.b')).toEqual([[0, 3]])
     expect(findMatches('text', '')).toEqual([])
+    expect(findMatches('text', '   ')).toEqual([])
   })
 })
 
@@ -88,6 +107,19 @@ describe('searchWiki', () => {
     expect(page.matchCount).toBe(1)
     expect(page.path).toEqual([])
     expect(ids.indexOf('s-kuchen')).toBeLessThan(ids.indexOf('d-index'))
+  })
+
+  it('finds names and text without accents and in any word order', () => {
+    expect(searchWiki(index, text, 'kurbis').map((r) => r.item.id)).toEqual(['d-suppe'])
+    const results = searchWiki(index, text, 'kuchen rezept')
+    expect(results.map((r) => r.item.id)).toContain('d-index')
+    expect(results.find((r) => r.item.id === 'd-index')!.matchCount).toBe(2)
+  })
+
+  it('needs every word, in the name or the text of a page', () => {
+    const inBoth = (id: string) => (id === 'd-suppe' ? 'mit Ingwer' : undefined)
+    expect(searchWiki(index, inBoth, 'kurbis ingwer').map((r) => r.item.id)).toEqual(['d-suppe'])
+    expect(searchWiki(index, inBoth, 'kurbis pfeffer')).toEqual([])
   })
 
   it('does not search for terms that are too short, or the root', () => {

@@ -1,6 +1,6 @@
 import type { DocumentModel, ResourceModel, SectionModel } from '@/api'
 import { headingsOf } from '@/markdown/headings'
-import { ancestorsOf } from '@/stores/treeIndex'
+import { ancestorsOf, normalize } from '@/stores/treeIndex'
 import type { TreeIndex } from '@/stores/treeIndex'
 
 /** Shorter terms would match nearly everything. */
@@ -41,14 +41,62 @@ export function isSearchable(term: string): boolean {
   return term.trim().length >= MIN_SEARCH_LENGTH
 }
 
-/** All places of `term` in `text`, taken literally and ignoring case. */
+/**
+ * `text` without case and accents, for comparing. `starts` and `ends` give for every character of
+ * `folded` the characters of `text` it came from, so a match can be marked in the original.
+ */
+function fold(text: string): { folded: string; starts: number[]; ends: number[] } {
+  let folded = ''
+  const starts: number[] = []
+  const ends: number[] = []
+  let position = 0
+  for (const character of text) {
+    const end = position + character.length
+    const plain = normalize(character)
+    // a separate accent belongs to the letter before it
+    if (plain === '' && ends.length > 0) ends[ends.length - 1] = end
+    for (let i = 0; i < plain.length; i++) {
+      starts.push(position)
+      ends.push(end)
+    }
+    folded += plain
+    position = end
+  }
+  return { folded, starts, ends }
+}
+
+/** The words of a search term, each of which has to be found. */
+function wordsOf(term: string): string[] {
+  return normalize(term).split(/\s+/).filter(Boolean)
+}
+
+/** Every place of any word in `text`, as ranges of the original, overlaps included. */
+function occurrences(text: string, words: string[]): MatchRange[] {
+  const { folded, starts, ends } = fold(text)
+  const ranges: MatchRange[] = []
+  for (const word of words) {
+    let from = folded.indexOf(word)
+    while (from !== -1) {
+      ranges.push([starts[from]!, ends[from + word.length - 1]!])
+      from = folded.indexOf(word, from + word.length)
+    }
+  }
+  return ranges
+}
+
+function merged(ranges: MatchRange[]): MatchRange[] {
+  const result: MatchRange[] = []
+  for (const [from, to] of [...ranges].sort((a, b) => a[0] - b[0] || a[1] - b[1])) {
+    const last = result.at(-1)
+    if (last && from <= last[1]) last[1] = Math.max(last[1], to)
+    else result.push([from, to])
+  }
+  return result
+}
+
+/** All places of the words of `term` in `text`, ignoring case and accents, in text order. */
 export function findMatches(text: string, term: string): MatchRange[] {
-  if (term === '') return []
-  const literal = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return [...text.matchAll(new RegExp(literal, 'giu'))].map((match): MatchRange => {
-    const start = match.index
-    return [start, start + match[0].length]
-  })
+  return merged(occurrences(text, wordsOf(term)))
 }
 
 function isLowSurrogate(code: number): boolean {
@@ -86,14 +134,16 @@ export function findExcerpts(
   content: string,
   term: string,
 ): { matchCount: number; excerpts: Excerpt[] } {
-  if (term === '') return { matchCount: 0, excerpts: [] }
+  const words = wordsOf(term)
+  if (words.length === 0) return { matchCount: 0, excerpts: [] }
   const headings = headingsOf(content)
   let matchCount = 0
   const excerpts: Excerpt[] = []
   content.split('\n').forEach((line, index) => {
-    const matches = findMatches(line, term)
-    if (matches.length === 0) return
-    matchCount += matches.length
+    const found = occurrences(line, words)
+    if (found.length === 0) return
+    matchCount += found.length
+    const matches = merged(found)
     const lineNumber = index + 1
     const onHeading = headings.some((heading) => heading.line === lineNumber)
     const above = onHeading ? undefined : headings.filter((h) => h.line < lineNumber).at(-1)
@@ -104,12 +154,13 @@ export function findExcerpts(
 
 /** The best matches first: the name before the content, the whole name before a part of it. */
 export function sortByRelevance(results: SearchResult[], searchTerm: string): SearchResult[] {
-  const term = searchTerm.trim().toLowerCase()
+  const words = wordsOf(searchTerm)
+  const whole = words.join(' ')
   const nameRank = (result: SearchResult): number => {
-    const name = result.item.name.toLowerCase()
-    if (name === term) return 0
-    if (name.startsWith(term)) return 1
-    return name.includes(term) ? 2 : 3
+    const name = normalize(result.item.name)
+    if (name === whole) return 0
+    if (name.startsWith(whole)) return 1
+    return words.every((word) => name.includes(word)) ? 2 : 3
   }
   return [...results].sort(
     (a, b) =>
@@ -119,7 +170,10 @@ export function sortByRelevance(results: SearchResult[], searchTerm: string): Se
   )
 }
 
-/** Searches the names of all items and the text of all stored pages. */
+/**
+ * Searches the names of all items and the text of all stored pages. An item matches when every
+ * word of the term is found; for a page, each word can be in its name or in its text.
+ */
 export function searchWiki(
   index: TreeIndex,
   pageText: (id: string) => string | undefined,
@@ -127,20 +181,19 @@ export function searchWiki(
 ): SearchResult[] {
   const term = searchTerm.trim()
   if (!isSearchable(term)) return []
+  const words = wordsOf(term)
   const results: SearchResult[] = []
   for (const item of index.items.values()) {
     if (!index.parents.has(item.id)) continue // the root itself
-    const found =
-      item.type === 'document'
-        ? findExcerpts(pageText(item.id) ?? '', term)
-        : { matchCount: 0, excerpts: [] }
-    if (found.matchCount === 0 && findMatches(item.name, term).length === 0) continue
+    const text = item.type === 'document' ? (pageText(item.id) ?? '') : ''
+    const searched = `${normalize(item.name)}\n${normalize(text)}`
+    if (!words.every((word) => searched.includes(word))) continue
     results.push({
       item,
       path: ancestorsOf(index, item.id)
         .slice(1)
         .map((section) => section.name),
-      ...found,
+      ...findExcerpts(text, term),
     })
   }
   return sortByRelevance(results, term)

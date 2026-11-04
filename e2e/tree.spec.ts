@@ -125,7 +125,7 @@ test('search finds the text of pages, also after a reload without the server', a
 test('finds pages with the search', async ({ page }) => {
   await login(page)
   await page.getByTestId('search-button').click()
-  await page.getByTestId('search-input').locator('input').fill('kürbis')
+  await page.getByTestId('search-input').locator('input').fill('kurbis')
   await page.getByTestId('search-result').first().click()
   await expect(page.getByTestId('document-title')).toHaveText('Kürbissuppe')
 })
