@@ -1,9 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { ApiError } from '@/api'
-import { describeAuthError } from '@/services/authErrors'
-import { errorMessage } from '@/services/errors'
+import { authErrorText } from '@/services/authErrors'
 
 export interface Notification {
   id: number
@@ -11,18 +9,9 @@ export interface Notification {
   color: 'success' | 'error' | 'info' | 'warning'
 }
 
-/** Human readable message for an error. */
+/** Human readable message for an error; a string is such a message already. */
 export function describeError(error: unknown): string {
-  if (error instanceof ApiError) {
-    const known = describeAuthError(error)
-    if (known) return known
-    if (error.isNetworkError) return 'The server is not reachable right now.'
-    if (error.isUnauthorized) return 'Please sign in again.'
-    if (error.status === 409) return `Not possible right now: ${error.message}`
-    if (error.status === 404) return 'This does not exist (any more).'
-    return error.message
-  }
-  return errorMessage(error)
+  return typeof error === 'string' ? error : authErrorText(error)
 }
 
 /** Snackbar messages. */

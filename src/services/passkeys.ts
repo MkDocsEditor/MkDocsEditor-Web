@@ -15,7 +15,7 @@ import type {
 
 export type { AuthenticationResponseJSON, RegistrationResponseJSON }
 
-import { errorMessage } from './errors'
+import { userMessage } from './errors'
 
 /**
  * Passkeys (WebAuthn) in the browser. The backend sends the options in the JSON form of the spec,
@@ -61,7 +61,8 @@ async function ceremony<T>(run: () => Promise<T>): Promise<T> {
     return await run()
   } catch (error) {
     if (error instanceof WebAuthnError || isPasskeyCancel(error)) throw error
-    throw new PasskeyProviderError(errorMessage(error))
+    console.error('mkdocseditor: passkey provider error', error)
+    throw new PasskeyProviderError(error instanceof Error ? error.message : String(error))
   }
 }
 
@@ -101,9 +102,8 @@ export function describePasskeyError(error: unknown, alternative?: string): stri
   if (error instanceof PasskeyProviderError) {
     const instead = alternative ? `, or ${alternative} instead` : ''
     return (
-      `Your passkey provider (the browser or a password manager extension) reported an error ` +
-      `("${error.message}"). Close any passkey windows that stayed open, then reload the page ` +
-      `and try again${instead}.`
+      `Your passkey provider (the browser or a password manager extension) reported an error. ` +
+      `Close any passkey windows that stayed open, then reload the page and try again${instead}.`
     )
   }
   if (error instanceof WebAuthnError) {
@@ -113,5 +113,5 @@ export function describePasskeyError(error: unknown, alternative?: string): stri
       return 'Passkeys do not work on this address (the domain does not match the server setting).'
   }
   if (isPasskeyCancel(error)) return 'Cancelled or timed out.'
-  return errorMessage(error)
+  return userMessage(error)
 }

@@ -5,7 +5,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { useAuthApi } from '@/api'
 import type { CreatedDeviceLink, DeviceLink } from '@/api'
 import QrCode from '@/components/auth/QrCode.vue'
-import { describeAuthError } from '@/services/authErrors'
+import { authErrorText } from '@/services/authErrors'
 import { useCopied } from '@/services/copied'
 import { connectUrlFor, OBTAINIUM_ADD_URL } from '@/services/connectLink'
 import { useAuthStore } from '@/stores/auth'
@@ -78,7 +78,7 @@ async function create(): Promise<void> {
     }, 1000)
     poll = setInterval(() => void refresh(), 2000)
   } catch (e) {
-    if (!(e instanceof ReauthCancelled)) error.value = describeAuthError(e) ?? String(e)
+    if (!(e instanceof ReauthCancelled)) error.value = authErrorText(e)
   } finally {
     busy.value = false
   }

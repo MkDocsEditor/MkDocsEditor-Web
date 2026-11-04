@@ -9,7 +9,7 @@ import CopyField from '@/components/auth/CopyField.vue'
 import QrCode from '@/components/auth/QrCode.vue'
 import RecoveryCodes from '@/components/auth/RecoveryCodes.vue'
 import { totpRule } from '@/services/accountRules'
-import { describeAuthError } from '@/services/authErrors'
+import { authErrorText } from '@/services/authErrors'
 import { useNotifyStore } from '@/stores/notify'
 import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
 
@@ -68,7 +68,7 @@ async function confirm(): Promise<void> {
     // below them on phones
     emit('changed')
   } catch (e) {
-    error.value = describeAuthError(e) ?? String(e)
+    error.value = authErrorText(e)
   } finally {
     busy.value = false
   }

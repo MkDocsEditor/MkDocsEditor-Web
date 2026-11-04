@@ -1,6 +1,6 @@
 import { ApiError } from '@/api'
 
-import { errorMessage } from './errors'
+import { userMessage } from './errors'
 import { plural } from './names'
 
 /** "5 seconds", "3 minutes" */
@@ -27,7 +27,7 @@ const WEAK_PASSWORD: Record<string, string> = {
  */
 export function describeAuthError(error: unknown): string | null {
   if (!(error instanceof ApiError)) return null
-  if (error.isNetworkError) return 'The server is not reachable right now.'
+  if (error.isNetworkError) return userMessage(error)
   switch (error.code) {
     case 'invalid-credentials':
       return 'Wrong username or password.'
@@ -76,14 +76,12 @@ export function describeAuthError(error: unknown): string | null {
     case 'csrf-check-failed':
     case 'origin-not-allowed':
       return 'The server refuses requests from this address (check the CORS setting).'
-    case 'conflict':
-      return `Not possible: ${error.message}`
   }
   if (error.isRateLimited) return 'Too many attempts. Please wait a moment.'
   return null
 }
 
-/** The known message for an error of the account endpoints, else its own message. */
+/** The known message for an error of the account endpoints, else a general one. */
 export function authErrorText(error: unknown): string {
-  return describeAuthError(error) ?? errorMessage(error)
+  return describeAuthError(error) ?? userMessage(error)
 }
