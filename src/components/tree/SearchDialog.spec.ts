@@ -1,4 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 
@@ -50,6 +51,7 @@ describe('SearchDialog', () => {
   })
 
   it('offers recent searches, searches for a chosen one, and shows them again when cleared', async () => {
+    setActivePinia(createPinia())
     rememberSearch('Kuchen')
     rememberSearch('Rezepte')
     const { wrapper } = await setup()

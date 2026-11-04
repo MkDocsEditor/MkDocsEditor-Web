@@ -21,6 +21,7 @@ import MoveDialog from '@/components/move/MoveDialog.vue'
 import { canDropInto, dragged, dropTarget } from '@/components/tree/dragState'
 import NavTree from '@/components/tree/NavTree.vue'
 import SearchDialog from '@/components/tree/SearchDialog.vue'
+import { signOut } from '@/services/signOut'
 import { roleLabel } from '@/services/accountRules'
 import { followMovedRoute } from '@/services/redirects'
 import { useStored } from '@/services/storedRef'
@@ -30,7 +31,6 @@ import { usePagesStore } from '@/stores/pages'
 import { useMoveStore } from '@/stores/move'
 import { describeError } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
-import { wikiCopy } from '@/sync/wikiCopy'
 
 const auth = useAuthStore()
 const tree = useTreeStore()
@@ -148,12 +148,7 @@ async function logout(): Promise<void> {
   loggingOut = true
   live.stop()
   try {
-    // signing out on purpose also removes the copy of the wiki from this device
-    const copy = wikiCopy()
-    await auth.logout()
-    tree.reset()
-    pages.reset()
-    await copy.clear()
+    await signOut()
     await router.push({ name: 'login' })
   } finally {
     loggingOut = false

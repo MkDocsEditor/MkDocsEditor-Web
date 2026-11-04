@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { indexTree } from '@/stores/treeIndex'
 import { sampleTree } from '@/test/fixtures'
 
-import { findExcerpts, findMatches, isSearchable, searchWiki, sortByRelevance } from './search'
+import {
+  countMatches,
+  findExcerpts,
+  findMatches,
+  isSearchable,
+  searchWiki,
+  sortByRelevance,
+} from './search'
 import type { SearchResult } from './search'
 
 describe('findMatches', () => {
@@ -36,11 +43,17 @@ describe('findMatches', () => {
   })
 })
 
+describe('countMatches', () => {
+  it('counts every word, without accents', () => {
+    expect(countMatches('Kürbis und kurbis\nApfel', 'kurbis apfel')).toBe(3)
+    expect(countMatches('Text', '')).toBe(0)
+  })
+})
+
 describe('findExcerpts', () => {
-  it('counts all matches and names the nearest heading above', () => {
+  it('names the nearest heading above and marks every match', () => {
     const page = '# Titel\n\nApfel und Apfel\n\n## Zweiter\n\n- noch ein Apfel\n'
-    const { matchCount, excerpts } = findExcerpts(page, 'apfel')
-    expect(matchCount).toBe(3)
+    const excerpts = findExcerpts(page, 'apfel')
     expect(excerpts.map((e) => e.heading)).toEqual(['Titel', 'Zweiter'])
     expect(excerpts[0]!.matches).toEqual([
       [0, 5],
@@ -48,15 +61,20 @@ describe('findExcerpts', () => {
     ])
   })
 
+  it('stops at the limit', () => {
+    expect(findExcerpts('Apfel\nApfel\nApfel', 'apfel')).toHaveLength(2)
+    expect(findExcerpts('Apfel\nApfel\nApfel', 'apfel', 3)).toHaveLength(3)
+  })
+
   it('names no heading for a match in a heading', () => {
-    const { excerpts } = findExcerpts('# Eins\n\n# Apfel\n', 'apfel')
+    const excerpts = findExcerpts('# Eins\n\n# Apfel\n', 'apfel')
     expect(excerpts[0]!.heading).toBeNull()
   })
 
   it('takes 20 characters before and 70 after the first match', () => {
     const before = 'v'.repeat(30)
     const after = 'n'.repeat(100)
-    const [excerpt] = findExcerpts(`${before}Apfel${after}`, 'apfel').excerpts
+    const [excerpt] = findExcerpts(`${before}Apfel${after}`, 'apfel')
     expect(excerpt!.text).toBe(`${'v'.repeat(20)}Apfel${'n'.repeat(70)}`)
     expect(excerpt!.matches).toEqual([[20, 25]])
     expect(excerpt!.truncatedStart).toBe(true)
@@ -64,12 +82,12 @@ describe('findExcerpts', () => {
   })
 
   it('skips line markers and does not count them as cut off', () => {
-    const [excerpt] = findExcerpts('- Apfel', 'apfel').excerpts
+    const [excerpt] = findExcerpts('- Apfel', 'apfel')
     expect(excerpt).toMatchObject({ text: 'Apfel', truncatedStart: false, truncatedEnd: false })
   })
 
   it('never cuts an emoji in half', () => {
-    const [excerpt] = findExcerpts(`😀${'v'.repeat(19)}Apfel`, 'apfel').excerpts
+    const [excerpt] = findExcerpts(`😀${'v'.repeat(19)}Apfel`, 'apfel')
     expect(excerpt!.text.startsWith('😀')).toBe(true)
     expect(excerpt!.matches).toEqual([[21, 26]])
   })
@@ -96,9 +114,11 @@ describe('sortByRelevance', () => {
 describe('searchWiki', () => {
   const index = indexTree(sampleTree())
   const text = (id: string) => (id === 'd-index' ? 'Rezept für Kuchen' : undefined)
+  const search = (pageText: (id: string) => string | undefined, term: string) =>
+    searchWiki(index, pageText, term).results
 
   it('finds pages by their text as well as items by their name', () => {
-    const results = searchWiki(index, text, 'kuchen')
+    const results = search(text, 'kuchen')
     const ids = results.map((r) => r.item.id)
     expect(ids).toContain('d-index')
     expect(ids).toContain('s-kuchen')
@@ -110,21 +130,44 @@ describe('searchWiki', () => {
   })
 
   it('finds names and text without accents and in any word order', () => {
-    expect(searchWiki(index, text, 'kurbis').map((r) => r.item.id)).toEqual(['d-suppe'])
-    const results = searchWiki(index, text, 'kuchen rezept')
+    expect(search(text, 'kurbis').map((r) => r.item.id)).toEqual(['d-suppe'])
+    const results = search(text, 'kuchen rezept')
     expect(results.map((r) => r.item.id)).toContain('d-index')
     expect(results.find((r) => r.item.id === 'd-index')!.matchCount).toBe(2)
   })
 
   it('needs every word, in the name or the text of a page', () => {
     const inBoth = (id: string) => (id === 'd-suppe' ? 'mit Ingwer' : undefined)
-    expect(searchWiki(index, inBoth, 'kurbis ingwer').map((r) => r.item.id)).toEqual(['d-suppe'])
-    expect(searchWiki(index, inBoth, 'kurbis pfeffer')).toEqual([])
+    expect(search(inBoth, 'kurbis ingwer').map((r) => r.item.id)).toEqual(['d-suppe'])
+    expect(search(inBoth, 'kurbis pfeffer')).toEqual([])
   })
 
   it('does not search for terms that are too short, or the root', () => {
     expect(isSearchable(' a ')).toBe(false)
-    expect(searchWiki(index, text, 'k')).toEqual([])
-    expect(searchWiki(index, text, 'docs')).toEqual([])
+    expect(isSearchable('a b')).toBe(false)
+    expect(isSearchable('\u0308\u0308')).toBe(false)
+    expect(isSearchable('a kuchen')).toBe(true)
+    expect(search(text, 'k')).toEqual([])
+    expect(search(text, 'docs')).toEqual([])
+  })
+
+  it('keeps the best 50 results and says how many there are', () => {
+    const tree = sampleTree()
+    for (let i = 0; i < 80; i++) {
+      tree.documents.push({
+        type: 'document',
+        id: `d-${i}`,
+        name: `Seite ${i}`,
+        filesize: 0,
+        modtime: '',
+        url: '',
+      })
+    }
+    const pageText = (id: string) => (id === 'd-79' ? 'seite seite seite' : undefined)
+    const { results, total } = searchWiki(indexTree(tree), pageText, 'seite')
+    expect(total).toBe(80)
+    expect(results).toHaveLength(50)
+    expect(results[0]!.item.id).toBe('d-79')
+    expect(results[0]!.excerpts).toHaveLength(1)
   })
 })

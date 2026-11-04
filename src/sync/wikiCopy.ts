@@ -57,13 +57,6 @@ function memoryRecords(): Records {
 const DB_NAME = 'mkdocseditor-wiki'
 const STORE = 'records'
 
-function done<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
-}
-
 /** Falls back to memory when IndexedDB is unavailable or full: the copy is then lost on reload. */
 function indexedDbRecords(): Records {
   const fallback = memoryRecords()
@@ -75,21 +68,37 @@ function indexedDbRecords(): Records {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     }))
-  const store = async (mode: IDBTransactionMode) =>
-    (await open()).transaction(STORE, mode).objectStore(STORE)
-  const range = (prefix: string) => IDBKeyRange.bound(prefix, `${prefix}￿`)
 
+  /** Resolves once the transaction is committed: a full disk only fails at that point. */
+  async function transact<T>(
+    mode: IDBTransactionMode,
+    work: (store: IDBObjectStore) => IDBRequest<T>,
+  ): Promise<T> {
+    const transaction = (await open()).transaction(STORE, mode)
+    return new Promise<T>((resolve, reject) => {
+      const request = work(transaction.objectStore(STORE))
+      transaction.oncomplete = () => resolve(request.result)
+      transaction.onabort = () => reject(transaction.error)
+      transaction.onerror = () => reject(transaction.error)
+    })
+  }
+  const range = (prefix: string) => IDBKeyRange.bound(prefix, `${prefix}\uffff`)
+
+  // A value is in memory only when IndexedDB refused it, so memory is always the newer one.
   return {
     async get(key) {
+      const memory = await fallback.get(key)
+      if (memory !== undefined) return memory
       try {
-        return (await done((await store('readonly')).get(key))) ?? (await fallback.get(key))
+        return await transact('readonly', (store) => store.get(key))
       } catch {
-        return fallback.get(key)
+        return undefined
       }
     },
     async put(key, value) {
       try {
-        await done((await store('readwrite')).put(value, key))
+        await transact('readwrite', (store) => store.put(value, key))
+        await fallback.delete(key)
       } catch {
         await fallback.put(key, value)
       }
@@ -97,7 +106,7 @@ function indexedDbRecords(): Records {
     async delete(key) {
       await fallback.delete(key)
       try {
-        await done((await store('readwrite')).delete(key))
+        await transact('readwrite', (store) => store.delete(key))
       } catch {
         // nothing stored then
       }
@@ -105,12 +114,10 @@ function indexedDbRecords(): Records {
     async list(prefix) {
       const memory = await fallback.list(prefix)
       try {
-        const objects = await store('readonly')
-        const [keys, values] = await Promise.all([
-          done(objects.getAllKeys(range(prefix))),
-          done(objects.getAll(range(prefix))),
-        ])
-        return [...keys.map((key, i): [string, unknown] => [String(key), values[i]]), ...memory]
+        const keys = await transact('readonly', (store) => store.getAllKeys(range(prefix)))
+        const values = await transact('readonly', (store) => store.getAll(range(prefix)))
+        const stored = keys.map((key, i): [string, unknown] => [String(key), values[i]])
+        return [...new Map([...stored, ...memory])]
       } catch {
         return memory
       }
@@ -118,7 +125,7 @@ function indexedDbRecords(): Records {
     async deleteAll(prefix) {
       await fallback.deleteAll(prefix)
       try {
-        await done((await store('readwrite')).delete(range(prefix)))
+        await transact('readwrite', (store) => store.delete(range(prefix)))
       } catch {
         // nothing stored then
       }
@@ -128,12 +135,20 @@ function indexedDbRecords(): Records {
 
 let records: Records | null = null
 
-/** The copy of whoever is signed in now. */
+/** Who is signed in now, for keeping local data apart; empty on a server without login. */
+export function accountKey(): string {
+  const user = useAuthStore().user
+  return encodeURIComponent(user ? (user.id ?? user.username) : '')
+}
+
+/**
+ * The copy of whoever is signed in now. Whatever finishes later, such as a load in progress, has to
+ * keep this object: by then somebody else can be signed in.
+ */
 export function wikiCopy(): WikiCopy {
   records ??= typeof indexedDB === 'undefined' ? memoryRecords() : indexedDbRecords()
   const raw = records
-  const user = useAuthStore().user
-  const prefix = `${encodeURIComponent(user ? (user.id ?? user.username) : '')}:`
+  const prefix = `${accountKey()}:`
   const treeKey = `${prefix}tree`
   const pagePrefix = `${prefix}page:`
   return {

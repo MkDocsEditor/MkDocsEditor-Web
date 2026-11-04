@@ -38,9 +38,9 @@ import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { isImage, resourceKind } from '@/services/icons'
 import { linkDestination } from '@/services/linkPath'
 import { initials } from '@/services/names'
-import { useDebounced } from '@/services/debounced'
 import { useStored } from '@/services/storedRef'
 import { usePagesStore } from '@/stores/pages'
+import { accountKey } from '@/sync/wikiCopy'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
 import { useMoveStore } from '@/stores/move'
@@ -106,10 +106,25 @@ const ready = ref(false)
 
 // Search finds what was just typed here, before the server's copy of the page is fetched again.
 const pages = usePagesStore()
-const settledText = useDebounced(() => text.value, 1_000)
-watch(settledText, (value) => {
-  if (ready.value) pages.edited(props.id, value)
+const account = accountKey()
+let unstoredText: { id: string; text: string } | null = null
+let storeTimer: ReturnType<typeof setTimeout> | undefined
+
+function storeText(): void {
+  clearTimeout(storeTimer)
+  // after a sign-out this text is not for whoever comes next
+  if (unstoredText && accountKey() === account) pages.edited(unstoredText.id, unstoredText.text)
+  unstoredText = null
+}
+
+watch(text, (value) => {
+  if (!ready.value) return
+  unstoredText = { id: props.id, text: value }
+  clearTimeout(storeTimer)
+  storeTimer = setTimeout(storeText, 1_000)
 })
+watch(() => props.id, storeText, { flush: 'sync' })
+onBeforeUnmount(storeText)
 const topLine = ref(0)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const editorView = () => editor.value?.getView() ?? null

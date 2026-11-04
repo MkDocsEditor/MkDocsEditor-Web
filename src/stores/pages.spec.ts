@@ -2,10 +2,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import { loadRecentSearches, rememberSearch } from '@/services/recentSearches'
+import { signOut } from '@/services/signOut'
 import { wikiCopy } from '@/sync/wikiCopy'
 import { createFetchMock, json } from '@/test/fetchMock'
-import { sampleTree } from '@/test/fixtures'
+import { sampleTree, user } from '@/test/fixtures'
 
+import { useAuthStore } from './auth'
 import { usePagesStore } from './pages'
 import { useTreeStore } from './tree'
 
@@ -68,7 +71,7 @@ describe('pages store', () => {
   it('stops at a connection failure but skips a single page that fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const { contentRequests } = backend((id) =>
-      id === 'd-index' ? json({ message: 'broken' }, 500) : new Response('Text'),
+      id === 'd-index' ? json({ message: 'broken' }, 404) : new Response('Text'),
     )
     await useTreeStore().load()
     const pages = usePagesStore()
@@ -109,7 +112,23 @@ describe('pages store', () => {
     pages.edited('d-index', 'Lokal')
     expect(pages.pages.get('d-index')?.text).toBe('Lokal')
     await pages.sync()
-    expect(contentRequests()).toBe(all)
+    expect(contentRequests()).toBe(all + 1)
+    expect(pages.pages.get('d-index')?.text).toBe('Server')
+  })
+
+  it('stops after a few server errors in a row, and at once when rate limited', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const failing = backend(() => json({ message: 'down' }, 503))
+    await useTreeStore().load()
+    await usePagesStore().sync()
+    expect(failing.contentRequests()).toBe(3)
+
+    setActivePinia(createPinia())
+    const limited = backend(() => json({ message: 'slow' }, 429))
+    await useTreeStore().load()
+    await usePagesStore().sync()
+    expect(limited.contentRequests()).toBe(1)
+    warn.mockRestore()
   })
 
   it('does not store anything for the next account after a reset', async () => {
@@ -128,6 +147,71 @@ describe('pages store', () => {
     await running
     expect(pages.pages.size).toBe(0)
     expect((await wikiCopy().pages()).size).toBe(0)
+  })
+})
+
+describe('tree load across a sign-out', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    await wikiCopy().clear()
+  })
+  afterEach(() => setApiClient(null))
+
+  it('drops a load still running, and stores nothing for the next account', async () => {
+    let answer!: (response: Response) => void
+    const mock = createFetchMock({
+      'GET /section/': () => new Promise<Response>((resolve) => (answer = resolve)),
+    })
+    setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
+    const auth = useAuthStore()
+    auth.signedIn(user({ id: 'a1', username: 'anna' }))
+    const tree = useTreeStore()
+    const running = tree.load()
+    await vi.waitFor(() => expect(answer).toBeDefined())
+
+    tree.reset()
+    auth.signedIn(user({ id: 'b2', username: 'ben' }))
+    answer(json(sampleTree()))
+    await running
+    expect(tree.root).toBeNull()
+    expect(await wikiCopy().tree()).toBeUndefined()
+  })
+})
+
+describe('signing out', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    await wikiCopy().clear()
+  })
+  afterEach(() => {
+    setApiClient(null)
+    localStorage.clear()
+  })
+
+  it('removes the copy and the search history of this account only', async () => {
+    const mock = createFetchMock({
+      'GET /section/': () => json(sampleTree()),
+      'POST /auth/logout/': () => new Response(null, { status: 204 }),
+    })
+    setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
+    const auth = useAuthStore()
+    auth.signedIn(user({ id: 'b2', username: 'ben' }))
+    await useTreeStore().load()
+    const ofBen = wikiCopy()
+    await expect.poll(async () => (await ofBen.tree())?.root.id).toBe('root')
+
+    auth.signedIn(user({ id: 'a1', username: 'anna' }))
+    await useTreeStore().load()
+    const ofAnna = wikiCopy()
+    await expect.poll(async () => (await ofAnna.tree())?.root.id).toBe('root')
+    rememberSearch('geheim')
+
+    await signOut()
+    expect(await ofAnna.tree()).toBeUndefined()
+    expect((await ofBen.tree())?.root.id).toBe('root')
+    expect(useTreeStore().root).toBeNull()
+    auth.signedIn(user({ id: 'a1', username: 'anna' }))
+    expect(loadRecentSearches()).toEqual([])
   })
 })
 

@@ -1,5 +1,6 @@
 import type { DocumentModel, ResourceModel, SectionModel } from '@/api'
 import { headingsOf } from '@/markdown/headings'
+import type { Heading } from '@/markdown/headings'
 import { ancestorsOf, normalize } from '@/stores/treeIndex'
 import type { TreeIndex } from '@/stores/treeIndex'
 
@@ -8,6 +9,10 @@ export const MIN_SEARCH_LENGTH = 2
 
 const CHARS_BEFORE_MATCH = 20
 const CHARS_AFTER_MATCH = 70
+/** Pages show this many of their matching lines. */
+const EXCERPT_LIMIT = 2
+/** More than anybody reads, and rendering all of them would freeze a phone. */
+const RESULT_LIMIT = 50
 
 /** List, quote and heading markers, which say nothing about the content. */
 const LINE_MARKER = /^\s*(#{1,6}\s+|[-*+]\s+|>\s*|\d+\.\s+)?/
@@ -37,8 +42,9 @@ export interface SearchResult {
   excerpts: Excerpt[]
 }
 
+/** At least one word must be long enough: "a b" would match nearly everything. */
 export function isSearchable(term: string): boolean {
-  return term.trim().length >= MIN_SEARCH_LENGTH
+  return wordsOf(term).some((word) => word.length >= MIN_SEARCH_LENGTH)
 }
 
 /**
@@ -129,27 +135,40 @@ function excerptOf(line: string, matches: MatchRange[], heading: string | null):
   }
 }
 
-/** The lines of a page that match, and how many matches it has in total. */
-export function findExcerpts(
-  content: string,
-  term: string,
-): { matchCount: number; excerpts: Excerpt[] } {
+function countIn(normalized: string, word: string): number {
+  let count = 0
+  let from = normalized.indexOf(word)
+  while (from !== -1) {
+    count++
+    from = normalized.indexOf(word, from + word.length)
+  }
+  return count
+}
+
+/** How often the words of `term` are in `text`, which can be more than the excerpts show. */
+export function countMatches(text: string, term: string): number {
+  const normalized = normalize(text)
+  return wordsOf(term).reduce((sum, word) => sum + countIn(normalized, word), 0)
+}
+
+/** The first lines of a page that match, each with the nearest heading above it. */
+export function findExcerpts(content: string, term: string, limit = EXCERPT_LIMIT): Excerpt[] {
   const words = wordsOf(term)
-  if (words.length === 0) return { matchCount: 0, excerpts: [] }
-  const headings = headingsOf(content)
-  let matchCount = 0
+  if (words.length === 0) return []
   const excerpts: Excerpt[] = []
-  content.split('\n').forEach((line, index) => {
-    const found = occurrences(line, words)
-    if (found.length === 0) return
-    matchCount += found.length
-    const matches = merged(found)
+  // only when a line matches: finding the headings is the expensive part
+  let headings: Heading[] | null = null
+  for (const [index, line] of content.split('\n').entries()) {
+    if (excerpts.length >= limit) break
+    const normalized = normalize(line)
+    if (!words.some((word) => normalized.includes(word))) continue
+    headings ??= headingsOf(content)
     const lineNumber = index + 1
     const onHeading = headings.some((heading) => heading.line === lineNumber)
     const above = onHeading ? undefined : headings.filter((h) => h.line < lineNumber).at(-1)
-    excerpts.push(excerptOf(line, matches, above?.text ?? null))
-  })
-  return { matchCount, excerpts }
+    excerpts.push(excerptOf(line, merged(occurrences(line, words)), above?.text ?? null))
+  }
+  return excerpts
 }
 
 /** The best matches first: the name before the content, the whole name before a part of it. */
@@ -173,28 +192,38 @@ export function sortByRelevance(results: SearchResult[], searchTerm: string): Se
 /**
  * Searches the names of all items and the text of all stored pages. An item matches when every
  * word of the term is found; for a page, each word can be in its name or in its text.
+ *
+ * @returns the best results, and how many there are in total
  */
 export function searchWiki(
   index: TreeIndex,
   pageText: (id: string) => string | undefined,
   searchTerm: string,
-): SearchResult[] {
+): { results: SearchResult[]; total: number } {
   const term = searchTerm.trim()
-  if (!isSearchable(term)) return []
+  if (!isSearchable(term)) return { results: [], total: 0 }
   const words = wordsOf(term)
-  const results: SearchResult[] = []
+  const found: SearchResult[] = []
   for (const item of index.items.values()) {
     if (!index.parents.has(item.id)) continue // the root itself
-    const text = item.type === 'document' ? (pageText(item.id) ?? '') : ''
-    const searched = `${normalize(item.name)}\n${normalize(text)}`
+    const text = item.type === 'document' ? normalize(pageText(item.id) ?? '') : ''
+    const searched = `${normalize(item.name)}\n${text}`
     if (!words.every((word) => searched.includes(word))) continue
-    results.push({
+    found.push({
       item,
-      path: ancestorsOf(index, item.id)
-        .slice(1)
-        .map((section) => section.name),
-      ...findExcerpts(text, term),
+      path: [],
+      matchCount: words.reduce((sum, word) => sum + countIn(text, word), 0),
+      excerpts: [],
     })
   }
-  return sortByRelevance(results, term)
+  const results = sortByRelevance(found, term)
+    .slice(0, RESULT_LIMIT)
+    .map((result) => ({
+      ...result,
+      path: ancestorsOf(index, result.item.id)
+        .slice(1)
+        .map((section) => section.name),
+      excerpts: result.matchCount > 0 ? findExcerpts(pageText(result.item.id) ?? '', term) : [],
+    }))
+  return { results, total: found.length }
 }

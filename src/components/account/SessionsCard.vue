@@ -8,12 +8,11 @@ import type { SessionInfo } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
 import { plural } from '@/services/names'
+import { signOut } from '@/services/signOut'
 import { formatTime } from '@/services/time'
-import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 
 const api = useAuthApi()
-const auth = useAuthStore()
 const notify = useNotifyStore()
 const router = useRouter()
 
@@ -44,7 +43,7 @@ async function revoke(session: SessionInfo): Promise<void> {
   busy.value = true
   try {
     if (session.current) {
-      await auth.logout()
+      await signOut()
       await router.push({ name: 'login' })
       return
     }

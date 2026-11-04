@@ -14,9 +14,6 @@ import { formatWhen } from '@/services/time'
 import { usePagesStore } from '@/stores/pages'
 import { useTreeStore } from '@/stores/tree'
 
-/** Pages show this many of their matching lines. */
-const EXCERPT_LIMIT = 2
-
 const open = defineModel<boolean>({ required: true })
 const tree = useTreeStore()
 const pages = usePagesStore()
@@ -29,7 +26,8 @@ const term = useDebounced(() => query.value, 300)
 
 const search = (searchTerm: string) =>
   searchWiki(tree.index, (id) => pages.pages.get(id)?.text, searchTerm)
-const results = computed(() => search(term.value))
+const found = computed(() => search(term.value))
+const results = computed(() => found.value.results)
 const tooShort = computed(() => query.value !== '' && !isSearchable(query.value))
 const settled = computed(() => term.value === query.value)
 
@@ -56,7 +54,7 @@ async function choose(result: SearchResult): Promise<void> {
 
 function chooseFirst(): void {
   // right away, not after the delay of the results on screen
-  const first = search(query.value)[0]
+  const first = search(query.value).results[0]
   if (first) void choose(first)
   else remember()
 }
@@ -153,7 +151,7 @@ function details(result: SearchResult): string {
               }}</span>
             </div>
             <div
-              v-for="(excerpt, i) in result.excerpts.slice(0, EXCERPT_LIMIT)"
+              v-for="(excerpt, i) in result.excerpts"
               :key="i"
               class="mt-1"
               data-testid="search-excerpt"
@@ -170,6 +168,14 @@ function details(result: SearchResult): string {
           </v-list-item>
         </v-list>
         <p v-else-if="settled" class="text-medium-emphasis pa-4">Nothing found.</p>
+        <p
+          v-if="query !== '' && !tooShort && found.total > results.length"
+          class="text-caption text-medium-emphasis px-4"
+          data-testid="search-limited"
+        >
+          Showing the best {{ results.length }} of {{ found.total }} results. Add a word to narrow
+          them down.
+        </p>
       </v-card-text>
       <v-card-actions v-if="$vuetify.display.xs">
         <v-spacer />
