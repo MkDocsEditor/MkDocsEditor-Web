@@ -17,6 +17,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { DocumentSession } from '@/sync/session'
 
 import { authorship, setAuthorship } from './authorship'
+import type { AuthorHighlightMode } from './authorship'
 import { sessionBinding } from './binding'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { formattingKeymap } from './formatting'
@@ -27,7 +28,7 @@ import type { UploadFiles } from './upload'
 
 const props = defineProps<{
   session: DocumentSession
-  showAuthorship?: boolean
+  authorHighlight?: AuthorHighlightMode
   /** Uploads pasted or dropped files and returns their markdown; no uploads without it. */
   upload?: UploadFiles
   /** Shows line numbers (off on phones, where every column counts). */
@@ -102,13 +103,13 @@ function pushAuthorship(): void {
   view?.dispatch({
     effects: setAuthorship.of({
       runs: props.session.authorship.value,
-      visible: props.showAuthorship ?? false,
+      mode: props.authorHighlight ?? 'off',
     }),
   })
 }
 
 watch(() => props.session.peers.value, pushPeers)
-watch([() => props.session.authorship.value, () => props.showAuthorship], pushAuthorship)
+watch([() => props.session.authorship.value, () => props.authorHighlight], pushAuthorship)
 watch(
   () => props.lineNumbers,
   (show) => view?.dispatch({ effects: gutter.reconfigure(show ? lineNumberGutter() : []) }),

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  mdiAccountEdit,
+  mdiCheck,
   mdiCloudCheckOutline,
   mdiCloudOffOutline,
   mdiCloudSyncOutline,
@@ -31,6 +31,7 @@ import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
+import type { AuthorHighlightMode } from '@/editor/authorship'
 import { insertionFor } from '@/editor/upload'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
@@ -70,7 +71,12 @@ const mode = computed<Mode>({
     storedMode.value = m
   },
 })
-const showAuthorship = ref(false)
+const authorHighlight = useStored<AuthorHighlightMode>('mkdocseditor.authorHighlight', 'marker')
+const authorHighlightModes: { value: AuthorHighlightMode; title: string }[] = [
+  { value: 'marker', title: 'Strip and marker' },
+  { value: 'strip', title: 'Strip next to the line' },
+  { value: 'off', title: 'Off' },
+]
 
 /** Leaves the preview-only mode, for actions that need the editor on screen. */
 function showEditor(): void {
@@ -386,12 +392,17 @@ const connection = computed(() => {
             <v-btn v-bind="menu" :icon="mdiDotsVertical" variant="text" aria-label="More" />
           </template>
           <v-list density="compact">
+            <v-list-subheader>Who wrote what?</v-list-subheader>
             <v-list-item
-              :prepend-icon="mdiAccountEdit"
-              :title="showAuthorship ? 'Hide authors' : 'Who wrote what?'"
-              :disabled="!session || session.authorship.value.length === 0"
-              @click="showAuthorship = !showAuthorship"
+              v-for="option in authorHighlightModes"
+              :key="option.value"
+              :title="option.title"
+              :active="authorHighlight === option.value"
+              :append-icon="authorHighlight === option.value ? mdiCheck : undefined"
+              :data-testid="`author-highlight-${option.value}`"
+              @click="authorHighlight = option.value"
             />
+            <v-divider />
             <v-list-item
               v-if="page"
               :prepend-icon="mdiFolderMoveOutline"
@@ -450,7 +461,7 @@ const connection = computed(() => {
           :key="id"
           class="document-view__editor"
           :session="session"
-          :show-authorship="showAuthorship"
+          :author-highlight="authorHighlight"
           :upload="upload"
           :line-numbers="!mobile"
           :format-override="shortcutOverride"
