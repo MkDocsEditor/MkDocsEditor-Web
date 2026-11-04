@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useAuthApi } from '@/api'
 import type { AccountInfo, Passkey } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import LoadError from '@/components/common/LoadError.vue'
 import { formatTime } from '@/services/time'
 import { addPasskey } from '@/services/addPasskey'
 import { describeAuthError } from '@/services/authErrors'
@@ -23,6 +24,7 @@ const notify = useNotifyStore()
 
 const passkeys = ref<Passkey[]>([])
 const loading = ref(true)
+const loadError = ref<unknown>(null)
 const busy = ref(false)
 const renaming = ref<Passkey | null>(null)
 const newName = ref('')
@@ -31,10 +33,13 @@ const deleting = ref<Passkey | null>(null)
 const available = computed(() => auth.passkeysEnabled && passkeysSupported())
 
 async function load(): Promise<void> {
+  if (loadError.value) loading.value = true
+  loadError.value = null
   try {
     passkeys.value = await api.passkeys()
   } catch (e) {
-    notify.error(e, 'Could not load the passkeys')
+    if (passkeys.value.length > 0) notify.error(e, 'Could not load the passkeys', () => void load())
+    else loadError.value = e
   } finally {
     loading.value = false
   }
@@ -104,6 +109,12 @@ onMounted(load)
         This browser does not support passkeys.
       </v-alert>
       <v-progress-linear v-if="loading" indeterminate />
+      <LoadError
+        v-else-if="loadError"
+        title="Could not load the passkeys"
+        :error="loadError"
+        @retry="load"
+      />
       <v-list v-else-if="passkeys.length" density="comfortable" data-testid="passkey-list">
         <v-list-item
           v-for="passkey in passkeys"

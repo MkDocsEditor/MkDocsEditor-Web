@@ -16,3 +16,8 @@ export function userMessage(error: unknown): string {
   console.error('mkdocseditor: unexpected error', error)
   return 'Something went wrong. Please try again.'
 }
+
+/** Whether trying the same thing again can work: the request itself was not the problem. */
+export function canRetry(error: unknown): boolean {
+  return error instanceof ApiError && (error.isNetworkError || error.status >= 500)
+}

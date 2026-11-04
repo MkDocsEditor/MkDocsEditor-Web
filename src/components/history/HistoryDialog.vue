@@ -6,10 +6,11 @@ import { useDisplay } from 'vuetify'
 import { useApi } from '@/api'
 import type { Revision } from '@/api'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import LoadError from '@/components/common/LoadError.vue'
 import { diffStats, parseUnifiedDiff } from '@/services/diff'
 import type { DiffLine } from '@/services/diff'
 import { formatDate, formatWhen } from '@/services/time'
-import { useNotifyStore } from '@/stores/notify'
+import { describeError, useNotifyStore } from '@/stores/notify'
 
 const props = defineProps<{ documentId: string; readOnly?: boolean }>()
 const open = defineModel<boolean>({ required: true })
@@ -29,6 +30,8 @@ const view = ref<View>('changes')
 const detailLoading = ref(false)
 const diffLines = ref<DiffLine[]>([])
 const content = ref('')
+const detailError = ref<unknown>(null)
+const restoreError = ref<unknown>(null)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -61,6 +64,8 @@ async function loadDetail(): Promise<void> {
   if (!revision) return
   const token = ++detailToken
   detailLoading.value = true
+  detailError.value = null
+  restoreError.value = null
   try {
     const api = useApi()
     const before = previous(revision)
@@ -79,7 +84,7 @@ async function loadDetail(): Promise<void> {
     diffLines.value = lines
     content.value = text
   } catch (error) {
-    if (token === detailToken) notify.error(error, 'Could not load the version')
+    if (token === detailToken) detailError.value = error
   } finally {
     if (token === detailToken) detailLoading.value = false
   }
@@ -115,13 +120,14 @@ async function restore(): Promise<void> {
   const revision = selected.value
   if (!revision) return
   restoring.value = true
+  restoreError.value = null
   try {
     await useApi().restoreRevision(props.documentId, revision.revision)
     notify.success(`Restored the version of ${formatDate(revision.time)}`)
     emit('restored', revision)
     open.value = false
   } catch (error) {
-    notify.error(error, 'Restore failed')
+    restoreError.value = error
   } finally {
     restoring.value = false
   }
@@ -153,9 +159,13 @@ const viewLabels: Record<View, string> = {
 
       <v-card-text class="history__body pa-0">
         <v-progress-linear v-if="loading" indeterminate color="primary" />
-        <v-alert v-else-if="loadError" type="error" variant="tonal" class="ma-4">
-          Could not load the version history.
-        </v-alert>
+        <LoadError
+          v-else-if="loadError"
+          class="ma-4"
+          title="Could not load the version history"
+          :error="loadError"
+          @retry="load"
+        />
         <v-empty-state
           v-else-if="revisions === null"
           title="No version history"
@@ -216,7 +226,25 @@ const viewLabels: Record<View, string> = {
             </v-tabs>
             <v-divider />
             <v-progress-linear v-if="detailLoading" indeterminate color="primary" />
-            <pre v-if="showsContent" class="history__text" data-testid="history-content">{{
+            <v-alert
+              v-if="restoreError"
+              type="error"
+              variant="tonal"
+              density="compact"
+              role="alert"
+              class="ma-3"
+              title="Restore failed"
+              :text="describeError(restoreError)"
+              data-testid="history-restore-error"
+            />
+            <LoadError
+              v-if="detailError"
+              class="ma-3"
+              title="Could not load the version"
+              :error="detailError"
+              @retry="loadDetail"
+            />
+            <pre v-else-if="showsContent" class="history__text" data-testid="history-content">{{
               content
             }}</pre>
             <template v-else>

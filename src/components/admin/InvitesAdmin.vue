@@ -6,6 +6,7 @@ import { useAuthApi } from '@/api'
 import { ROLES } from '@/api/authTypes'
 import type { CreatedLink, LinkInfo, Role } from '@/api'
 import LinkResultDialog from '@/components/admin/LinkResultDialog.vue'
+import LoadError from '@/components/common/LoadError.vue'
 import LinkStatusChip from '@/components/admin/LinkStatusChip.vue'
 import { roleLabel } from '@/services/accountRules'
 import { formatTime } from '@/services/time'
@@ -16,6 +17,7 @@ const notify = useNotifyStore()
 
 const invites = ref<LinkInfo[]>([])
 const loading = ref(true)
+const loadError = ref<unknown>(null)
 const showAll = ref(false)
 
 const role = ref<Role>('editor')
@@ -35,10 +37,13 @@ const expiryItems = [
 const visible = computed(() => invites.value.filter((i) => showAll.value || i.status === 'pending'))
 
 async function load(): Promise<void> {
+  if (loadError.value) loading.value = true
+  loadError.value = null
   try {
     invites.value = await api.invites()
   } catch (e) {
-    notify.error(e, 'Could not load the invites')
+    if (invites.value.length > 0) notify.error(e, 'Could not load the invites', () => void load())
+    else loadError.value = e
   } finally {
     loading.value = false
   }
@@ -128,6 +133,9 @@ onMounted(load)
         </template>
       </v-card-item>
       <v-progress-linear v-if="loading" indeterminate />
+      <v-card-text v-if="loadError">
+        <LoadError title="Could not load the invites" :error="loadError" @retry="load" />
+      </v-card-text>
       <v-list v-if="visible.length" lines="two">
         <v-list-item v-for="invite in visible" :key="invite.id" data-testid="invite-item">
           <v-list-item-title>
@@ -157,7 +165,7 @@ onMounted(load)
           </template>
         </v-list-item>
       </v-list>
-      <v-card-text v-else-if="!loading" class="text-medium-emphasis">
+      <v-card-text v-else-if="!loading && !loadError" class="text-medium-emphasis">
         No pending invites.
       </v-card-text>
     </v-card>

@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 
 import { useAuthApi } from '@/api'
 import type { AuditEvent } from '@/api'
+import LoadError from '@/components/common/LoadError.vue'
 import { formatTime } from '@/services/time'
 import { useNotifyStore } from '@/stores/notify'
 
@@ -12,6 +13,7 @@ const notify = useNotifyStore()
 const events = ref<AuditEvent[]>([])
 const next = ref<number | null>(null)
 const loading = ref(false)
+const loadError = ref<unknown>(null)
 const type = ref<string | null>(null)
 
 /** Readable names of the audit event types (`docs/auth.md` section 2). */
@@ -67,6 +69,7 @@ function detailText(event: AuditEvent): string {
 
 async function load(more = false): Promise<void> {
   loading.value = true
+  loadError.value = null
   try {
     const page = await api.audit({
       limit: 100,
@@ -76,7 +79,9 @@ async function load(more = false): Promise<void> {
     events.value = more ? [...events.value, ...page.events] : page.events
     next.value = page.next
   } catch (e) {
-    notify.error(e, 'Could not load the audit log')
+    if (more || events.value.length > 0)
+      notify.error(e, 'Could not load the audit log', () => void load(more))
+    else loadError.value = e
   } finally {
     loading.value = false
   }
@@ -103,6 +108,9 @@ onMounted(() => void load())
         class="mb-2"
       />
     </v-card-text>
+    <v-card-text v-if="loadError">
+      <LoadError title="Could not load the audit log" :error="loadError" @retry="load()" />
+    </v-card-text>
     <v-list lines="three" density="compact">
       <v-list-item v-for="event in events" :key="event.id" data-testid="audit-event">
         <v-list-item-title :class="{ 'text-error': isWarning(event) }">
@@ -118,7 +126,7 @@ onMounted(() => void load())
           <template v-if="detailText(event)"><br />{{ detailText(event) }}</template>
         </v-list-item-subtitle>
       </v-list-item>
-      <v-list-item v-if="!loading && events.length === 0" title="No entries" />
+      <v-list-item v-if="!loading && !loadError && events.length === 0" title="No entries" />
     </v-list>
     <v-progress-linear v-if="loading" indeterminate />
     <v-card-actions v-if="next !== null">

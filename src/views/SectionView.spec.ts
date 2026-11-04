@@ -68,6 +68,37 @@ describe('SectionView', () => {
     wrapper.unmount()
   })
 
+  it('keeps the name dialog open and says why when creating fails', async () => {
+    let status = 409
+    const { wrapper, router } = await setup('s-urlaub', {
+      'POST /document/': () =>
+        status === 200
+          ? json({ type: 'document', id: 'd-new', name: 'Rom', filesize: 0, modtime: '', url: '' })
+          : json({ message: 'Rom already exists' }, status),
+    })
+    await wrapper.find('[data-testid="create-fab"]').trigger('click')
+    await flushPromises()
+    ;(document.querySelector('[data-testid="create-document"]') as HTMLElement).click()
+    await flushPromises()
+    const input = document.querySelector('[data-testid="name-input"] input') as HTMLInputElement
+    input.value = 'Rom'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    const confirm = () =>
+      (document.querySelector('[data-testid="name-confirm"]') as HTMLElement).click()
+
+    confirm()
+    await flushPromises()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('This name already exists.'))
+    expect(document.querySelector('[data-testid="name-input"]')).not.toBeNull()
+    expect(useNotifyStore().queue).toEqual([])
+
+    status = 200
+    confirm()
+    await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/document/d-new'))
+    wrapper.unmount()
+  })
+
   it('creates a page and opens it', async () => {
     const { wrapper, router, requests } = await setup('s-urlaub', {
       'POST /document/': () =>

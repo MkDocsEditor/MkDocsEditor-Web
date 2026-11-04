@@ -234,6 +234,23 @@ describe('AdminView', () => {
     wrapper.unmount()
   })
 
+  it('shows a failed load in place, with a retry that works', async () => {
+    let up = false
+    const { wrapper } = await mount('settings', {
+      'GET /admin/settings/': () =>
+        up ? json({ require2FA: false }) : json({ message: 'stack trace' }, 500),
+    })
+    expect(byTestId('load-error').textContent).toContain('The server has a problem')
+    expect(byTestId('load-error').textContent).not.toContain('stack trace')
+
+    up = true
+    byTestId('load-error-retry').click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="load-error"]')).toBeNull()
+    expect(document.querySelector('[data-testid="require-2fa"]')).not.toBeNull()
+    wrapper.unmount()
+  })
+
   it('switches require2FA', async () => {
     const { wrapper, mock } = await mount('settings', {
       'GET /admin/settings/': () => json({ require2FA: false }),

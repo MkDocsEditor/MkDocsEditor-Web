@@ -83,7 +83,7 @@ async function open(): Promise<void> {
   try {
     await openResource(props.id)
   } catch (error) {
-    notify.error(error, 'Could not open the file')
+    notify.error(error, 'Could not open the file', () => void open())
   }
 }
 
@@ -93,7 +93,7 @@ async function download(): Promise<void> {
   try {
     downloadUrl(item.name, await resourceObjectUrl(item.id))
   } catch (error) {
-    notify.error(error, 'Download failed')
+    notify.error(error, 'Download failed', () => void download())
   }
 }
 
@@ -110,13 +110,9 @@ const deleteText = computed(() => {
 })
 
 async function rename(name: string): Promise<void> {
-  try {
-    const renamed = await tree.renameResource(props.id, name)
-    await router.replace({ name: 'resource', params: { id: renamed.id } })
-    notify.success('Renamed')
-  } catch (error) {
-    notify.error(error, 'Rename failed')
-  }
+  const renamed = await tree.renameResource(props.id, name)
+  await router.replace({ name: 'resource', params: { id: renamed.id } })
+  notify.success('Renamed')
 }
 
 async function remove(): Promise<void> {
@@ -132,7 +128,7 @@ async function remove(): Promise<void> {
         : { name: 'home' },
     )
   } catch (error) {
-    notify.error(error, 'Delete failed')
+    notify.error(error, 'Delete failed', () => void remove())
   }
 }
 </script>
@@ -234,7 +230,7 @@ async function remove(): Promise<void> {
       title="Rename file"
       label="New name"
       :initial="resource?.name"
-      @confirm="rename"
+      :save="rename"
     />
     <ConfirmDialog
       v-model="deleteOpen"

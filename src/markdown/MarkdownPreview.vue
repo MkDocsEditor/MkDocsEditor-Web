@@ -51,6 +51,12 @@ async function loadImages(): Promise<void> {
 }
 watch([html, () => tree.root], loadImages, { immediate: true })
 
+function openWithRetry(id: string): void {
+  openResource(id).catch((e: unknown) =>
+    notify.error(e, 'Could not open the file', () => openWithRetry(id)),
+  )
+}
+
 async function onClick(event: MouseEvent): Promise<void> {
   const anchor = (event.target as HTMLElement).closest('a')
   const href = anchor?.getAttribute('href')
@@ -65,7 +71,7 @@ async function onClick(event: MouseEvent): Promise<void> {
   const item = resolve(href)
   if (item?.type === 'document') await router.push({ name: 'document', params: { id: item.id } })
   else if (item?.type === 'section') await router.push({ name: 'section', params: { id: item.id } })
-  else if (item?.type === 'resource') openResource(item.id).catch((e: unknown) => notify.error(e))
+  else if (item?.type === 'resource') openWithRetry(item.id)
   else notify.push(`Link target not found: ${href}`, 'warning')
 }
 
