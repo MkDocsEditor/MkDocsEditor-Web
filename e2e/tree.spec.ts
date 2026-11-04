@@ -1,7 +1,26 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
-import { login, testName } from './helpers'
+import { createDocument, login, openEditor, testName, typeAt } from './helpers'
+
+/** How many pages the local copy of the wiki holds. */
+function storedPageCount(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const open = indexedDB.open('mkdocseditor-wiki')
+        open.onerror = () => reject(open.error)
+        open.onsuccess = () => {
+          const count = open.result.transaction('records').objectStore('records').count()
+          count.onerror = () => reject(count.error)
+          count.onsuccess = () => {
+            open.result.close()
+            resolve(count.result)
+          }
+        }
+      }),
+  )
+}
 
 /**
  * Opens the actions menu of an entry and picks an action. A live tree update (another test's
@@ -70,11 +89,44 @@ test('creates, renames and deletes a folder', async ({ page }, testInfo) => {
   await expect(main.getByText(`${name} neu`, { exact: true })).toHaveCount(0)
 })
 
+test('search finds the text of pages, also after a reload without the server', async ({
+  page,
+  context,
+}, testInfo) => {
+  const word = testName('Suchwort', testInfo).replace(/\W/g, '')
+  const id = await createDocument(testName('Seite mit Treffer', testInfo))
+  await login(page)
+  await openEditor(page, id)
+  await typeAt(page, 'end', `Hier steht ${word} im Text`)
+  await page.getByTestId('search-button').click()
+  const input = page.getByTestId('search-input').locator('input')
+  await input.fill(word)
+  const excerpt = page.getByTestId('search-excerpt').first()
+  await expect(excerpt.locator('mark')).toHaveText(word)
+  await expect(page.getByTestId('search-match-count').first()).toHaveText('1 match')
+
+  // chosen once, the term comes back as a recent search
+  await input.press('Enter')
+  await page.getByTestId('search-button').click()
+  await expect(page.getByTestId('search-recent-term').first()).toHaveText(word)
+  await page.keyboard.press('Escape')
+
+  // the copy in IndexedDB survives a reload without the server
+  await expect.poll(() => storedPageCount(page)).toBeGreaterThan(0)
+  await context.route('**/section/**', (route) => route.abort())
+  await context.route('**/document/**', (route) => route.abort())
+  await page.goto('/')
+  await expect(page.getByTestId('sync-status')).toContainText('Not connected · Synced')
+  await page.getByTestId('search-button').click()
+  await page.getByTestId('search-input').locator('input').fill(word)
+  await expect(page.getByTestId('search-excerpt').first().locator('mark')).toHaveText(word)
+})
+
 test('finds pages with the search', async ({ page }) => {
   await login(page)
   await page.getByTestId('search-button').click()
-  await page.getByTestId('search-input').locator('input').fill('kurbis')
-  await page.getByText('Kürbissuppe').click()
+  await page.getByTestId('search-input').locator('input').fill('kürbis')
+  await page.getByTestId('search-result').first().click()
   await expect(page.getByTestId('document-title')).toHaveText('Kürbissuppe')
 })
 

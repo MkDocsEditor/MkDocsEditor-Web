@@ -26,9 +26,11 @@ import { followMovedRoute } from '@/services/redirects'
 import { useStored } from '@/services/storedRef'
 import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
+import { usePagesStore } from '@/stores/pages'
 import { useMoveStore } from '@/stores/move'
 import { describeError } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
+import { wikiCopy } from '@/sync/wikiCopy'
 
 const auth = useAuthStore()
 const tree = useTreeStore()
@@ -77,6 +79,15 @@ async function loadTree(): Promise<void> {
 
 // Live updates (tree changes, who is editing what) while logged in.
 const live = useLiveStore()
+
+// The text of all pages for search, kept up to date whenever the tree was loaded.
+const pages = usePagesStore()
+watch(
+  () => tree.root,
+  (root) => {
+    if (root) void pages.sync()
+  },
+)
 watch(
   showWiki,
   (show) => {
@@ -126,6 +137,7 @@ watch(
     if (loggedIn) return
     live.stop()
     tree.reset()
+    pages.reset()
     if (!route.meta.public && !loggingOut) {
       void router.push({ name: 'login', query: { redirect: route.fullPath } })
     }
@@ -136,8 +148,12 @@ async function logout(): Promise<void> {
   loggingOut = true
   live.stop()
   try {
+    // signing out on purpose also removes the copy of the wiki from this device
+    const copy = wikiCopy()
     await auth.logout()
     tree.reset()
+    pages.reset()
+    await copy.clear()
     await router.push({ name: 'login' })
   } finally {
     loggingOut = false

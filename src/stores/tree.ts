@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 
-import { useApi } from '@/api'
+import { ApiError, useApi } from '@/api'
 import type { DocumentModel, ResourceModel, SectionModel, TreeItem } from '@/api'
 import type { LinkTarget } from '@/services/linkPath'
 import { sanitizeFileName, shrinkImage, uniqueName } from '@/services/upload'
+import { wikiCopy } from '@/sync/wikiCopy'
 
 import {
   ancestorsOf,
@@ -29,6 +30,16 @@ export const useTreeStore = defineStore('tree', () => {
 
   let pending: Promise<void> | null = null
 
+  /** Without an answer from the server, the stored tree is better than nothing. */
+  async function restore(failure: unknown): Promise<void> {
+    if (root.value) return
+    if (!(failure instanceof ApiError) || !(failure.isNetworkError || failure.status >= 500)) return
+    const stored = await wikiCopy().tree()
+    if (!stored || root.value) return
+    root.value = stored.root
+    lastSync.value = stored.syncedAt
+  }
+
   /** Loads the tree. Concurrent calls share one request. */
   function load(): Promise<void> {
     pending ??= (async () => {
@@ -37,8 +48,10 @@ export const useTreeStore = defineStore('tree', () => {
         root.value = await useApi().getTree()
         error.value = null
         lastSync.value = Date.now()
+        void wikiCopy().putTree({ root: root.value, syncedAt: lastSync.value })
       } catch (e) {
         error.value = e
+        await restore(e)
         throw e
       } finally {
         loading.value = false
@@ -135,6 +148,7 @@ export const useTreeStore = defineStore('tree', () => {
 
   return {
     root,
+    index,
     loading,
     error,
     lastSync,
