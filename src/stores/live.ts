@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { shallowRef } from 'vue'
+import { ref, shallowRef } from 'vue'
 
 import { useApi } from '@/api'
 import type { MovedItem } from '@/api'
@@ -13,6 +13,8 @@ import { useTreeStore } from './tree'
 /** Live updates from the server: tree changes and who has which page open. */
 export const useLiveStore = defineStore('live', () => {
   const online = shallowRef<Map<string, OnlineUser[]>>(new Map())
+  /** The connection worked and is gone; the tree may be out of date until it is back. */
+  const connectionLost = ref(false)
   let connection: EventsConnection | null = null
   let reloadRunning = false
   let reloadAgain = false
@@ -61,6 +63,7 @@ export const useLiveStore = defineStore('live', () => {
       onTreeChanged: () => void reloadTree(),
       onItemsMoved: itemsMoved,
       onOnline: (documents) => (online.value = documents),
+      onConnectionChanged: (connected) => (connectionLost.value = !connected),
       onUnauthorized: options.onUnauthorized,
     })
   }
@@ -69,11 +72,12 @@ export const useLiveStore = defineStore('live', () => {
     connection?.close()
     connection = null
     online.value = new Map()
+    connectionLost.value = false
   }
 
   function usersOf(documentId: string): OnlineUser[] {
     return online.value.get(documentId) ?? []
   }
 
-  return { online, start, stop, usersOf, reloadTree, onItemsMoved }
+  return { online, connectionLost, start, stop, usersOf, reloadTree, onItemsMoved }
 })

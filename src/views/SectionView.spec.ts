@@ -34,6 +34,26 @@ describe('SectionView', () => {
     wrapper.unmount()
   })
 
+  it('says below the title when the tree was synced and whether the server is reachable', async () => {
+    const { wrapper } = await setup()
+    const status = () => wrapper.find('[data-testid="sync-status"]').text()
+    expect(status()).toBe('Synced just now')
+
+    useTreeStore().lastSync = Date.now() - 3.5 * 3_600_000
+    await flushPromises()
+    expect(status()).toBe('Synced 3 hours ago')
+
+    useLiveStore().connectionLost = true
+    await flushPromises()
+    expect(status()).toBe('Not connected · Synced 3 hours ago')
+
+    useLiveStore().connectionLost = false
+    useTreeStore().error = new Error('nope')
+    await flushPromises()
+    expect(status()).toBe('Not connected · Synced 3 hours ago')
+    wrapper.unmount()
+  })
+
   it('shows a sub section with breadcrumbs', async () => {
     const { wrapper } = await setup('s-kuchen')
     expect(wrapper.find('[data-testid="section-title"]').text()).toBe('Kuchen')

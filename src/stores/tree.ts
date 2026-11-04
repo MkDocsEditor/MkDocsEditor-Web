@@ -21,6 +21,8 @@ export const useTreeStore = defineStore('tree', () => {
   const root = shallowRef<SectionModel | null>(null)
   const loading = ref(false)
   const error = ref<unknown>(null)
+  /** When the tree was last loaded, as milliseconds; null until it was. */
+  const lastSync = ref<number | null>(null)
   const index = computed<TreeIndex>(() =>
     root.value ? indexTree(root.value) : { items: new Map(), parents: new Map() },
   )
@@ -34,6 +36,7 @@ export const useTreeStore = defineStore('tree', () => {
       try {
         root.value = await useApi().getTree()
         error.value = null
+        lastSync.value = Date.now()
       } catch (e) {
         error.value = e
         throw e
@@ -126,6 +129,7 @@ export const useTreeStore = defineStore('tree', () => {
 
   function reset(): void {
     root.value = null
+    lastSync.value = null
     error.value = null
   }
 
@@ -133,6 +137,7 @@ export const useTreeStore = defineStore('tree', () => {
     root,
     loading,
     error,
+    lastSync,
     load,
     ensureLoaded,
     get,
