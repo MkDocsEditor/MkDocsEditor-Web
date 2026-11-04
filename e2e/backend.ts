@@ -163,6 +163,18 @@ export interface RunningBackend {
   stop(): Promise<void>
 }
 
+/**
+ * Fails if a backend already answers on the port. `startBackend` would take its answer for the new
+ * backend, and tests would silently share its state.
+ */
+export async function assertPortFree(port: number): Promise<void> {
+  const taken = await fetch(`http://127.0.0.1:${port}/alive/`).then(
+    () => true,
+    () => false,
+  )
+  if (taken) throw new Error(`port ${port} is in use, is another test run still going?`)
+}
+
 /** Starts the backend and waits for `/alive/`. */
 export async function startBackend(
   bin: string,
