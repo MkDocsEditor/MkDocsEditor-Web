@@ -5,15 +5,18 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ghost, Peer } from '@/sync'
 import { followTarget, isPresent } from '@/sync/followTarget'
 
-/** How long following waits after the last manual movement or edit of this user. */
+/** How long following waits after the last manual movement of this user. */
 export const FOLLOW_RESUME_MS = 5_000
+/** Moving again this soon after following resumed doubles the wait, because it came too early. */
+export const FOLLOW_BACKOFF_WINDOW_MS = 10_000
+export const FOLLOW_RESUME_MAX_MS = 40_000
 
 const MANUAL_INPUT = ['wheel', 'pointerdown', 'touchmove', 'keydown'] as const
 
 /**
  * Keeps the editor on what another account is looking at, without touching the local cursor.
- * Moving the view by hand or typing only pauses it, like the navigation of a map. It ends when the
- * account is neither here nor a ghost; while disconnected nobody knows, so that does not end it.
+ * Moving the view by hand only pauses it, like the navigation of a map. It ends when the account is
+ * neither here nor a ghost; while disconnected nobody knows, so that does not end it.
  */
 export function useFollow(options: {
   view: () => EditorView | null
@@ -25,6 +28,9 @@ export function useFollow(options: {
   const following = ref<{ accountId: string; name: string } | null>(null)
   const paused = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
+  let resumeMs = FOLLOW_RESUME_MS
+  /** When following last resumed by itself; null if it has not. */
+  let resumedAt: number | null = null
 
   function clearTimer(): void {
     if (timer) clearTimeout(timer)
@@ -38,27 +44,37 @@ export function useFollow(options: {
     return who ? who.displayName || who.username : ''
   }
 
-  function start(accountId: string): void {
+  function reset(): void {
     clearTimer()
     paused.value = false
+    resumeMs = FOLLOW_RESUME_MS
+    resumedAt = null
+  }
+
+  function start(accountId: string): void {
+    reset()
     following.value = { accountId, name: nameOf(accountId) }
   }
 
   function stop(): void {
-    clearTimer()
-    paused.value = false
+    reset()
     following.value = null
   }
 
-  /** The user did something on their own: following waits until they have stopped. */
+  /** The user moves the view: following waits until they have stopped. */
   function pause(): void {
     if (!following.value) return
+    if (!paused.value) {
+      const tooEarly = resumedAt !== null && Date.now() - resumedAt <= FOLLOW_BACKOFF_WINDOW_MS
+      resumeMs = tooEarly ? Math.min(resumeMs * 2, FOLLOW_RESUME_MAX_MS) : FOLLOW_RESUME_MS
+    }
     paused.value = true
     clearTimer()
     timer = setTimeout(() => {
       timer = null
+      resumedAt = Date.now()
       paused.value = false
-    }, FOLLOW_RESUME_MS)
+    }, resumeMs)
   }
 
   /** A scroll that goes on after the input, such as inertia or the scrollbar, counts as well. */
@@ -117,5 +133,5 @@ export function useFollow(options: {
     if (view) listen(view, false)
   })
 
-  return { following, paused, start, stop, pause }
+  return { following, paused, start, stop }
 }

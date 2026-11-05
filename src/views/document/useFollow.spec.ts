@@ -6,7 +6,12 @@ import { defineComponent, nextTick, ref, shallowRef } from 'vue'
 
 import type { Ghost, Peer } from '@/sync'
 
-import { FOLLOW_RESUME_MS, useFollow } from './useFollow'
+import {
+  FOLLOW_BACKOFF_WINDOW_MS,
+  FOLLOW_RESUME_MAX_MS,
+  FOLLOW_RESUME_MS,
+  useFollow,
+} from './useFollow'
 
 const anna = (head?: number): Peer => ({
   clientId: 'c-1',
@@ -79,7 +84,7 @@ describe('useFollow', () => {
     await nextTick()
     follow.start('anna')
     await nextTick()
-    const effect = [dispatch.mock.calls[0]![0].effects].flat()[0] as { value: { range: unknown } }
+    const effect = [dispatch.mock.calls[0]![0]!.effects].flat()[0] as { value: { range: unknown } }
     expect(effect.value.range).toMatchObject({ from: 20, to: 20 })
     wrapper.unmount()
   })
@@ -104,6 +109,58 @@ describe('useFollow', () => {
     await nextTick()
     expect(follow.paused.value).toBe(false)
     expect(dispatch).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('waits longer when the user moves again right after it resumed, up to the limit', async () => {
+    const { wrapper, view, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    const moveAndExpectPause = async (ms: number) => {
+      view.scrollDOM.dispatchEvent(new Event('wheel'))
+      await vi.advanceTimersByTimeAsync(ms - 1)
+      expect(follow.paused.value).toBe(true)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(follow.paused.value).toBe(false)
+    }
+    for (const ms of [
+      FOLLOW_RESUME_MS,
+      10_000,
+      20_000,
+      FOLLOW_RESUME_MAX_MS,
+      FOLLOW_RESUME_MAX_MS,
+    ]) {
+      await moveAndExpectPause(ms)
+    }
+    wrapper.unmount()
+  })
+
+  it('counts several inputs of one pause only once for the longer wait', async () => {
+    const { wrapper, view, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    await vi.advanceTimersByTimeAsync(FOLLOW_RESUME_MS)
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    await vi.advanceTimersByTimeAsync(2 * FOLLOW_RESUME_MS)
+    expect(follow.paused.value).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('starts at the short wait again when the last resume is long ago', async () => {
+    const { wrapper, view, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    await vi.advanceTimersByTimeAsync(FOLLOW_RESUME_MS)
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    await vi.advanceTimersByTimeAsync(2 * FOLLOW_RESUME_MS)
+    await vi.advanceTimersByTimeAsync(FOLLOW_BACKOFF_WINDOW_MS + 1)
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    await vi.advanceTimersByTimeAsync(FOLLOW_RESUME_MS)
+    expect(follow.paused.value).toBe(false)
     wrapper.unmount()
   })
 

@@ -37,8 +37,9 @@ together, in real time, from a phone or a desktop browser. It talks to the
   [Automerge](https://automerge.org). Everyone sees the others' cursors and selections with
   names and colours, plus a list of who is online.
 - Follow someone by clicking their avatar: the editor stays on what they are looking at, without
-  moving your cursor. Scrolling or typing pauses it for 5 seconds. A user who leaves stays as a
-  faint cursor for as long as the server says (60 seconds), and following ends when that is gone.
+  moving your cursor. Scrolling pauses it for 5 seconds, and for up to 40 seconds if you scroll again
+  right after it resumed. Typing ends it. A user who leaves stays as a faint cursor for as long as
+  the server says (60 seconds), and following ends when that is gone.
 - Editing works offline. Changes are kept in the browser and merged after the reconnect, even
   when the server lost its state meanwhile. The connection state is always visible, and text
   is never thrown away silently. Each account has its own local copies, so unsynced edits only

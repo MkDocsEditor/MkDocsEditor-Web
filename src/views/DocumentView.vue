@@ -450,7 +450,7 @@ async function share(): Promise<void> {
           :format-override="shortcutOverride"
           :shown="mode !== 'preview'"
           @change="(t: string) => (text = t)"
-          @local-edit="follow.pause()"
+          @local-edit="follow.stop()"
           @top-line="(l: number) => (topLine = l)"
         />
       </div>

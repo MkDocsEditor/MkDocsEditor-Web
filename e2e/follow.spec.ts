@@ -52,6 +52,24 @@ test.describe('following another user', () => {
     await expect(follower.getByText('Zeile 1', { exact: true })).toBeInViewport()
   })
 
+  test('ends without a note when the follower types', async ({ browser }, testInfo) => {
+    await requireJoinPresence()
+    const id = await createDocument(`Follow typing ${testInfo.project.name} ${testInfo.retry}`)
+    const leader = await userPage(browser, USERS.alice)
+    await openEditor(leader, id)
+    await leader.locator('.cm-content').click()
+
+    const follower = await userPage(browser, USERS.bob)
+    await openEditor(follower, id)
+    await follower.getByTestId('online-user').click()
+    await expect(follower.getByTestId('following')).toBeVisible()
+
+    await follower.locator('.cm-content').click()
+    await follower.keyboard.type('x')
+    await expect(follower.getByTestId('following')).toBeHidden()
+    await expect(follower.getByText('no longer following')).toBeHidden()
+  })
+
   test('stays on the ghost of a user who has left', async ({ browser }, testInfo) => {
     await requireJoinPresence()
     const id = await createDocument(`Follow ghost ${testInfo.project.name} ${testInfo.retry}`)
