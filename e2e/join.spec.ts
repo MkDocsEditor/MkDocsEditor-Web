@@ -124,7 +124,10 @@ test.describe('join links', () => {
     const guest = await devicePage(browser, testInfo)
     await guest.goto(`/join/${id}?from=somebody`)
     await guest.getByTestId('join-request').click()
-    await guest.getByTestId('join-name').locator('input').fill(name)
+    // the focus arrives late, and would take a fill of the message into the name
+    const nameInput = guest.getByTestId('join-name').locator('input')
+    await expect(nameInput).toBeFocused()
+    await nameInput.fill(name)
     await guest.getByTestId('join-message').locator('textarea').fill('Markus sent me')
     await guest.getByTestId('join-submit').click()
     await expect(guest.getByTestId('join-waiting')).toBeVisible()
