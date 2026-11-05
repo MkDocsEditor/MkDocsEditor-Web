@@ -3,13 +3,17 @@ import type { Range } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType } from '@codemirror/view'
 import type { DecorationSet } from '@codemirror/view'
 
+import { instanceName } from '@/sync/session'
 import type { Peer } from '@/sync/session'
 
 /** Replaces the shown peers (their selections are indices of the current document). */
 export const setPeers = StateEffect.define<readonly ShownPeer[]>()
 
 /** Someone whose cursor shows. A ghost has left and is faint. */
-export type ShownPeer = Pick<Peer, 'username' | 'displayName' | 'color' | 'selections'> & {
+export type ShownPeer = Pick<
+  Peer,
+  'username' | 'displayName' | 'color' | 'selections' | 'deviceName'
+> & {
   ghost?: boolean
 }
 
@@ -67,7 +71,7 @@ export function peerDecorations(peers: readonly ShownPeer[], docLength: number):
   const ranges: Range<Decoration>[] = []
   const clamp = (n: number) => Math.max(0, Math.min(docLength, n))
   for (const peer of peers) {
-    const name = peer.displayName || peer.username
+    const name = instanceName(peer)
     for (const selection of peer.selections) {
       const anchor = clamp(selection.anchor)
       const head = clamp(selection.head)

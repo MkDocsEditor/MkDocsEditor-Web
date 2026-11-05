@@ -20,6 +20,7 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
   const localChanges: TextChange[][] = []
   const selections: TextSelection[][] = []
   const viewports: (TextRange | null)[] = []
+  const colors: (string | null)[] = []
   const status = ref<SessionStatus>({
     connection: 'online',
     readOnly: options.readOnly ?? false,
@@ -51,6 +52,9 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     setLocalViewport(viewport) {
       viewports.push(viewport)
     },
+    setLocalColor(color) {
+      colors.push(color)
+    },
     onRemoteChanges(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -63,6 +67,7 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     localChanges,
     selections,
     viewports,
+    colors,
     get text() {
       return text
     },

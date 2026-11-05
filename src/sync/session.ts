@@ -44,9 +44,22 @@ export interface SessionUser {
   color: string
 }
 
+/** Whom a cursor belongs to, with the device so that two instances of a person can be told apart. */
+export function instanceName(who: {
+  displayName?: string
+  username: string
+  deviceName?: string
+}): string {
+  const name = who.displayName || who.username
+  return who.deviceName ? `${name} · ${who.deviceName}` : name
+}
+
 export interface Peer extends SessionUser {
   clientId: string
+  /** The client instance. Following and ghosts go by this: a reconnect has a new `clientId`. */
+  instanceId: string
   accountId?: string
+  deviceName?: string
   lastActiveAt?: string
   /** Resolved to indices of the local text. Empty when the peer's editor is not focused. */
   selections: TextSelection[]
@@ -54,9 +67,11 @@ export interface Peer extends SessionUser {
   viewport?: TextRange
 }
 
-/** The cursor of an account that has left, which stays for a while. The server sets how long. */
+/** The cursor of an instance that has left, which stays for a while. The server sets how long. */
 export interface Ghost extends SessionUser {
+  instanceId: string
   accountId: string
+  deviceName?: string
   selections: TextSelection[]
   viewport?: TextRange
 }
@@ -82,7 +97,7 @@ export interface DocumentSession {
   readonly status: Readonly<Ref<SessionStatus>>
   /** Other users in this document (not including this connection). */
   readonly peers: Readonly<Ref<Peer[]>>
-  /** Accounts that have left this document a moment ago. Removed when they return or time out. */
+  /** Instances that have left this document a moment ago. Removed when they return or time out. */
   readonly ghosts: Readonly<Ref<Ghost[]>>
   /** Whether the server has told this connection who is here; false while disconnected. */
   readonly presenceKnown: Readonly<Ref<boolean>>
@@ -106,6 +121,8 @@ export interface DocumentSession {
   setLocalSelections(selections: readonly TextSelection[]): void
   /** Publishes the text the user is looking at; null when the editor pane is not visible. */
   setLocalViewport(viewport: TextRange | null): void
+  /** Publishes the color of this instance; null goes back to the one of the account. */
+  setLocalColor(color: string | null): void
   /** Subscribes to text changes made by others (or by a resync). Returns an unsubscribe function. */
   onRemoteChanges(listener: (changes: readonly TextChange[]) => void): () => void
   /** Closes the connection. Unsynced edits stay persisted by implementations that support it. */

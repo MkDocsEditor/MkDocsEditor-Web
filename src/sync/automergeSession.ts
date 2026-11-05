@@ -8,6 +8,7 @@ import { createConnection } from './connection'
 import { sameHeads } from './automerge'
 import type { AmDoc, Automerge, AutomergeApi, DocContent } from './automerge'
 import type { OfflineStore, StoredCopy } from './offlineStore'
+import { instanceColor, instanceId, randomHexId } from './instance'
 import { createPresence } from './presence'
 import { fromBase64, toBase64 } from './protocol'
 import type { ServerMessage } from './protocol'
@@ -79,11 +80,7 @@ const DELETED_MESSAGE =
   'This page was deleted. Your text is still here – copy it if you want to keep it.'
 
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
-function randomActorId(): string {
-  const bytes = new Uint8Array(16)
-  crypto.getRandomValues(bytes)
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+const randomActorId = randomHexId
 
 /** Converts Automerge patches on `content` to sequential TextChanges, or null if unexpected. */
 function patchesToChanges(patches: readonly Automerge.Patch[]): TextChange[] | null {
@@ -164,9 +161,11 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         type: 'hello',
         documentId,
         actorId,
+        instanceId: instanceId(),
         ticket,
         client: options.clientName ?? 'MkDocsEditor-Web',
       }
+      if (instanceColor.value) hello.instanceColor = instanceColor.value
       if (doc && epoch) hello.epoch = epoch
       return hello
     },
@@ -334,7 +333,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         presence.update(message)
         break
       case 'presence-snapshot':
-        presence.replaceAll(message.peers ?? [], message.lastPositions ?? [])
+        presence.replaceAll(message.peers ?? [], message.lastPositions ?? [], message.ghosts ?? [])
         break
       case 'presence-leave':
         presence.remove(message)
@@ -581,6 +580,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     },
     setLocalSelections: presence.setLocalSelections,
     setLocalViewport: presence.setLocalViewport,
+    setLocalColor: presence.setLocalColor,
     onRemoteChanges(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)

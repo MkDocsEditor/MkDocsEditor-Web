@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import type { Ghost, Peer } from '@/sync'
 import { followTarget, isPresent } from '@/sync/followTarget'
+import { instanceName } from '@/sync/session'
 
 /** How long following waits after the last manual movement of this user. */
 export const FOLLOW_RESUME_MS = 5_000
@@ -14,9 +15,9 @@ export const FOLLOW_RESUME_MAX_MS = 40_000
 const MANUAL_INPUT = ['wheel', 'pointerdown', 'touchmove', 'keydown'] as const
 
 /**
- * Keeps the editor on what another account is looking at, without touching the local cursor.
- * Moving the view by hand only pauses it, like the navigation of a map. It ends when the account is
- * neither here nor a ghost; while disconnected nobody knows, so that does not end it.
+ * Keeps the editor on what another instance is looking at, without touching the local cursor.
+ * Moving the view by hand only pauses it, like the navigation of a map. It ends when the instance
+ * is neither here nor a ghost; while disconnected nobody knows, so that does not end it.
  */
 export function useFollow(options: {
   view: () => EditorView | null
@@ -25,7 +26,7 @@ export function useFollow(options: {
   presenceKnown: () => boolean
   onEnded: (name: string) => void
 }) {
-  const following = ref<{ accountId: string; name: string } | null>(null)
+  const following = ref<{ instanceId: string; name: string } | null>(null)
   const paused = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
   let resumeMs = FOLLOW_RESUME_MS
@@ -37,11 +38,11 @@ export function useFollow(options: {
     timer = null
   }
 
-  function nameOf(accountId: string): string {
+  function nameOf(instanceId: string): string {
     const who =
-      options.peers().find((p) => p.accountId === accountId) ??
-      options.ghosts().find((g) => g.accountId === accountId)
-    return who ? who.displayName || who.username : ''
+      options.peers().find((p) => p.instanceId === instanceId) ??
+      options.ghosts().find((g) => g.instanceId === instanceId)
+    return who ? instanceName(who) : ''
   }
 
   function reset(): void {
@@ -51,9 +52,9 @@ export function useFollow(options: {
     resumedAt = null
   }
 
-  function start(accountId: string): void {
+  function start(instanceId: string): void {
     reset()
-    following.value = { accountId, name: nameOf(accountId) }
+    following.value = { instanceId, name: nameOf(instanceId) }
   }
 
   function stop(): void {
@@ -85,7 +86,7 @@ export function useFollow(options: {
   /** The position to center: on any screen size, the middle of what the other user sees. */
   const middle = computed(() => {
     if (!following.value) return null
-    const target = followTarget(options.peers(), options.ghosts(), following.value.accountId)
+    const target = followTarget(options.peers(), options.ghosts(), following.value.instanceId)
     return target && Math.round((target.top + target.bottom) / 2)
   })
 
@@ -106,7 +107,7 @@ export function useFollow(options: {
     () =>
       !!following.value &&
       options.presenceKnown() &&
-      !isPresent(options.peers(), options.ghosts(), following.value.accountId),
+      !isPresent(options.peers(), options.ghosts(), following.value.instanceId),
     (ended) => {
       if (!ended) return
       const name = following.value?.name ?? ''

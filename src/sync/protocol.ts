@@ -15,8 +15,14 @@ export interface ViewportInfo {
 
 export interface PresenceInfo {
   clientId: string
+  /** The client instance, which stays across reconnects and reloads; absent on older servers. */
+  instanceId?: string
   /** The stable id of the account; absent on older servers. */
   accountId?: string
+  /** Stamped by the server, from the login of this device. */
+  deviceName?: string
+  /** The color this instance chose, instead of `color` of the account. */
+  instanceColor?: string
   username: string
   displayName?: string
   color?: string
@@ -35,14 +41,30 @@ export interface LastPosition {
   color?: string
   selections?: { anchor: string; head: string }[]
   viewport?: ViewportInfo
-  /** How much longer the account stays as a ghost; only while it is one. */
-  ghostMs?: number
 }
 
-/** The last connection of an account left. Without `ghostMs` there is no ghost. */
+/** A client instance that left a moment ago. */
+export interface GhostInfo {
+  instanceId: string
+  accountId: string
+  username?: string
+  displayName?: string
+  color?: string
+  instanceColor?: string
+  deviceName?: string
+  selections?: { anchor: string; head: string }[]
+  viewport?: ViewportInfo
+  /** How much longer it stays. */
+  ghostMs: number
+}
+
+/** A connection left. Without `ghostMs` there is no ghost. */
 export interface PresenceLeave {
   clientId: string
+  instanceId?: string
   accountId?: string
+  deviceName?: string
+  instanceColor?: string
   selections?: { anchor: string; head: string }[]
   viewport?: ViewportInfo
   ghostMs?: number
@@ -59,7 +81,12 @@ export type ServerMessage =
     }
   | { type: 'sync-request'; syncMessage?: string }
   | ({ type: 'presence' } & PresenceInfo)
-  | { type: 'presence-snapshot'; peers?: PresenceInfo[]; lastPositions?: LastPosition[] }
+  | {
+      type: 'presence-snapshot'
+      peers?: PresenceInfo[]
+      lastPositions?: LastPosition[]
+      ghosts?: GhostInfo[]
+    }
   | ({ type: 'presence-leave' } & PresenceLeave)
   | ({ type: 'actor' } & ActorInfo)
   | { type: 'document-renamed'; newDocumentId?: string }

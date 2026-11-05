@@ -6,6 +6,7 @@ import type { PresenceInfo } from './protocol'
 
 const anna: PresenceInfo = {
   clientId: 'c-1',
+  instanceId: 'tab-1',
   accountId: 'anna',
   username: 'anna',
   displayName: 'Anna',
@@ -46,7 +47,9 @@ describe('presence', () => {
       presence.update(anna)
       presence.remove({
         clientId: 'c-1',
+        instanceId: 'tab-1',
         accountId: 'anna',
+        deviceName: 'Pixel 8',
         selections: [at(5)],
         viewport: { top: 'at-10', bottom: 'at-20' },
         ghostMs: 60_000,
@@ -54,7 +57,9 @@ describe('presence', () => {
       expect(presence.peers.value).toEqual([])
       expect(presence.ghosts.value).toEqual([
         {
+          instanceId: 'tab-1',
           accountId: 'anna',
+          deviceName: 'Pixel 8',
           username: 'anna',
           displayName: 'Anna',
           color: '#123456',
@@ -75,9 +80,38 @@ describe('presence', () => {
       expect(presence.ghosts.value).toEqual([])
     })
 
-    it('ends when the account is back, and its timer does nothing after that', () => {
+    it('keeps the ghost of one instance while another of the account is here', () => {
+      const { presence } = setup()
+      presence.update({ ...anna, clientId: 'c-2', instanceId: 'tab-2' })
+      presence.remove({
+        clientId: 'c-1',
+        instanceId: 'tab-1',
+        accountId: 'anna',
+        selections: [at(1)],
+        ghostMs: 1000,
+      })
+      presence.update({ ...anna, clientId: 'c-2', instanceId: 'tab-2', selections: [at(2)] })
+      expect(presence.ghosts.value.map((g) => g.instanceId)).toEqual(['tab-1'])
+    })
+
+    it('counts an account as one instance on a server without instances', () => {
       const { presence } = setup()
       presence.remove({ clientId: 'c-1', accountId: 'anna', selections: [], ghostMs: 1000 })
+      expect(presence.ghosts.value.map((g) => g.instanceId)).toEqual(['anna'])
+      presence.update({ ...anna, instanceId: undefined, clientId: 'c-2' })
+      expect(presence.ghosts.value).toEqual([])
+      expect(presence.peers.value[0]!.instanceId).toBe('anna')
+    })
+
+    it('ends when the instance is back, and its timer does nothing after that', () => {
+      const { presence } = setup()
+      presence.remove({
+        clientId: 'c-1',
+        instanceId: 'tab-1',
+        accountId: 'anna',
+        selections: [],
+        ghostMs: 1000,
+      })
       presence.update({ ...anna, clientId: 'c-2', selections: [at(1)] })
       expect(presence.ghosts.value).toEqual([])
       expect(presence.peers.value).toHaveLength(1)
@@ -85,25 +119,35 @@ describe('presence', () => {
       expect(presence.peers.value).toHaveLength(1)
     })
 
-    it('comes from a snapshot with the remaining time, unless the account is online', () => {
+    it('comes from a snapshot with the remaining time, unless the instance is online', () => {
       const { presence } = setup()
+      const left = (instanceId: string) => ({
+        instanceId,
+        accountId: 'anna',
+        username: 'anna',
+        instanceColor: '#00ff00',
+        selections: [at(3)],
+        ghostMs: 500,
+      })
       presence.replaceAll(
-        [{ ...anna, accountId: 'online', clientId: 'c-9' }],
-        [
-          { accountId: 'anna', username: 'anna', selections: [at(3)], ghostMs: 500 },
-          { accountId: 'online', username: 'o', selections: [at(4)], ghostMs: 500 },
-          { accountId: 'away', username: 'a', selections: [at(5)] },
-        ],
+        [{ ...anna, instanceId: 'online', clientId: 'c-9' }],
+        [{ accountId: 'away', username: 'a', selections: [at(5)] }],
+        [left('tab-1'), left('online')],
       )
       expect(presence.known.value).toBe(true)
-      expect(presence.ghosts.value.map((g) => g.accountId)).toEqual(['anna'])
+      expect(presence.ghosts.value.map((g) => g.instanceId)).toEqual(['tab-1'])
+      expect(presence.ghosts.value[0]!.color).toBe('#00ff00')
       vi.advanceTimersByTime(500)
       expect(presence.ghosts.value).toEqual([])
     })
 
     it('forgets everybody when the connection ends', () => {
       const { presence } = setup()
-      presence.replaceAll([], [{ accountId: 'anna', username: 'anna', selections: [], ghostMs: 9 }])
+      presence.replaceAll(
+        [],
+        [],
+        [{ instanceId: 'tab-1', accountId: 'anna', username: 'anna', selections: [], ghostMs: 9 }],
+      )
       presence.clear()
       expect(presence.known.value).toBe(false)
       expect(presence.ghosts.value).toEqual([])
@@ -133,6 +177,29 @@ describe('presence', () => {
         [{ accountId: 'anna', selections: [], viewport: { top: 'at-7', bottom: 'at-9' } }],
       )
       expect(presence.lastPositionOf('anna')).toBe(7)
+    })
+  })
+
+  describe('instance color', () => {
+    it('shows instead of the color of the account', () => {
+      const { presence } = setup()
+      presence.update({ ...anna, instanceColor: '#00ff00' })
+      expect(presence.peers.value[0]!.color).toBe('#00ff00')
+      presence.update(anna)
+      expect(presence.peers.value[0]!.color).toBe('#123456')
+    })
+
+    it('goes out once, and null clears it', () => {
+      const { presence, send } = setup()
+      presence.setLocalColor('#00ff00')
+      vi.advanceTimersByTime(100)
+      expect(send.mock.lastCall![0]).toMatchObject({ instanceColor: '#00ff00' })
+      presence.setLocalSelections([])
+      vi.advanceTimersByTime(100)
+      expect(send.mock.lastCall![0]).not.toHaveProperty('instanceColor')
+      presence.setLocalColor(null)
+      vi.advanceTimersByTime(100)
+      expect(send.mock.lastCall![0]).toMatchObject({ instanceColor: null })
     })
   })
 

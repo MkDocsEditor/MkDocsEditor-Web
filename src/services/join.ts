@@ -1,18 +1,20 @@
 import { local, readJson, remove, writeJson } from './storage'
 
 /**
- * Join links (`docs/auth.md`, "Access request and join link"): `/join/{documentId}?from={accountId}`
- * holds no secret and grants nothing. The Android app handles the same path as an App Link.
+ * Join links (`docs/auth.md`, "Access request and join link"):
+ * `/join/{documentId}?from={accountId}&instance={instanceId}` holds no secret and grants nothing.
+ * The Android app handles the same path as an App Link.
  */
-export function joinPath(documentId: string, from?: string): string {
-  const query = from ? `?from=${encodeURIComponent(from)}` : ''
+export function joinPath(documentId: string, from?: string, instance?: string): string {
+  const sender = from ? `?from=${encodeURIComponent(from)}` : ''
+  const query = sender && instance ? `${sender}&instance=${encodeURIComponent(instance)}` : sender
   return `/join/${encodeURIComponent(documentId)}${query}`
 }
 
 /** The link to share. This client is the host of the link, as `clientUrl` is on the server. */
-export function joinLink(documentId: string, from?: string): string {
+export function joinLink(documentId: string, from?: string, instance?: string): string {
   const base = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/+$/, '')
-  return `${base}${joinPath(documentId, from)}`
+  return `${base}${joinPath(documentId, from, instance)}`
 }
 
 const TARGET_KEY = 'mkdocseditor.joinTarget'

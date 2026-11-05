@@ -13,6 +13,14 @@ async function requireJoinPresence(): Promise<void> {
   test.skip(!info.features?.includes('join-presence'), 'the backend has no join-presence')
 }
 
+/** The backend needs client instances for these. */
+async function requireInstances(): Promise<void> {
+  const info = (await (await fetch(`${BACKEND_URL}/server-info/`)).json()) as {
+    features?: string[]
+  }
+  test.skip(!info.features?.includes('instance-presence'), 'the backend has no instance-presence')
+}
+
 test.describe('following another user', () => {
   test.skip(({ isMobile }) => isMobile, 'these tests scroll with the mouse wheel')
 
@@ -71,7 +79,7 @@ test.describe('following another user', () => {
   })
 
   test('follows the own account on another device', async ({ browser }, testInfo) => {
-    await requireJoinPresence()
+    await requireInstances()
     const id = await createDocument(`Follow own ${testInfo.project.name} ${testInfo.retry}`)
     const device = await userPage(browser, USERS.alice)
     await openEditor(device, id)
@@ -115,10 +123,59 @@ test.describe('following another user', () => {
     await expect(other.getByTestId('following')).toBeVisible()
   })
 
+  test('treats two tabs of one browser as two instances', async ({ browser }, testInfo) => {
+    await requireInstances()
+    const id = await createDocument(`Follow tabs ${testInfo.project.name} ${testInfo.retry}`)
+    const first = await userPage(browser, USERS.alice)
+    await openEditor(first, id)
+    await first.locator('.cm-content').click()
+    await first.keyboard.insertText(LINES)
+    await expect(first.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
+
+    const second = await first.context().newPage()
+    await openEditor(second, id)
+    await expect(second.getByTestId('online-user')).toHaveCount(1)
+    await second.getByTestId('online-user').click()
+    await expect(second.getByText('Zeile 300', { exact: true })).toBeInViewport()
+
+    await first.close()
+    await expect(second.locator('.cm-remote-caret--ghost')).toBeVisible()
+    await expect(second.getByTestId('following')).toBeVisible()
+  })
+
+  test('shows the color an instance chose to the others', async ({ browser }, testInfo) => {
+    await requireInstances()
+    const id = await createDocument(`Follow color ${testInfo.project.name} ${testInfo.retry}`)
+    const chooser = await userPage(browser, USERS.alice)
+    await openEditor(chooser, id)
+    await chooser.locator('.cm-content').click()
+    const other = await userPage(browser, USERS.bob)
+    await openEditor(other, id)
+    const caret = other.locator('.cm-remote-caret')
+    await expect(caret).toBeVisible()
+    const before = await caret.evaluate((el) => getComputedStyle(el).borderLeftColor)
+
+    await chooser.getByRole('button', { name: 'More' }).click()
+    await chooser.getByTestId('cursor-color').click()
+    await chooser.locator('.v-color-picker-swatches__color').nth(40).click()
+    await chooser.getByTestId('cursor-color-close').click()
+    await expect
+      .poll(() => caret.evaluate((el) => getComputedStyle(el).borderLeftColor))
+      .not.toBe(before)
+    const chosen = await caret.evaluate((el) => getComputedStyle(el).borderLeftColor)
+
+    // a reload keeps it
+    await chooser.reload()
+    await chooser.locator('.cm-content').click()
+    await expect
+      .poll(() => caret.evaluate((el) => getComputedStyle(el).borderLeftColor))
+      .toBe(chosen)
+  })
+
   test('shows no ghost of the own previous connection after a reload', async ({
     browser,
   }, testInfo) => {
-    await requireJoinPresence()
+    await requireInstances()
     const id = await createDocument(`Follow reload ${testInfo.project.name} ${testInfo.retry}`)
     const page = await userPage(browser, USERS.alice)
     await openEditor(page, id)
