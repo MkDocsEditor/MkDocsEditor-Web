@@ -108,17 +108,17 @@ test.describe('following another user', () => {
     await device.locator('.cm-content').click()
     await device.keyboard.press('ControlOrMeta+End')
     await expect(other.getByText('Zeile 300', { exact: true })).toBeInViewport()
-    await device.context().close()
+    await device.goto('/')
     await expect(other.locator('.cm-remote-caret--ghost')).toBeVisible()
     await expect(other.getByTestId('following')).toBeVisible()
     await expect(other.getByTestId('online-user')).toHaveCount(0)
 
-    const back = await userPage(browser, USERS.alice)
-    await openEditor(back, id)
+    // the same instance, because the tab is the same
+    await openEditor(device, id)
     await expect(other.getByTestId('online-user')).toHaveCount(1)
     await expect(other.locator('.cm-remote-caret--ghost')).toHaveCount(0)
-    await back.locator('.cm-content').click()
-    await back.keyboard.press('ControlOrMeta+Home')
+    await device.locator('.cm-content').click()
+    await device.keyboard.press('ControlOrMeta+Home')
     await expect(other.getByText('Zeile 1', { exact: true })).toBeInViewport()
     await expect(other.getByTestId('following')).toBeVisible()
   })
@@ -159,6 +159,8 @@ test.describe('following another user', () => {
     await chooser.getByTestId('cursor-color').click()
     await chooser.locator('.v-color-picker-swatches__color').nth(40).click()
     await chooser.getByTestId('cursor-color-close').click()
+    // the dialog took the focus, and without it there is no cursor to see
+    await chooser.locator('.cm-content').click()
     await expect
       .poll(() => caret.evaluate((el) => getComputedStyle(el).borderLeftColor))
       .not.toBe(before)

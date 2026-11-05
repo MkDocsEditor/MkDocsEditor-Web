@@ -44,6 +44,12 @@ export interface SessionUser {
   color: string
 }
 
+/** The user of this connection. */
+export interface SessionMe extends SessionUser {
+  /** The instance id the server uses for this connection, which can differ from the one sent. */
+  instanceId?: string
+}
+
 /** Whom a cursor belongs to, with the device so that two instances of a person can be told apart. */
 export function instanceName(who: {
   displayName?: string
@@ -104,7 +110,7 @@ export interface DocumentSession {
   /** Who wrote which part of the text. Empty when unknown. */
   readonly authorship: Readonly<Ref<AuthorRun[]>>
   /** The user of this connection, once known. */
-  readonly me: Readonly<Ref<SessionUser | null>>
+  readonly me: Readonly<Ref<SessionMe | null>>
   /** Resolves when the first text is available. */
   readonly ready: Promise<void>
 

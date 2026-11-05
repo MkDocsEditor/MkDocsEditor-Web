@@ -276,7 +276,7 @@ watch(
 
 /** Shares the page with a link that leads others to where this user is right now. */
 async function share(): Promise<void> {
-  const url = joinLink(props.id, auth.user?.id, instanceId())
+  const url = joinLink(props.id, auth.user?.id, session.value?.me.value?.instanceId ?? instanceId())
   if (mobile.value && typeof navigator.share === 'function') {
     await navigator.share({ title: page.value?.name, url }).catch(() => undefined)
   } else if (await copyText(url)) {

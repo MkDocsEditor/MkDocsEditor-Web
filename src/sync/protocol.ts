@@ -76,7 +76,7 @@ export type ServerMessage =
       epoch?: string
       documentState?: string
       readOnly?: boolean
-      you?: SessionUser & { username: string }
+      you?: SessionUser & { username: string; instanceId?: string }
       actors?: ActorInfo[]
     }
   | { type: 'sync-request'; syncMessage?: string }

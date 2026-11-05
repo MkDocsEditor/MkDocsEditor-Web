@@ -16,7 +16,7 @@ import { rebaseChanges } from './rebase'
 import { CLOSE_DELETED, CLOSE_PROTOCOL_ERROR, CLOSE_REFUSED, CLOSE_RENAMED } from './socket'
 import type { SocketLike } from './socket'
 import { diffText } from './session'
-import type { DocumentSession, SessionStatus, SessionUser, TextChange } from './session'
+import type { DocumentSession, SessionMe, SessionStatus, TextChange } from './session'
 import { createStoredCopy } from './storedCopy'
 
 /**
@@ -104,7 +104,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let documentId = options.documentId
 
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
-  const me = shallowRef<SessionUser | null>(null)
+  const me = shallowRef<SessionMe | null>(null)
   const listeners = new Set<(changes: readonly TextChange[]) => void>()
 
   let doc: AmDoc | null = null
@@ -180,6 +180,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   })
   const send = connection.send
   const presence = createPresence({
+    ownInstance: () => me.value?.instanceId,
     automerge: () => A,
     doc: () => doc,
     documentId: () => documentId,
@@ -442,6 +443,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         username: you.username,
         displayName: you.displayName || you.username,
         color: you.color,
+        instanceId: you.instanceId,
       }
       authors.rememberUser(you)
     }

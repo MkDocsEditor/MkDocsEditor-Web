@@ -48,6 +48,8 @@ export interface PresenceOptions {
   automerge: () => AutomergeApi
   doc: () => AmDoc | null
   documentId: () => string
+  /** The instance of this connection: an old socket of it can still be listed. */
+  ownInstance: () => string | undefined
   /** Whether the current socket has received its initial content. */
   isSynced: () => boolean
   send: SendMessage
@@ -127,6 +129,7 @@ export function createPresence(options: PresenceOptions) {
     if (!options.doc()) return
     const list: Peer[] = []
     for (const state of states.values()) {
+      if (instanceOf(state.info) === options.ownInstance()) continue
       state.resolved = resolved(state.info.selections, state.info.viewport, state.resolved)
       list.push({
         clientId: state.info.clientId,
@@ -179,6 +182,14 @@ export function createPresence(options: PresenceOptions) {
     timer = null
     if (!options.doc() || !options.isSynced()) return
     lastSent = Date.now()
+    // a cursor that moved took the view along: it must not arrive without it, because this user
+    // can be gone before the viewport timer runs, and their ghost would show the old place
+    if (viewportTimer) {
+      clearTimeout(viewportTimer)
+      viewportTimer = null
+      lastViewportAt = lastSent
+      pendingViewport = nextViewport
+    }
     options.send({
       type: 'presence',
       documentId: options.documentId(),

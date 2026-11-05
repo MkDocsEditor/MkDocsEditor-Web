@@ -28,6 +28,7 @@ function setup(content = 'x'.repeat(100)) {
     automerge: () => automerge,
     doc: () => ({ content }) as unknown as AmDoc,
     documentId: () => 'doc',
+    ownInstance: () => 'own',
     isSynced: () => true,
     send,
     presenceMs: 100,
@@ -71,6 +72,12 @@ describe('presence', () => {
       expect(presence.ghosts.value).toHaveLength(1)
       vi.advanceTimersByTime(1)
       expect(presence.ghosts.value).toEqual([])
+    })
+
+    it('does not list an old socket of the own instance', () => {
+      const { presence } = setup()
+      presence.update({ ...anna, instanceId: 'own' })
+      expect(presence.peers.value).toEqual([])
     })
 
     it('has no ghost without ghostMs', () => {
@@ -227,6 +234,19 @@ describe('presence', () => {
         { top: 'at-0', bottom: 'at-10' },
         { top: 'at-8', bottom: 'at-18' },
       ])
+    })
+
+    it('goes along with a cursor that moves, not after it', () => {
+      const { presence, send } = setup()
+      presence.setLocalViewport({ top: 1, bottom: 2 })
+      vi.advanceTimersByTime(500)
+      presence.setLocalViewport({ top: 50, bottom: 60 })
+      presence.setLocalSelections([{ anchor: 55, head: 55 }])
+      vi.advanceTimersByTime(100)
+      expect(send.mock.lastCall![0]).toMatchObject({
+        selections: [at(55)],
+        viewport: { top: 'at-50', bottom: 'at-60' },
+      })
     })
 
     it('clears at once with null', () => {
