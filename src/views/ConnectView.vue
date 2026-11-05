@@ -3,6 +3,7 @@ import { mdiCellphoneArrowDown } from '@mdi/js'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
+import SectionHeader from '@/components/common/SectionHeader.vue'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import CopyField from '@/components/auth/CopyField.vue'
 import { formatTime } from '@/services/time'
@@ -39,7 +40,7 @@ const server = computed(() => {
 </script>
 
 <template>
-  <AuthCard title="Connect the Android app" :max-width="520">
+  <AuthCard title="Connect the Android app">
     <div data-testid="connect-page">
       <template v-if="payload">
         <p class="mb-4" data-testid="connect-info">
@@ -55,7 +56,6 @@ const server = computed(() => {
           v-if="!expired"
           color="primary"
           variant="flat"
-          size="large"
           block
           class="mb-6"
           :href="appUrlForPayload(raw)"
@@ -64,7 +64,7 @@ const server = computed(() => {
           Open in the app
         </v-btn>
       </template>
-      <v-alert v-else type="info" variant="tonal" class="mb-4" data-testid="connect-invalid">
+      <v-alert v-else type="info" class="mb-4" data-testid="connect-invalid">
         <template v-if="decoded.ok === false && decoded.reason === 'version'">
           This link needs a newer version of the web client and the app.
         </template>
@@ -74,7 +74,7 @@ const server = computed(() => {
         </template>
       </v-alert>
 
-      <h2 class="text-subtitle-1 font-weight-bold mb-2">Don't have the app yet?</h2>
+      <SectionHeader title="Don't have the app yet?" />
       <ol class="install-steps mb-4" data-testid="connect-install">
         <li>
           Install <a :href="OBTAINIUM_HOME" target="_blank" rel="noopener">Obtainium</a>. It
@@ -88,7 +88,7 @@ const server = computed(() => {
         <li>Come back here and tap “Open in the app”, or scan the QR code again.</li>
       </ol>
       <v-btn
-        variant="tonal"
+        variant="outlined"
         :prepend-icon="mdiCellphoneArrowDown"
         :href="OBTAINIUM_ADD_URL"
         target="_blank"
@@ -100,7 +100,7 @@ const server = computed(() => {
       </v-btn>
 
       <template v-if="payload && !expired">
-        <h2 class="text-subtitle-1 font-weight-bold mb-2">The link</h2>
+        <SectionHeader title="The link" />
         <p class="mb-2 text-medium-emphasis">Paste it into the app if opening does not work.</p>
         <CopyField :value="connectUrlForPayload(raw)" label="Connect link" testid="connect-link" />
       </template>
@@ -110,10 +110,10 @@ const server = computed(() => {
 
 <style scoped>
 .install-steps {
-  padding-left: 1.25rem;
+  padding-left: var(--app-space-6);
 }
 
 .install-steps li {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--app-space-2);
 }
 </style>

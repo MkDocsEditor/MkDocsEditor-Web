@@ -80,7 +80,7 @@ async function save(): Promise<void> {
           class="mb-2"
           :rules="[usernameRule]"
         />
-        <div class="d-flex align-center ga-3">
+        <div class="d-flex align-center ga-4">
           <v-text-field
             v-model="color"
             label="Colour"
@@ -129,6 +129,6 @@ async function save(): Promise<void> {
   border: none;
   background: none;
   cursor: pointer;
-  margin-bottom: 22px;
+  margin-bottom: var(--app-space-6);
 }
 </style>

@@ -102,7 +102,6 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
           v-bind="menu"
           :icon="mdiFormatHeaderPound"
           :disabled="disabled"
-          variant="text"
           size="small"
           rounded="lg"
           aria-label="Heading"
@@ -110,7 +109,7 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
           data-testid="format-heading"
         />
       </template>
-      <v-list density="compact" @mousedown.prevent>
+      <v-list @mousedown.prevent>
         <v-list-item
           v-for="level in levels"
           :key="level"
@@ -121,7 +120,9 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
             >Heading {{ level }}</v-list-item-title
           >
           <template #append>
-            <span class="text-caption text-medium-emphasis ms-4">{{ headingShortcut(level) }}</span>
+            <span class="text-body-small text-medium-emphasis ms-4">{{
+              headingShortcut(level)
+            }}</span>
           </template>
         </v-list-item>
       </v-list>
@@ -133,7 +134,6 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
         :key="button.name"
         :icon="button.icon"
         :disabled="disabled"
-        variant="text"
         size="small"
         rounded="lg"
         :aria-label="tooltip(button)"
@@ -148,7 +148,6 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
           v-bind="menu"
           :icon="mdiAlertBoxOutline"
           :disabled="disabled"
-          variant="text"
           size="small"
           rounded="lg"
           aria-label="Admonition"
@@ -156,7 +155,7 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
           data-testid="format-admonition"
         />
       </template>
-      <v-list density="compact" @mousedown.prevent>
+      <v-list @mousedown.prevent>
         <v-list-item
           v-for="type in ADMONITION_TYPES"
           :key="type"
@@ -174,11 +173,12 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
 </template>
 
 <style scoped>
+/* stylelint-disable color-no-hex -- the colours of the admonitions, as rendered in preview.css */
 .format-toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
+  gap: var(--app-space-half);
+  padding: var(--app-space-half) var(--app-space-2);
   overflow-x: auto;
   scrollbar-width: thin;
   flex: none;
@@ -189,7 +189,7 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
 .format-toolbar__divider {
   height: 24px;
   align-self: center;
-  margin: 0 4px;
+  margin: 0 var(--app-space-1);
 }
 .format-toolbar__h1 {
   font-size: 1.3em;
@@ -209,8 +209,8 @@ const title = (type: string) => type.charAt(0).toUpperCase() + type.slice(1)
   display: inline-block;
   width: 4px;
   height: 20px;
-  border-radius: 2px;
-  margin-inline-end: 12px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  margin-inline-end: var(--app-space-2);
   background: #448aff;
 }
 .format-toolbar__swatch--abstract {

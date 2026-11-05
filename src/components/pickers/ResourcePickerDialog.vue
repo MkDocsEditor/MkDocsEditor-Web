@@ -3,6 +3,7 @@ import { mdiUpload } from '@mdi/js'
 import { computed, ref, watch } from 'vue'
 
 import type { TreeItem } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import TreeBrowser from '@/components/tree/TreeBrowser.vue'
 import { resourceKind } from '@/services/icons'
 import { describeError } from '@/stores/notify'
@@ -94,10 +95,10 @@ function insertWeb(): void {
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="640" :fullscreen="$vuetify.display.xs" scrollable>
+  <AppDialog v-model="open" size="medium" scrollable>
     <v-card data-testid="resource-picker">
       <v-card-title>Insert image or file</v-card-title>
-      <v-tabs v-model="tab" density="compact" class="px-4">
+      <v-tabs v-model="tab" class="px-4">
         <v-tab value="wiki" data-testid="resource-tab-wiki">In the wiki</v-tab>
         <v-tab value="upload" data-testid="resource-tab-upload">Upload</v-tab>
         <v-tab value="web" data-testid="resource-tab-web">Web address</v-tab>
@@ -106,10 +107,8 @@ function insertWeb(): void {
         <v-alert
           v-if="uploadError"
           type="error"
-          variant="tonal"
-          density="compact"
           role="alert"
-          class="mb-3"
+          class="mb-4"
           title="Upload failed"
           :text="describeError(uploadError)"
           data-testid="picker-upload-error"
@@ -119,7 +118,6 @@ function insertWeb(): void {
           label="Description (alt text)"
           placeholder="From the file name"
           persistent-placeholder
-          density="compact"
           hide-details
           class="mb-2"
           data-testid="resource-alt"
@@ -143,14 +141,15 @@ function insertWeb(): void {
           />
         </template>
         <template v-else-if="tab === 'upload'">
-          <p class="text-body-2 mb-2">
+          <p class="text-body-medium mb-2">
             Upload into <strong data-testid="upload-target">{{ uploadPath }}</strong>
           </p>
           <v-btn
             :prepend-icon="mdiUpload"
             color="primary"
+            variant="flat"
             :loading="uploading"
-            class="mb-3"
+            class="mb-4"
             data-testid="resource-choose-files"
             @click="fileInput?.click()"
           >
@@ -164,7 +163,7 @@ function insertWeb(): void {
             data-testid="resource-file-input"
             @change="onFilesChosen"
           />
-          <p class="text-caption text-medium-emphasis mb-1">Pick another folder:</p>
+          <p class="text-body-small text-medium-emphasis mb-1">Pick another folder:</p>
           <TreeBrowser
             v-model:section="uploadSection"
             :types="[]"
@@ -184,7 +183,7 @@ function insertWeb(): void {
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" @click="open = false">Cancel</v-btn>
+        <v-btn @click="open = false">Cancel</v-btn>
         <v-btn
           v-if="tab === 'web'"
           color="primary"
@@ -197,7 +196,7 @@ function insertWeb(): void {
         </v-btn>
       </v-card-actions>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>
 
 <style scoped>

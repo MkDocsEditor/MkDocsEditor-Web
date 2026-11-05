@@ -148,7 +148,6 @@ onMounted(load)
             <LinkStatusChip :status="invite.status" class="mr-2" />
             <v-btn
               v-if="invite.status === 'pending'"
-              variant="text"
               size="small"
               color="error"
               data-testid="invite-revoke"

@@ -1,0 +1,17 @@
+{
+  "overrides": [{ "files": ["**/*.vue"], "customSyntax": "postcss-html" }],
+  "rules": {
+    "color-no-hex": [true, { "message": "Use a theme colour: rgb(var(--v-theme-…))." }],
+    "declaration-property-value-allowed-list": [
+      {
+        "/^(padding|margin|gap)(-|$)/": [
+          "/^(0|auto|calc\\(.*\\)|(var\\(--app-space-[a-z0-9]+\\)|0|auto)( (var\\(--app-space-[a-z0-9]+\\)|0|auto))*)$/"
+        ],
+        "border-radius": ["/^(50%|0|var\\(--md-sys-shape-corner-[a-z-]+\\))$/"],
+        "font-size": ["/^(var\\(--md-sys-typescale-[a-z-]+-size\\)|[0-9.]+em)$/"],
+        "font-family": ["inherit", "var(--app-font-mono)"]
+      },
+      { "message": "Use a design token from src/styles/tokens.css." }
+    ]
+  }
+}

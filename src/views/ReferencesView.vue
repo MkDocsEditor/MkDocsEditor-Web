@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 
 import { ApiError, useApi } from '@/api'
 import type { BrokenReference, ResourceModel } from '@/api'
+import PageHeader from '@/components/common/PageHeader.vue'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
 import { formatSize } from '@/services/icons'
 import { groupBySource } from '@/components/references/backlinks'
@@ -71,19 +72,19 @@ function resourcePath(resource: ResourceModel): string {
 </script>
 
 <template>
-  <v-container max-width="960" class="pb-16">
-    <div class="d-flex align-center mb-2">
-      <h1 class="text-h5 flex-grow-1">Links and files</h1>
-      <v-btn
-        :icon="mdiRefresh"
-        variant="text"
-        :loading="loading"
-        aria-label="Reload"
-        data-testid="references-reload"
-        @click="load"
-      />
-    </div>
-    <v-tabs v-model="tab" class="mb-3">
+  <v-container class="pb-16">
+    <PageHeader title="Links and files">
+      <template #actions>
+        <v-btn
+          :icon="mdiRefresh"
+          :loading="loading"
+          aria-label="Reload"
+          data-testid="references-reload"
+          @click="load"
+        />
+      </template>
+    </PageHeader>
+    <v-tabs v-model="tab" class="mb-4">
       <v-tab value="broken" data-testid="tab-broken">
         Broken links
         <v-chip v-if="broken" size="x-small" class="ms-2">{{ broken.length }}</v-chip>
@@ -94,7 +95,7 @@ function resourcePath(resource: ResourceModel): string {
       </v-tab>
     </v-tabs>
 
-    <v-alert v-if="failure" type="warning" variant="tonal" :text="failure" class="mb-3" />
+    <v-alert v-if="failure" type="warning" :text="failure" class="mb-4" />
 
     <template v-if="tab === 'broken'">
       <v-empty-state
@@ -126,7 +127,7 @@ function resourcePath(resource: ResourceModel): string {
     </template>
 
     <template v-else>
-      <p class="text-body-2 text-medium-emphasis mb-3">
+      <p class="text-body-medium text-medium-emphasis mb-4">
         No page links to these files and <code>mkdocs.yml</code> does not name them. Templates of
         the theme, snippets and links from outside the wiki are not seen, so check before deleting.
       </p>

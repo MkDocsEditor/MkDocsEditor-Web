@@ -127,14 +127,7 @@ onBeforeUnmount(stopTimers)
           <a :href="OBTAINIUM_ADD_URL" target="_blank" rel="noopener">Obtainium</a> (turn on
           pre-releases for it).
         </p>
-        <v-alert
-          v-if="error"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="mb-3"
-          role="alert"
-        >
+        <v-alert v-if="error" type="error" class="mb-4" role="alert">
           {{ error }}
         </v-alert>
         <v-btn
@@ -150,7 +143,7 @@ onBeforeUnmount(stopTimers)
       </template>
 
       <template v-else-if="status === 'pending'">
-        <p class="mb-3">
+        <p class="mb-4">
           Scan with your phone's camera. Don't have the app? Install it with
           <a :href="OBTAINIUM_ADD_URL" target="_blank" rel="noopener">Obtainium</a> (turn on
           pre-releases for it), then scan again.
@@ -163,7 +156,7 @@ onBeforeUnmount(stopTimers)
         </p>
         <div class="d-flex flex-wrap justify-center ga-2">
           <v-btn
-            variant="tonal"
+            variant="outlined"
             :prepend-icon="copied ? mdiCheckCircle : mdiContentCopy"
             data-testid="connect-copy"
             @click="copyUrl"
@@ -171,29 +164,27 @@ onBeforeUnmount(stopTimers)
             {{ copied ? 'Copied' : 'Copy link' }}
           </v-btn>
           <v-btn
-            variant="tonal"
+            variant="outlined"
             :prepend-icon="mdiOpenInNew"
             :href="url"
             data-testid="connect-open"
           >
             Open on this device
           </v-btn>
-          <v-btn variant="text" color="error" data-testid="connect-revoke" @click="revoke">
-            Cancel
-          </v-btn>
+          <v-btn color="error" data-testid="connect-revoke" @click="revoke"> Cancel </v-btn>
         </div>
       </template>
 
       <template v-else-if="status === 'redeemed'">
-        <v-alert type="success" variant="tonal" class="mb-3" data-testid="connect-done">
+        <v-alert type="success" class="mb-4" data-testid="connect-done">
           Connected{{ link?.redeemedDeviceName ? `: ${link.redeemedDeviceName}` : '' }}. The app is
           signed in and shows up in the list below.
         </v-alert>
-        <v-btn variant="text" @click="reset">Connect another device</v-btn>
+        <v-btn @click="reset">Connect another device</v-btn>
       </template>
 
       <template v-else>
-        <v-alert type="info" variant="tonal" class="mb-3" data-testid="connect-expired">
+        <v-alert type="info" class="mb-4" data-testid="connect-expired">
           {{
             status === 'revoked'
               ? 'The link was cancelled.'

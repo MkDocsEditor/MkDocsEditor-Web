@@ -37,7 +37,7 @@ function later(): void {
 
 <template>
   <section class="passkey-step" aria-labelledby="passkey-step-title" data-testid="passkey-step">
-    <h2 id="passkey-step-title" class="text-h6 mb-2">Sign in with a passkey next time</h2>
+    <h2 id="passkey-step-title" class="text-title-medium mb-2">Sign in with a passkey next time</h2>
     <p class="mb-2">
       A passkey replaces typing your password: you confirm with your fingerprint, face, screen lock
       or a security key. It only works on this site, so it cannot be phished.
@@ -46,7 +46,7 @@ function later(): void {
       A password manager like Bitwarden (browser extension) can store the passkey. It then shows its
       own dialog instead of the browser's.
     </p>
-    <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3" role="alert">
+    <v-alert v-if="error" type="error" class="mb-4" role="alert">
       {{ error }}
     </v-alert>
     <div class="d-flex flex-wrap ga-2">
@@ -60,9 +60,7 @@ function later(): void {
       >
         Create passkey
       </v-btn>
-      <v-btn variant="text" :disabled="busy" data-testid="passkey-step-later" @click="later">
-        Later
-      </v-btn>
+      <v-btn :disabled="busy" data-testid="passkey-step-later" @click="later"> Later </v-btn>
     </div>
   </section>
 </template>

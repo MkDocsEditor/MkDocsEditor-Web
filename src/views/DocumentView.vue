@@ -198,10 +198,10 @@ watch(
 
 <template>
   <div class="document-view">
-    <div class="document-view__bar px-3 pt-1">
+    <div class="document-view__bar px-4 pt-1">
       <ItemBreadcrumbs v-if="!mobile" :ancestors="ancestors" :current="page?.name" />
       <div class="d-flex align-center ga-2 pb-1">
-        <h1 class="document-view__title text-truncate flex-grow-1" data-testid="document-title">
+        <h1 class="text-title-large text-truncate flex-grow-1" data-testid="document-title">
           {{ page?.name }}
         </h1>
 
@@ -213,7 +213,12 @@ watch(
             location="bottom"
           >
             <template #activator="{ props: tip }">
-              <v-avatar v-bind="tip" :color="user.color" size="30" class="text-caption text-white">
+              <v-avatar
+                v-bind="tip"
+                :color="user.color"
+                size="30"
+                class="text-body-small text-white"
+              >
                 {{ initials(user.name) }}
               </v-avatar>
             </template>
@@ -225,21 +230,13 @@ watch(
           :prepend-icon="connection.icon"
           :color="connection.color"
           size="small"
-          variant="tonal"
           data-testid="connection-state"
           :title="connection.text"
         >
           <span v-if="!mobile">{{ connection.text }}</span>
         </v-chip>
 
-        <v-btn-toggle
-          v-model="mode"
-          mandatory
-          density="compact"
-          variant="outlined"
-          divided
-          color="primary"
-        >
+        <v-btn-toggle v-model="mode" mandatory density="comfortable" border divided color="primary">
           <v-btn value="edit" :icon="mdiFileDocumentEditOutline" aria-label="Edit" />
           <v-btn
             v-if="!mobile"
@@ -263,9 +260,9 @@ watch(
 
         <v-menu>
           <template #activator="{ props: menu }">
-            <v-btn v-bind="menu" :icon="mdiDotsVertical" variant="text" aria-label="More" />
+            <v-btn v-bind="menu" :icon="mdiDotsVertical" aria-label="More" />
           </template>
-          <v-list density="compact">
+          <v-list>
             <v-list-subheader>Who wrote what?</v-list-subheader>
             <v-list-item
               v-for="option in authorHighlightModes"
@@ -304,8 +301,6 @@ watch(
       <v-alert
         v-if="status?.message"
         :type="status.connection === 'closed' ? 'error' : 'info'"
-        variant="tonal"
-        density="compact"
         class="mb-2"
         data-testid="session-message"
       >
@@ -317,7 +312,6 @@ watch(
     <v-progress-linear
       v-if="uploading > 0"
       indeterminate
-      color="primary"
       aria-label="Uploading a file"
       data-testid="upload-progress"
     />
@@ -328,7 +322,7 @@ watch(
           <FormatToolbar :view="editorView" :override="toolbarOverride" />
           <v-divider />
         </template>
-        <v-skeleton-loader v-if="!ready" type="paragraph@3" class="pa-4" />
+        <v-progress-linear v-if="!ready" indeterminate aria-label="Loading the page" />
         <MarkdownEditor
           v-else
           ref="editor"
@@ -345,7 +339,7 @@ watch(
       </div>
       <v-divider v-if="mode === 'split'" vertical />
       <div v-show="mode !== 'edit'" class="document-view__pane">
-        <v-skeleton-loader v-if="!ready" type="paragraph@3" class="pa-4" />
+        <v-progress-linear v-if="!ready" indeterminate aria-label="Loading the page" />
         <MarkdownPreview
           v-else
           :text="text"
@@ -375,7 +369,7 @@ watch(
           <div class="pa-4">
             <v-btn
               :prepend-icon="mdiImageSearchOutline"
-              variant="tonal"
+              variant="outlined"
               block
               :disabled="!ready || (status?.readOnly ?? true)"
               data-testid="panel-browse"
@@ -411,11 +405,6 @@ watch(
   display: flex;
   flex-direction: column;
   height: calc(100dvh - var(--v-layout-top, 0px));
-}
-.document-view__title {
-  font-size: 1.25rem;
-  font-weight: 500;
-  min-width: 0;
 }
 .document-view__panes {
   flex: 1;

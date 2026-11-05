@@ -103,7 +103,6 @@ onMounted(load)
           <template #append>
             <v-btn
               :prepend-icon="mdiLogout"
-              variant="text"
               size="small"
               :disabled="busy"
               :aria-label="`Sign out ${session.deviceName}`"
@@ -119,7 +118,7 @@ onMounted(load)
       <v-spacer />
       <v-btn
         color="error"
-        variant="tonal"
+        variant="outlined"
         :disabled="busy"
         data-testid="revoke-others"
         @click="confirmOthers = true"

@@ -4,6 +4,7 @@ import { ref, watch } from 'vue'
 import { ApiError } from '@/api'
 import { validateName } from '@/services/names'
 import { describeError } from '@/stores/notify'
+import AppDialog from '@/components/common/AppDialog.vue'
 
 const props = defineProps<{
   title: string
@@ -46,7 +47,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="440">
+  <AppDialog v-model="open">
     <v-card :title="title">
       <v-form @submit.prevent="submit">
         <v-card-text>
@@ -62,7 +63,7 @@ async function submit(): Promise<void> {
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="open = false">Cancel</v-btn>
+          <v-btn @click="open = false">Cancel</v-btn>
           <v-btn
             type="submit"
             color="primary"
@@ -76,5 +77,5 @@ async function submit(): Promise<void> {
         </v-card-actions>
       </v-form>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>

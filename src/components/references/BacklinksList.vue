@@ -52,8 +52,8 @@ const groups = computed(() => groupBySource(backlinks.value ?? []))
 
 <template>
   <div data-testid="backlinks">
-    <v-progress-linear v-if="loading" indeterminate color="primary" height="2" />
-    <v-list density="compact" class="py-0">
+    <v-progress-linear v-if="loading" indeterminate height="2" />
+    <v-list class="py-0">
       <v-list-item
         v-for="group in groups"
         :key="group.source.id"
@@ -75,13 +75,7 @@ const groups = computed(() => groupBySource(backlinks.value ?? []))
       />
       <v-list-item v-if="failure" :subtitle="failure" class="text-medium-emphasis">
         <template #append>
-          <v-btn
-            :icon="mdiRefresh"
-            variant="text"
-            size="small"
-            aria-label="Try again"
-            @click="load"
-          />
+          <v-btn :icon="mdiRefresh" size="small" aria-label="Try again" @click="load" />
         </template>
       </v-list-item>
     </v-list>

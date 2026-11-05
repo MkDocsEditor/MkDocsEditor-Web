@@ -88,5 +88,45 @@ export default defineConfigWithVueTs(
 
   ...layers,
 
+  {
+    // The design system: see "Design" in the README.
+    name: 'app/design',
+    files: ['src/**/*.vue'],
+    rules: {
+      'vue/no-restricted-class': [
+        'error',
+        // the type scale of Vuetify 2 and 3: these classes do not exist any more and do nothing
+        '/^text-(h[1-6]|subtitle-[12]|body-[12]|caption|overline|button)$/',
+        // spacing is 4, 8, 16, 24 or 32 pixels
+        '/^(m|p)[a-z]?-(3|5|7)$/',
+        '/^ga-(3|5|7)$/',
+      ],
+      'vue/no-restricted-static-attribute': [
+        'error',
+        {
+          key: 'variant',
+          value: 'tonal',
+          element: 'v-btn',
+          message: 'Android has filled, outlined and text buttons.',
+        },
+        {
+          key: 'size',
+          value: 'large',
+          element: 'v-btn',
+          message: 'Buttons are the default size, or small in a row of a list.',
+        },
+      ],
+      'vue/no-restricted-html-elements': [
+        'error',
+        { element: 'v-dialog', message: 'Use AppDialog, which has the widths of the app.' },
+      ],
+    },
+  },
+  {
+    name: 'app/design-dialog',
+    files: ['src/components/common/AppDialog.vue'],
+    rules: { 'vue/no-restricted-html-elements': 'off' },
+  },
+
   skipFormatting,
 )

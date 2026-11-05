@@ -13,8 +13,6 @@ const { copied, copy } = useCopied()
     :model-value="value"
     :label="label"
     readonly
-    variant="outlined"
-    density="comfortable"
     hide-details
     :data-testid="testid"
     @focus="($event.target as HTMLInputElement).select()"
@@ -23,7 +21,6 @@ const { copied, copy } = useCopied()
       <v-btn
         :icon="copied ? mdiCheck : mdiContentCopy"
         :aria-label="copied ? 'Copied' : `Copy ${label.toLowerCase()}`"
-        variant="text"
         size="small"
         @click="copy(value)"
       />

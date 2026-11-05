@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 
 import { useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
+import PageHeader from '@/components/common/PageHeader.vue'
 import ConnectAppCard from '@/components/account/ConnectAppCard.vue'
 import PasskeysCard from '@/components/account/PasskeysCard.vue'
 import PasswordCard from '@/components/account/PasswordCard.vue'
@@ -90,23 +91,21 @@ onMounted(load)
 </script>
 
 <template>
-  <v-container class="account-view" max-width="820">
-    <h1 class="text-h5 mb-4">Account</h1>
+  <v-container class="account-view">
+    <PageHeader title="Account" />
     <v-alert
       v-if="auth.secondFactorSetupRequired"
       type="warning"
-      variant="tonal"
       class="mb-4"
       data-testid="2fa-required"
     >
       This server requires a second factor. Add a passkey or an authenticator app, then you can
       continue to the wiki.
     </v-alert>
-    <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
+    <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
     <v-alert
       v-if="showPasskeyReminder"
       type="info"
-      variant="tonal"
       class="mb-4"
       :icon="mdiFingerprint"
       title="Sign in with a passkey next time"
@@ -117,7 +116,7 @@ onMounted(load)
     >
       You have no passkey yet. With one, you confirm with your fingerprint, face or screen lock
       instead of typing the password. Password managers like Bitwarden can store it.
-      <div class="mt-3">
+      <div class="mt-4">
         <v-btn
           color="primary"
           variant="flat"
@@ -156,8 +155,6 @@ onMounted(load)
         <TotpCard :account="account" @changed="load" />
       </div>
     </template>
-    <div v-else-if="!error" class="d-flex justify-center pa-8">
-      <v-progress-circular indeterminate aria-label="Loading" />
-    </div>
+    <v-progress-linear v-else-if="!error" indeterminate aria-label="Loading" />
   </v-container>
 </template>

@@ -95,7 +95,6 @@ onMounted(() => void load())
         :items="typeItems"
         label="Only this event"
         clearable
-        density="compact"
         hide-details
         class="mb-2"
       />
@@ -103,7 +102,7 @@ onMounted(() => void load())
     <v-card-text v-if="loadError">
       <LoadError title="Could not load the audit log" :error="loadError" @retry="load()" />
     </v-card-text>
-    <v-list lines="three" density="compact">
+    <v-list lines="three">
       <v-list-item v-for="event in events" :key="event.id" data-testid="audit-event">
         <v-list-item-title :class="{ 'text-error': isWarning(event) }">
           {{ TYPES[event.type] ?? event.type }}
@@ -123,7 +122,7 @@ onMounted(() => void load())
     <v-progress-linear v-if="loading" indeterminate />
     <v-card-actions v-if="next !== null">
       <v-spacer />
-      <v-btn variant="text" :loading="loading" @click="load(true)">Load older</v-btn>
+      <v-btn :loading="loading" @click="load(true)">Load older</v-btn>
     </v-card-actions>
   </v-card>
 </template>

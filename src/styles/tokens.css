@@ -1,0 +1,48 @@
+/*
+ * The design tokens of the app. Names and values are those of Material Design 3 (the `md.sys`
+ * tokens), the same ones the Android app gets from Compose Material 3. Scoped styles use these
+ * instead of raw values: `npm run lint` enforces it.
+ */
+:root {
+  /* the font of the Android app */
+  --v-font-body: 'Roboto Variable', Roboto, sans-serif;
+  --app-font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* spacing, in the steps of the Vuetify classes: pa-1 is 4px, pa-2 is 8px, pa-4 is 16px */
+  --app-space-half: 2px;
+  --app-space-1: 4px;
+  --app-space-2: 8px;
+  --app-space-4: 16px;
+  --app-space-6: 24px;
+  --app-space-8: 32px;
+
+  /* shape */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* the font sizes of the type scale; prefer its classes such as `text-title-medium` */
+  --md-sys-typescale-label-small-size: 0.6875rem;
+  --md-sys-typescale-body-small-size: 0.75rem;
+  --md-sys-typescale-body-medium-size: 0.875rem;
+  --md-sys-typescale-body-large-size: 1rem;
+
+  /* motion: small things are quick, duration grows with the distance covered */
+  --md-sys-motion-duration-short2: 100ms;
+  --md-sys-motion-duration-short3: 150ms;
+  --md-sys-motion-duration-short4: 200ms;
+  --md-sys-motion-duration-medium1: 250ms;
+  /* things that stay on screen */
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* things that enter or leave the screen */
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* the search bar in the app bar and its docked search view line up with each other */
+  --app-search-height: 48px;
+  --app-search-width: min(720px, calc(100vw - 560px));
+}

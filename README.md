@@ -208,6 +208,27 @@ The layers, from the bottom up. Each one only uses those below it, which ESLint 
 | `src/views/`, `src/components/` | Pages and UI components (`auth/`, `account/`, `admin/` for the account system)          |
 | `e2e/`                          | Playwright tests and the test backend setup                                             |
 
+### Design
+
+The web client should feel familiar next to the Android app. Both follow Material Design 3, with the
+same colours (`src/plugins/vuetify.ts`), font (Roboto) and components, and the same `md.sys` token
+values (`src/styles/tokens.css`). The web client is denser, because it is meant for a desktop screen.
+
+- **Defaults first:** `vuetify.ts` sets what a component looks like. A call site only states what
+  differs, so a button has no `variant` unless it is a filled (`color="primary" variant="flat"`) or an
+  outlined one. `src/styles/vuetify.css` covers what props cannot.
+- **Type:** the classes of the Material type scale, such as `text-headline-small`, `text-title-medium`
+  or `text-body-small`. Vuetify 4 does not have the older `text-h5` and `text-caption`.
+- **Spacing:** 4, 8, 16, 24 or 32 pixels, as `pa-1`, `pa-2`, `pa-4`, `pa-6`, `pa-8` or `--app-space-*`.
+- **Parts:** `PageHeader`, `SectionHeader` and `AppDialog` (`small`, `medium`, `large`) in
+  `components/common`. Waiting is a `v-progress-linear`.
+- **Motion:** state changes take 100 to 150ms on the standard curve. Overlays enter in 250ms on the
+  emphasized decelerate curve, and leave in 150ms on the accelerate one.
+- **Search:** Material's search bar in the app bar, with a search view docked to it from 960 pixels up
+  and a full-screen one below.
+
+`npm run lint` enforces this: ESLint for the classes and props, Stylelint for raw values in styles.
+
 ### End-to-end tests
 
 `npm run test:e2e` builds the app, builds the backend, starts it with a small German test

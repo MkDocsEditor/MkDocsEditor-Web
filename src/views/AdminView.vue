@@ -3,6 +3,7 @@ import { mdiAccountGroup, mdiCog, mdiEmailPlus, mdiHistory } from '@mdi/js'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
+import PageHeader from '@/components/common/PageHeader.vue'
 import AuditAdmin from '@/components/admin/AuditAdmin.vue'
 import InvitesAdmin from '@/components/admin/InvitesAdmin.vue'
 import SettingsAdmin from '@/components/admin/SettingsAdmin.vue'
@@ -18,8 +19,8 @@ const current = computed({
 </script>
 
 <template>
-  <v-container max-width="960">
-    <h1 class="text-h5 mb-4">Admin</h1>
+  <v-container>
+    <PageHeader title="Admin" />
     <v-tabs v-model="current" show-arrows class="mb-4" aria-label="Admin sections">
       <v-tab value="users" :prepend-icon="mdiAccountGroup">Users</v-tab>
       <v-tab value="invites" :prepend-icon="mdiEmailPlus">Invites</v-tab>

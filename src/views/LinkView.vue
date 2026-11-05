@@ -207,7 +207,7 @@ watch(
 </script>
 
 <template>
-  <AuthCard :title="title" :max-width="480">
+  <AuthCard :title="title">
     <!-- 1. no token in the link -->
     <v-form
       v-if="!token && !finished"
@@ -230,25 +230,25 @@ watch(
         spellcheck="false"
         data-testid="token-input"
       />
-      <v-btn type="submit" color="primary" block :disabled="!pastedToken.trim()">Continue</v-btn>
+      <v-btn type="submit" color="primary" variant="flat" block :disabled="!pastedToken.trim()"
+        >Continue</v-btn
+      >
     </v-form>
 
     <!-- 2. checking the link -->
-    <div v-else-if="inspecting" class="d-flex justify-center pa-6">
-      <v-progress-circular indeterminate aria-label="Checking the link" />
-    </div>
+    <v-progress-linear v-else-if="inspecting" indeterminate aria-label="Checking the link" />
 
     <!-- 3. invalid link -->
     <div v-else-if="linkError && !finished">
-      <v-alert type="error" variant="tonal" role="alert" data-testid="link-error">
+      <v-alert type="error" role="alert" data-testid="link-error">
         {{ linkError }}
       </v-alert>
-      <v-btn variant="text" class="mt-4" :to="{ name: 'login' }">To sign in</v-btn>
+      <v-btn class="mt-4" :to="{ name: 'login' }">To sign in</v-btn>
     </div>
 
     <!-- 4. done: offer passkey and TOTP -->
     <div v-else-if="finished" data-testid="link-done">
-      <v-alert type="success" variant="tonal" class="mb-4">
+      <v-alert type="success" class="mb-4">
         <template v-if="isReset">New password set. You are signed in.</template>
         <template v-else>
           Welcome, {{ finished.user.displayName }}! Your account is ready.
@@ -261,26 +261,32 @@ watch(
           @later="passkeySkipped = true"
         />
       </v-card>
-      <v-alert v-if="addedPasskey" type="success" variant="tonal" density="compact" class="mb-4">
+      <v-alert v-if="addedPasskey" type="success" class="mb-4">
         Passkey created. Next time, pick it when you sign in.
       </v-alert>
       <v-card v-if="showAppHint" variant="outlined" class="pa-4 mb-4">
         <AndroidAppHint @dismissed="appHintDismissed = true" />
       </v-card>
-      <p class="mb-3">Also possible later under “Account”:</p>
+      <p class="mb-4">Also possible later under “Account”:</p>
       <div class="d-flex flex-column ga-2">
         <v-btn
           :prepend-icon="mdiShieldKey"
-          variant="tonal"
+          variant="outlined"
           :to="{ name: 'account', params: { tab: 'security' } }"
           data-testid="done-setup-totp"
         >
           Set up an authenticator app
         </v-btn>
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" role="alert">
+        <v-alert v-if="error" type="error" role="alert">
           {{ error }}
         </v-alert>
-        <v-btn color="primary" class="mt-2" data-testid="done-continue" @click="goOn">
+        <v-btn
+          color="primary"
+          variant="flat"
+          class="mt-2"
+          data-testid="done-continue"
+          @click="goOn"
+        >
           Continue to the wiki
         </v-btn>
       </div>
@@ -293,7 +299,7 @@ watch(
       data-testid="link-form"
       @submit.prevent="submitPassword"
     >
-      <v-alert type="info" variant="tonal" density="compact" class="mb-4" data-testid="link-info">
+      <v-alert type="info" class="mb-4" data-testid="link-info">
         <template v-if="link.kind === 'setup'">
           You are creating the first account. It gets the role <strong>Admin</strong>.
         </template>
@@ -370,20 +376,13 @@ watch(
         :disabled="busy"
         class="mt-2"
       />
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        class="my-3"
-        role="alert"
-        data-testid="link-form-error"
-      >
+      <v-alert v-if="error" type="error" class="my-4" role="alert" data-testid="link-form-error">
         {{ error }}
       </v-alert>
       <v-btn
         type="submit"
         color="primary"
-        size="large"
+        variant="flat"
         block
         :loading="busy"
         :disabled="!formValid"
@@ -392,10 +391,9 @@ watch(
       </v-btn>
 
       <template v-if="canUsePasskeys">
-        <div class="text-center text-medium-emphasis my-3">or without a password</div>
+        <div class="text-center text-medium-emphasis my-4">or without a password</div>
         <v-btn
           variant="outlined"
-          size="large"
           block
           :prepend-icon="mdiFingerprint"
           :disabled="busy"

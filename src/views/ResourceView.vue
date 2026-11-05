@@ -10,6 +10,7 @@ import {
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import PageHeader from '@/components/common/PageHeader.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import BacklinksList from '@/components/references/BacklinksList.vue'
 import { useBreakWarning } from '@/components/references/backlinks'
@@ -134,38 +135,31 @@ async function remove(): Promise<void> {
 </script>
 
 <template>
-  <v-container class="resource-view pb-16" max-width="960">
+  <v-container class="resource-view pb-16">
     <template v-if="resource">
       <ItemBreadcrumbs :ancestors="ancestors" />
-      <div class="d-flex align-center ga-3 mb-3">
-        <v-icon :icon="iconFor(resource)" :color="colorFor(resource)" size="32" />
-        <h1 class="text-h5 text-truncate flex-grow-1" data-testid="resource-title">
-          {{ resource.name }}
-        </h1>
-      </div>
+      <PageHeader :title="resource.name" testid="resource-title">
+        <template #icon
+          ><v-icon :icon="iconFor(resource)" :color="colorFor(resource)" size="32"
+        /></template>
+      </PageHeader>
 
       <div class="d-flex flex-wrap ga-2 mb-4">
         <v-btn
           :prepend-icon="mdiOpenInNew"
-          variant="tonal"
+          variant="outlined"
           data-testid="resource-open"
           @click="open"
         >
           Open
         </v-btn>
-        <v-btn :prepend-icon="mdiDownload" variant="tonal" @click="download">Download</v-btn>
-        <v-btn :prepend-icon="mdiContentCopy" variant="text" @click="copyPath">Copy path</v-btn>
-        <v-btn
-          :prepend-icon="mdiPencil"
-          variant="text"
-          data-testid="resource-rename"
-          @click="renameOpen = true"
-        >
+        <v-btn :prepend-icon="mdiDownload" variant="outlined" @click="download">Download</v-btn>
+        <v-btn :prepend-icon="mdiContentCopy" @click="copyPath">Copy path</v-btn>
+        <v-btn :prepend-icon="mdiPencil" data-testid="resource-rename" @click="renameOpen = true">
           Rename
         </v-btn>
         <v-btn
           :prepend-icon="mdiFolderMoveOutline"
-          variant="text"
           data-testid="resource-move"
           @click="moveStore.open(resource)"
         >
@@ -173,7 +167,6 @@ async function remove(): Promise<void> {
         </v-btn>
         <v-btn
           :prepend-icon="mdiDelete"
-          variant="text"
           color="error"
           data-testid="resource-delete"
           @click="deleteOpen = true"
@@ -183,7 +176,7 @@ async function remove(): Promise<void> {
       </div>
 
       <v-card variant="outlined" class="mb-4">
-        <v-list density="compact" lines="one">
+        <v-list lines="one">
           <v-list-item title="Kind" :subtitle="KIND_LABELS[kind]" />
           <v-list-item title="Size" :subtitle="formatSize(resource.filesize)" />
           <v-list-item v-if="modified" title="Modified" :subtitle="modified" />
@@ -192,7 +185,7 @@ async function remove(): Promise<void> {
       </v-card>
 
       <v-card variant="outlined" class="mb-4">
-        <v-card-subtitle class="pt-3">Used by</v-card-subtitle>
+        <v-card-subtitle class="pt-4">Used by</v-card-subtitle>
         <BacklinksList :id="resource.id" type="resource" :reload-key="tree.root" />
       </v-card>
 
@@ -209,7 +202,7 @@ async function remove(): Promise<void> {
         <video v-else-if="previewUrl && kind === 'video'" :src="previewUrl" controls />
         <audio v-else-if="previewUrl && kind === 'audio'" :src="previewUrl" controls />
         <pre v-else-if="previewText !== null" class="resource-view__text">{{ previewText }}</pre>
-        <v-alert v-else-if="previewFailed" type="warning" variant="tonal">
+        <v-alert v-else-if="previewFailed" type="warning">
           The preview could not be loaded.
         </v-alert>
       </div>
@@ -221,7 +214,7 @@ async function remove(): Promise<void> {
       text="This file does not exist (any more)."
     >
       <template #actions>
-        <v-btn color="primary" :to="{ name: 'home' }">To the start page</v-btn>
+        <v-btn color="primary" variant="flat" :to="{ name: 'home' }">To the start page</v-btn>
       </template>
     </v-empty-state>
 
@@ -248,7 +241,7 @@ async function remove(): Promise<void> {
 .resource-view__preview video {
   max-width: 100%;
   max-height: 70vh;
-  border-radius: 8px;
+  border-radius: var(--md-sys-shape-corner-small);
   display: block;
 }
 .resource-view__preview audio {
@@ -257,15 +250,15 @@ async function remove(): Promise<void> {
 .resource-view__pdf {
   width: 100%;
   height: 75vh;
-  border-radius: 8px;
+  border-radius: var(--md-sys-shape-corner-small);
 }
 .resource-view__text {
-  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.875rem;
+  font-family: var(--app-font-mono);
+  font-size: var(--md-sys-typescale-body-medium-size);
   white-space: pre-wrap;
   word-break: break-word;
-  padding: 12px 14px;
-  border-radius: 6px;
+  padding: var(--app-space-2) var(--app-space-4);
+  border-radius: var(--md-sys-shape-corner-small);
   background: rgb(var(--v-theme-code-code-background));
   color: rgb(var(--v-theme-code-text));
   max-height: 70vh;

@@ -4,7 +4,6 @@ import {
   mdiAccountCog,
   mdiLinkVariantOff,
   mdiLogout,
-  mdiMagnify,
   mdiPaperclip,
   mdiPaperclipOff,
   mdiRefresh,
@@ -20,6 +19,7 @@ import NotificationHost from '@/components/common/NotificationHost.vue'
 import MoveDialog from '@/components/move/MoveDialog.vue'
 import { canDropInto, dragged, dropTarget } from '@/components/tree/dragState'
 import NavTree from '@/components/tree/NavTree.vue'
+import SearchBar from '@/components/tree/SearchBar.vue'
 import SearchDialog from '@/components/tree/SearchDialog.vue'
 import { signOut } from '@/stores/signOut'
 import { roleLabel } from '@/services/accountRules'
@@ -169,7 +169,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 <template>
   <v-app>
-    <v-app-bar color="primary-container" density="comfortable" flat class="app-bar">
+    <v-app-bar color="primary-container" class="app-bar">
       <template v-if="showWiki" #prepend>
         <v-app-bar-nav-icon aria-label="Menu" @click="drawer = !drawer" />
       </template>
@@ -179,14 +179,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           MkDocsEditor
         </router-link>
       </v-app-bar-title>
+      <SearchBar v-if="showShell && showWiki" @open="searchOpen = true" />
       <template v-if="showShell" #append>
-        <v-btn
-          v-if="showWiki"
-          :icon="mdiMagnify"
-          aria-label="Search"
-          data-testid="search-button"
-          @click="searchOpen = true"
-        />
         <v-menu v-if="!auth.anonymous">
           <template #activator="{ props }">
             <v-btn
@@ -196,7 +190,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               data-testid="account-menu"
             />
           </template>
-          <v-list density="compact">
+          <v-list>
             <v-list-item
               :title="auth.displayName || auth.username"
               :subtitle="auth.role ? `signed in (${roleLabel(auth.role)})` : 'signed in'"
@@ -239,7 +233,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       width="300"
       data-testid="nav-drawer"
     >
-      <v-list nav density="compact" class="py-1">
+      <v-list nav class="py-1">
         <v-list-item
           :to="{ name: 'home' }"
           :active="activeId === tree.root?.id"
@@ -255,7 +249,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <template #append>
             <v-btn
               :icon="showFiles ? mdiPaperclip : mdiPaperclipOff"
-              variant="text"
               size="x-small"
               :aria-label="showFiles ? 'Hide files' : 'Show files'"
               :title="showFiles ? 'Hide files' : 'Show files'"
@@ -279,16 +272,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     </v-navigation-drawer>
 
     <v-main>
-      <v-progress-linear v-if="tree.loading" indeterminate color="secondary" absolute />
+      <v-progress-linear v-if="tree.loading" indeterminate absolute />
       <v-alert
         v-if="showWiki && tree.error && !tree.root && !route.meta.standalone"
         type="error"
-        variant="tonal"
         class="ma-4"
         :text="describeError(tree.error)"
       >
         <template #append>
-          <v-btn :prepend-icon="mdiRefresh" variant="text" @click="loadTree">Retry</v-btn>
+          <v-btn :prepend-icon="mdiRefresh" @click="loadTree">Retry</v-btn>
         </template>
       </v-alert>
       <router-view v-if="!showWiki || tree.root || route.meta.standalone" />
@@ -314,7 +306,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .app-title {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--app-space-2);
   color: inherit;
   text-decoration: none;
 }

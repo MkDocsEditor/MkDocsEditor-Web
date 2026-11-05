@@ -18,7 +18,7 @@ const text = computed(() =>
 </script>
 
 <template>
-  <div v-if="text" class="text-caption text-medium-emphasis" data-testid="sync-status">
+  <div v-if="text" class="text-body-small text-medium-emphasis" data-testid="sync-status">
     {{ text }}
   </div>
 </template>
