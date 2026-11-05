@@ -4,6 +4,7 @@ import { EditorView } from '@codemirror/view'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, ref, shallowRef } from 'vue'
 
+import { scrollToCenter } from '@/editor/scrollToCenter'
 import type { Ghost, Peer } from '@/sync'
 
 import {
@@ -12,6 +13,8 @@ import {
   FOLLOW_RESUME_MS,
   useFollow,
 } from './useFollow'
+
+vi.mock('@/editor/scrollToCenter', () => ({ scrollToCenter: vi.fn() }))
 
 const anna = (head?: number): Peer => ({
   clientId: 'c-1',
@@ -37,6 +40,8 @@ function setup() {
     state: EditorState.create({ doc: 'x'.repeat(100), selection: { anchor: 3 } }),
   })
   const dispatch = vi.spyOn(view, 'dispatch')
+  const scroll = vi.mocked(scrollToCenter)
+  scroll.mockClear()
   const currentView = shallowRef<EditorView | null>(null)
   const peers = shallowRef<Peer[]>([anna(10)])
   const ghosts = shallowRef<Ghost[]>([])
@@ -58,7 +63,7 @@ function setup() {
     }),
   )
   currentView.value = view
-  return { wrapper, view, dispatch, peers, ghosts, known, ended, follow }
+  return { wrapper, view, dispatch, scroll, peers, ghosts, known, ended, follow }
 }
 
 describe('useFollow', () => {
@@ -66,42 +71,41 @@ describe('useFollow', () => {
   afterEach(() => void vi.useRealTimers())
 
   it('scrolls to the account without moving the local cursor', async () => {
-    const { wrapper, view, dispatch, peers, follow } = setup()
+    const { wrapper, view, dispatch, scroll, peers, follow } = setup()
     await nextTick()
     follow.start('anna')
     await nextTick()
     expect(follow.following.value).toEqual({ instanceId: 'anna', name: 'Anna' })
-    expect(dispatch).toHaveBeenCalledTimes(1)
-    expect(dispatch.mock.calls[0]![0]).not.toHaveProperty('selection')
+    expect(scroll).toHaveBeenCalledExactlyOnceWith(view, 10)
+    expect(dispatch).not.toHaveBeenCalled()
     peers.value = [anna(20)]
     await nextTick()
-    expect(dispatch).toHaveBeenCalledTimes(2)
+    expect(scroll).toHaveBeenLastCalledWith(view, 20)
     expect(view.state.selection.main.head).toBe(3)
     wrapper.unmount()
   })
 
   it('centers the middle of a viewport', async () => {
-    const { wrapper, dispatch, peers, follow } = setup()
+    const { wrapper, view, scroll, peers, follow } = setup()
     peers.value = [{ ...anna(), viewport: { top: 10, bottom: 30 } }]
     await nextTick()
     follow.start('anna')
     await nextTick()
-    const effect = [dispatch.mock.calls[0]![0]!.effects].flat()[0] as { value: { range: unknown } }
-    expect(effect.value.range).toMatchObject({ from: 20, to: 20 })
+    expect(scroll).toHaveBeenCalledWith(view, 20)
     wrapper.unmount()
   })
 
   it('pauses on manual input, and catches up after the last of it', async () => {
-    const { wrapper, view, dispatch, peers, follow } = setup()
+    const { wrapper, view, scroll, peers, follow } = setup()
     await nextTick()
     follow.start('anna')
     await nextTick()
-    dispatch.mockClear()
+    scroll.mockClear()
     view.scrollDOM.dispatchEvent(new Event('wheel'))
     expect(follow.paused.value).toBe(true)
     peers.value = [anna(20)]
     await nextTick()
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(scroll).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(FOLLOW_RESUME_MS - 1)
     // inertia after the input keeps it paused
     view.scrollDOM.dispatchEvent(new Event('scroll'))
@@ -110,7 +114,7 @@ describe('useFollow', () => {
     await vi.advanceTimersByTimeAsync(1)
     await nextTick()
     expect(follow.paused.value).toBe(false)
-    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(scroll).toHaveBeenCalledExactlyOnceWith(view, 20)
     wrapper.unmount()
   })
 
@@ -177,16 +181,16 @@ describe('useFollow', () => {
   })
 
   it('goes on with the ghost, and ends with it', async () => {
-    const { wrapper, dispatch, peers, ghosts, ended, follow } = setup()
+    const { wrapper, view, scroll, peers, ghosts, ended, follow } = setup()
     await nextTick()
     follow.start('anna')
     await nextTick()
-    dispatch.mockClear()
+    scroll.mockClear()
     peers.value = []
     ghosts.value = [annaGhost(40)]
     await nextTick()
     expect(follow.following.value).not.toBeNull()
-    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(scroll).toHaveBeenCalledExactlyOnceWith(view, 40)
     ghosts.value = []
     await nextTick()
     expect(follow.following.value).toBeNull()

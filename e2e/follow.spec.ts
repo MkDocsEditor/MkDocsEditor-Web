@@ -207,7 +207,12 @@ test.describe('following another user', () => {
     await expect(follower.getByText('Zeile 300', { exact: true })).toBeInViewport()
 
     await leader.context().close()
-    await expect(follower.locator('.cm-remote-caret--ghost')).toBeVisible()
+    const ghost = follower.locator('.cm-remote-caret--ghost')
+    await expect(ghost).toBeVisible()
+    // faint, until pointed at
+    await expect(ghost).toHaveCSS('opacity', '0.4')
+    await ghost.locator('.cm-remote-caret-label').hover()
+    await expect(ghost).toHaveCSS('opacity', '1')
     await expect(follower.getByTestId('following')).toBeVisible()
     await expect(follower.getByTestId('online-user')).toHaveCount(0)
   })
