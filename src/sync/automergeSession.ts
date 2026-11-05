@@ -499,6 +499,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   function onSyncMessage(encoded: string): void {
     if (!doc || !syncState) return
     const before = doc
+    // Slow on long pages: see "Known issues" in the README (automerge#1591).
     const [nextDoc, nextState] = A.receiveSyncMessage(doc, syncState, fromBase64(encoded))
     doc = nextDoc
     syncState = nextState

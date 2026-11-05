@@ -262,6 +262,19 @@ of the app: the first worker uses the ports above, the next one `17415` and `417
 
 CI runs the same tests against the backend's `master`.
 
+### Known issues
+
+- **Remote edits arrive late on long pages.** Automerge 3 takes time in proportion to the length of
+  the text to apply a remote change, even a single character
+  ([automerge#1591](https://github.com/automerge/automerge/issues/1591)). On a page of 66,000
+  characters that is about 25ms per sync message, against about 0.85ms in Automerge 2.2. Edits from
+  another client therefore show up later than on Android, whose older Automerge core does not have
+  this. The cost is per message, not per change: 20 changes applied together take about as long as
+  one. A fix is in progress upstream
+  ([automerge#1596](https://github.com/automerge/automerge/pull/1596)). Automerge 2.2.9 reads and
+  writes the same documents and syncs with Automerge 3, so downgrading stays an option if this
+  becomes a problem before the fix ships.
+
 # License
 
 AGPLv3+
