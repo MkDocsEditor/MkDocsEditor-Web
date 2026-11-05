@@ -221,9 +221,12 @@ function startFollowing(accountId: string): void {
   follow.start(accountId)
 }
 
-/** The users who can be followed: everybody but this user, in another tab or on another device. */
+/**
+ * Everybody listed can be followed, this user too: presence never lists this connection itself, so
+ * their entry is another tab or device.
+ */
 function canFollow(accountId: string | undefined): accountId is string {
-  return !!accountId && accountId !== auth.user?.id
+  return !!accountId
 }
 
 function followLabel(user: { name: string; accountId?: string }): string {
@@ -252,7 +255,6 @@ const jump = useJoinJump({
   presenceKnown: () => presenceKnown.value,
   onFollow: startFollowing,
   lastPosition: (accountId) => session.value?.lastPositionOf(accountId) ?? null,
-  ownAccountId: () => auth.user?.id,
   onSenderNotFound: () => notify.push('Could not find the position of the person who invited you.'),
 })
 

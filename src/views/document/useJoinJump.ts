@@ -9,7 +9,8 @@ export const SENDER_WAIT_MS = 5_000
 
 /**
  * What a join link does, once: follow a sender who is here or a ghost, or else go to where the
- * sender was last. It stops waiting when the reader has started doing something on the page.
+ * sender was last. It stops waiting when the reader has started doing something on the page. The
+ * sender can be this user too, on another device: presence never lists this connection itself.
  */
 export function useJoinJump(options: {
   view: () => EditorView | null
@@ -18,7 +19,6 @@ export function useJoinJump(options: {
   ghosts: () => readonly Ghost[]
   presenceKnown: () => boolean
   lastPosition: (accountId: string) => number | null
-  ownAccountId: () => string | undefined
   onFollow: (accountId: string) => void
   onSenderNotFound: () => void
 }) {
@@ -34,7 +34,7 @@ export function useJoinJump(options: {
 
   function start(accountId: string | undefined): void {
     stop()
-    if (!accountId || accountId === options.ownAccountId()) return
+    if (!accountId) return
     sender.value = accountId
     for (const event of INTERACTIONS) window.addEventListener(event, stop, true)
   }

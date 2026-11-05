@@ -18,7 +18,7 @@ function peer(accountId: string, head?: number): Peer {
   }
 }
 
-function setup(own = 'me') {
+function setup() {
   const dispatch = vi.fn()
   const focus = vi.fn()
   const view = { state: { doc: { length: 100 } }, dispatch, focus } as unknown as EditorView
@@ -40,7 +40,6 @@ function setup(own = 'me') {
           ghosts: () => ghosts.value,
           presenceKnown: () => known.value,
           lastPosition: () => last.value,
-          ownAccountId: () => own,
           onFollow,
           onSenderNotFound: notFound,
         })
@@ -159,10 +158,9 @@ describe('useJoinJump', () => {
     wrapper.unmount()
   })
 
-  it('does nothing for the own link', async () => {
-    const { wrapper, dispatch, peers, notFound, onFollow, start } = setup('me')
-    peers.value = [peer('me', 7)]
-    start('me')
+  it('does nothing for a link without a sender', async () => {
+    const { wrapper, dispatch, notFound, onFollow, start } = setup()
+    start(undefined)
     await nextTick()
     await vi.advanceTimersByTimeAsync(SENDER_WAIT_MS)
     expect(dispatch).not.toHaveBeenCalled()

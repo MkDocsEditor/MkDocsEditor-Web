@@ -70,6 +70,69 @@ test.describe('following another user', () => {
     await expect(follower.getByText('no longer following')).toBeHidden()
   })
 
+  test('follows the own account on another device', async ({ browser }, testInfo) => {
+    await requireJoinPresence()
+    const id = await createDocument(`Follow own ${testInfo.project.name} ${testInfo.retry}`)
+    const device = await userPage(browser, USERS.alice)
+    await openEditor(device, id)
+    await device.locator('.cm-content').click()
+    await device.keyboard.insertText(LINES)
+    await expect(device.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
+    const from = await device.evaluate(
+      () => JSON.parse(localStorage.getItem('mkdocseditor.user')!).id as string,
+    )
+
+    // the own join link turns it on
+    const other = await userPage(browser, USERS.alice)
+    await other.goto(`/join/${id}?from=${from}`)
+    await expect(other.getByTestId('following')).toBeVisible({ timeout: 15_000 })
+    await expect(other.getByText('Zeile 300', { exact: true })).toBeInViewport()
+    await device.keyboard.press('ControlOrMeta+Home')
+    await expect(other.getByText('Zeile 1', { exact: true })).toBeInViewport()
+
+    // and so does the own avatar
+    await other.getByTestId('following').getByRole('button').click()
+    await expect(other.getByTestId('following')).toBeHidden()
+    await other.getByTestId('online-user').click()
+    await expect(other.getByTestId('following')).toBeVisible()
+
+    // the other device goes away: following stays on its ghost, and goes on when it is back
+    await device.locator('.cm-content').click()
+    await device.keyboard.press('ControlOrMeta+End')
+    await expect(other.getByText('Zeile 300', { exact: true })).toBeInViewport()
+    await device.context().close()
+    await expect(other.locator('.cm-remote-caret--ghost')).toBeVisible()
+    await expect(other.getByTestId('following')).toBeVisible()
+    await expect(other.getByTestId('online-user')).toHaveCount(0)
+
+    const back = await userPage(browser, USERS.alice)
+    await openEditor(back, id)
+    await expect(other.getByTestId('online-user')).toHaveCount(1)
+    await expect(other.locator('.cm-remote-caret--ghost')).toHaveCount(0)
+    await back.locator('.cm-content').click()
+    await back.keyboard.press('ControlOrMeta+Home')
+    await expect(other.getByText('Zeile 1', { exact: true })).toBeInViewport()
+    await expect(other.getByTestId('following')).toBeVisible()
+  })
+
+  test('shows no ghost of the own previous connection after a reload', async ({
+    browser,
+  }, testInfo) => {
+    await requireJoinPresence()
+    const id = await createDocument(`Follow reload ${testInfo.project.name} ${testInfo.retry}`)
+    const page = await userPage(browser, USERS.alice)
+    await openEditor(page, id)
+    await page.locator('.cm-content').click()
+    await page.keyboard.insertText('Text')
+    await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
+
+    await page.reload()
+    await expect(page.locator('.cm-content')).toBeVisible()
+    await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
+    await expect(page.locator('.cm-remote-caret')).toHaveCount(0)
+    await expect(page.getByTestId('online-user')).toHaveCount(0)
+  })
+
   test('stays on the ghost of a user who has left', async ({ browser }, testInfo) => {
     await requireJoinPresence()
     const id = await createDocument(`Follow ghost ${testInfo.project.name} ${testInfo.retry}`)
