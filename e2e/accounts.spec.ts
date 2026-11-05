@@ -11,6 +11,7 @@ import {
   devicePage,
   fieldValue,
   logout,
+  openAdminUsers,
   requireEndpoints,
   uniqueUsername,
 } from './accounts'
@@ -413,7 +414,7 @@ test.describe('accounts', () => {
     const oldDevice = await devicePage(browser, testInfo, user)
 
     const admin = await devicePage(browser, testInfo, ADMIN)
-    await accountMenu(admin, 'menu-admin')
+    await openAdminUsers(admin)
     const row = admin.getByTestId(`user-${user.username}`)
     // A click that lands while the menu is still opening does nothing, so try again.
     await expect(async () => {
@@ -458,7 +459,7 @@ test.describe('accounts', () => {
     const user = await createAccount(uniqueUsername('demoted', testInfo), 'editor')
     const userPage = await devicePage(browser, testInfo, user)
     const admin = await devicePage(browser, testInfo, ADMIN)
-    await accountMenu(admin, 'menu-admin')
+    await openAdminUsers(admin)
     const row = admin.getByTestId(`user-${user.username}`)
     await row.getByTestId('user-role').click()
     await admin.getByRole('option', { name: 'Reader' }).click()

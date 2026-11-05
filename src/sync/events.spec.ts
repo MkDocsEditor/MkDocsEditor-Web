@@ -286,4 +286,28 @@ describe('connectEvents', () => {
       expect(fixture.sockets).toHaveLength(1)
     })
   })
+
+  it('reports the number of waiting access requests', async () => {
+    const sockets: FakeSocket[] = []
+    const onAccessRequests = vi.fn()
+    const connection = connectEvents({
+      wsTicket: async () => ({ ticket: 't' }),
+      wsUrl: (path) => `ws://b${path}`,
+      createSocket: (url) => {
+        const socket = new FakeSocket(url)
+        sockets.push(socket)
+        return socket
+      },
+      clientName: 'test',
+      onTreeChanged: vi.fn(),
+      onOnline: vi.fn(),
+      onAccessRequests,
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    sockets[0]!.open()
+    sockets[0]!.receive({ type: 'access-requests', pending: 2 })
+    sockets[0]!.receive({ type: 'access-requests' })
+    expect(onAccessRequests.mock.calls).toEqual([[2]])
+    connection.close()
+  })
 })

@@ -334,7 +334,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         presence.update(message)
         break
       case 'presence-snapshot':
-        presence.replaceAll(message.peers ?? [])
+        presence.replaceAll(message.peers ?? [], message.lastPositions ?? [])
         break
       case 'presence-leave':
         presence.remove(message.clientId)
@@ -558,6 +558,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   return {
     status,
     peers: presence.peers,
+    lastPositionOf: presence.lastPositionOf,
     authorship: authors.authorship,
     me,
     ready,

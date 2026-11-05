@@ -9,10 +9,20 @@ import type { SessionUser } from './session'
 
 export interface PresenceInfo {
   clientId: string
+  /** The stable id of the account; absent on older servers. */
+  accountId?: string
   username: string
   displayName?: string
   color?: string
   actorId?: string
+  /** Stamped by the server: the last presence message of this connection, or when it connected. */
+  lastActiveAt?: string
+  selections?: { anchor: string; head: string }[]
+}
+
+/** Where an account's cursor was last in this document, also if it is offline now. */
+export interface LastPosition {
+  accountId: string
   selections?: { anchor: string; head: string }[]
 }
 
@@ -27,7 +37,7 @@ export type ServerMessage =
     }
   | { type: 'sync-request'; syncMessage?: string }
   | ({ type: 'presence' } & PresenceInfo)
-  | { type: 'presence-snapshot'; peers?: PresenceInfo[] }
+  | { type: 'presence-snapshot'; peers?: PresenceInfo[]; lastPositions?: LastPosition[] }
   | { type: 'presence-leave'; clientId: string }
   | ({ type: 'actor' } & ActorInfo)
   | { type: 'document-renamed'; newDocumentId?: string }

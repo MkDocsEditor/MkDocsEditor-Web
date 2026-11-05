@@ -12,6 +12,8 @@ export interface Notification {
   color: 'success' | 'error' | 'info' | 'warning'
   /** Offered as a button. */
   retry?: () => void
+  /** Offered as a button with its own label. */
+  action?: { label: string; run: () => void }
 }
 
 /** Human readable message for an error; a string is such a message already. */
@@ -36,6 +38,9 @@ export const useNotifyStore = defineStore('notify', () => {
     queue,
     push,
     success: (text: string) => push(text, 'success'),
+    withAction: (text: string, label: string, run: () => void) => {
+      queue.value.push({ id: nextId++, text, color: 'info', action: { label, run } })
+    },
     /**
      * `retry` is only offered if trying again can work. Closing the step-up dialog is no failure,
      * so it shows nothing.

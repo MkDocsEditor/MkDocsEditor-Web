@@ -1,4 +1,6 @@
 import type {
+  AccessRequest,
+  AccessRequestStatus,
   AccountInfo,
   AccountPatch,
   AdminUser,
@@ -6,6 +8,7 @@ import type {
   AuditPage,
   AuditQuery,
   AuthStatus,
+  CreatedAccessRequest,
   CreatedDeviceLink,
   CreatedLink,
   DeviceLink,
@@ -112,6 +115,21 @@ export class AuthApi {
       { ceremonyId, credential, passkeyName, ...COOKIE },
       true,
     )
+  }
+
+  createAccessRequest(request: {
+    name: string
+    message?: string
+    documentId?: string
+    invitedBy?: string
+  }): Promise<CreatedAccessRequest> {
+    return this.send('POST', '/auth/access-requests', request, true)
+  }
+
+  accessRequestStatus(
+    token: string,
+  ): Promise<{ status: AccessRequestStatus; inviteToken?: string }> {
+    return this.send('POST', '/auth/access-requests/status', { token }, true)
   }
 
   // session
@@ -255,6 +273,26 @@ export class AuthApi {
 
   revokeInvite(id: string): Promise<void> {
     return this.del(urlPath`/admin/invites/${id}`)
+  }
+
+  accessRequests(status?: AccessRequestStatus): Promise<AccessRequest[]> {
+    return this.get(`/admin/access-requests${status ? `?status=${status}` : ''}`)
+  }
+
+  async approveAccessRequest(
+    id: string,
+    options: { role: Role; expiresInHours?: number },
+  ): Promise<CreatedLink> {
+    const approved = await this.send<{ invite: LinkInfo; token: string; url: string | null }>(
+      'POST',
+      urlPath`/admin/access-requests/${id}/approve`,
+      options,
+    )
+    return { link: approved.invite, token: approved.token, url: approved.url }
+  }
+
+  rejectAccessRequest(id: string): Promise<void> {
+    return this.send('POST', urlPath`/admin/access-requests/${id}/reject`)
   }
 
   resetLinks(): Promise<LinkInfo[]> {

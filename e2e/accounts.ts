@@ -49,6 +49,12 @@ export async function accountMenu(
   await page.getByTestId(entry).click()
 }
 
+/** The list of users. The menu leads to the access requests while some are waiting. */
+export async function openAdminUsers(page: Page): Promise<void> {
+  await accountMenu(page, 'menu-admin')
+  await page.getByRole('tab', { name: 'Users' }).click()
+}
+
 export async function logout(page: Page): Promise<void> {
   await accountMenu(page, 'menu-logout')
   await expect(page).toHaveURL(/\/login/)

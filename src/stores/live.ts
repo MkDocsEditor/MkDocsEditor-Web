@@ -15,6 +15,8 @@ export const useLiveStore = defineStore('live', () => {
   const online = shallowRef<Map<string, OnlineUser[]>>(new Map())
   /** The connection worked and is gone; the tree may be out of date until it is back. */
   const connectionLost = ref(false)
+  /** Access requests that wait for an admin. */
+  const pendingAccessRequests = ref(0)
   let connection: EventsConnection | null = null
   let reloadRunning = false
   let reloadAgain = false
@@ -63,6 +65,7 @@ export const useLiveStore = defineStore('live', () => {
       onTreeChanged: () => void reloadTree(),
       onItemsMoved: itemsMoved,
       onOnline: (documents) => (online.value = documents),
+      onAccessRequests: (pending) => (pendingAccessRequests.value = pending),
       onConnectionChanged: (connected) => (connectionLost.value = !connected),
       onUnauthorized: options.onUnauthorized,
     })
@@ -73,11 +76,21 @@ export const useLiveStore = defineStore('live', () => {
     connection = null
     online.value = new Map()
     connectionLost.value = false
+    pendingAccessRequests.value = 0
   }
 
   function usersOf(documentId: string): OnlineUser[] {
     return online.value.get(documentId) ?? []
   }
 
-  return { online, connectionLost, start, stop, usersOf, reloadTree, onItemsMoved }
+  return {
+    online,
+    connectionLost,
+    pendingAccessRequests,
+    start,
+    stop,
+    usersOf,
+    reloadTree,
+    onItemsMoved,
+  }
 })

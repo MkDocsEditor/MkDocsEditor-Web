@@ -28,6 +28,7 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
 
   const session: DocumentSession = {
     status,
+    lastPositionOf: () => null,
     peers,
     authorship,
     me,

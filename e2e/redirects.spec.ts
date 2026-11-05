@@ -68,10 +68,12 @@ test('offline edits of a closed page reach it after it moved', async ({
   await expect(page.getByTestId('connection-state')).toHaveAttribute('title', /Offline/, {
     timeout: 20_000,
   })
+  // before the edit: on a slow machine the copy is written before typing has returned
+  const beforeEdit = await browserNow(page)
   await typeAt(page, 'end', ' Offline.')
   // leave the page while offline; the copy stays in IndexedDB (written 300 ms after the last
   // change, or when the page is hidden)
-  await storedCopyWritten(page, doc.id, await browserNow(page))
+  await storedCopyWritten(page, doc.id, beforeEdit)
   await page.close()
 
   const renamed = await rename('document', doc.id, 'Neu')

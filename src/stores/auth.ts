@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import { ApiError, setSessionEndedHandler, useApi, useAuthApi } from '@/api'
 import type { AuthStatus, UserInfo, WhoAmI } from '@/api'
+import { clearJoinTarget } from '@/services/join'
 import { clearResourceUrls } from '@/services/resourceUrls'
 import { local, readJson, remove, session, writeJson } from '@/services/storage'
 
@@ -142,6 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
       // offline or already signed out: forget it locally anyway
     }
     clearLocal()
+    clearJoinTarget()
     anonymous.value = false
     sessionEnded.value = false
     checked.value = false
