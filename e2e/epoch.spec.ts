@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test'
 import { backendBinary, createWiki, startBackend, TMP, writeConfig } from './backend'
 import type { RunningBackend } from './backend'
 import { bearerToken, editorText, forgetBearer, login, typeAt } from './helpers'
-import { USERS } from './ports'
+import { extraBackendPort, USERS } from './ports'
 
 /**
  * The server loses its saved Automerge state (new epoch) while a client has unsynced offline
@@ -17,7 +17,7 @@ test('offline edits survive a server that lost its state (new epoch)', async ({
   browser,
 }, testInfo) => {
   test.setTimeout(120_000)
-  const port = 17420 + testInfo.parallelIndex + (testInfo.project.name === 'phone' ? 5 : 0)
+  const port = extraBackendPort()
   const workDir = path.join(TMP, `epoch-${testInfo.project.name}`)
   rmSync(workDir, { recursive: true, force: true })
   mkdirSync(workDir, { recursive: true })

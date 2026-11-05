@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
 import { createFetchMock, json } from '@/test/fetchMock'
@@ -9,7 +9,6 @@ import { useLiveStore } from './live'
 
 describe('live store', () => {
   beforeEach(() => setActivePinia(createPinia()))
-  afterEach(() => setApiClient(null))
 
   it('runs one more reload for changes that arrive during a reload', async () => {
     let release!: () => void

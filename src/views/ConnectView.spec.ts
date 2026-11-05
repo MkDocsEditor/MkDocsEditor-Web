@@ -28,8 +28,6 @@ const payload = encodeConnectPayload({
 })
 
 describe('ConnectView', () => {
-  afterEach(() => setApiClient(null))
-
   it('offers the app, the install steps and the link, without any request', async () => {
     const mock = createFetchMock({})
     setApiClient(new ApiClient({ baseUrl: 'http://backend', fetchFn: mock.fetchFn }))
@@ -84,7 +82,6 @@ describe('ConnectView', () => {
 describe('WelcomeView', () => {
   beforeEach(() => localStorage.clear())
   afterEach(() => {
-    setApiClient(null)
     vi.unstubAllGlobals()
   })
 

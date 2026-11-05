@@ -1,5 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
 import { snoozePasskeyReminder } from '@/services/passkeyReminder'
@@ -71,7 +71,6 @@ describe('LoginView', () => {
     passkeys.getPasskey.mockClear()
     passkeys.autofill = false
   })
-  afterEach(() => setApiClient(null))
 
   it('has the autocomplete attributes password managers need', async () => {
     backend()

@@ -37,15 +37,17 @@ async function setup() {
 async function type(text: string): Promise<void> {
   const input = q('[data-testid="search-input"] input') as HTMLInputElement
   input.value = text
+  // past the debounce of the input, without waiting for it
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   input.dispatchEvent(new Event('input'))
   await flushPromises()
-  await new Promise((resolve) => setTimeout(resolve, 320))
+  vi.advanceTimersByTime(320)
+  vi.useRealTimers()
   await flushPromises()
 }
 
 describe('SearchDialog', () => {
   afterEach(() => {
-    setApiClient(null)
     localStorage.clear()
     document.body.innerHTML = ''
   })

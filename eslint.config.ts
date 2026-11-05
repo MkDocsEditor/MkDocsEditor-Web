@@ -75,6 +75,7 @@ export default defineConfigWithVueTs(
     '**/coverage/**',
     '**/playwright-report/**',
     '**/test-results/**',
+    '.claude/**',
   ]),
 
   ...pluginVue.configs['flat/recommended'],

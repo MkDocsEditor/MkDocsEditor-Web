@@ -1,3 +1,9 @@
+import { afterEach } from 'vitest'
+
+import { setApiClient } from '@/api'
+
+afterEach(() => setApiClient(null))
+
 // jsdom lacks a few browser APIs that Vuetify overlays and CodeMirror use.
 
 class ResizeObserverStub {

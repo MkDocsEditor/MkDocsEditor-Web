@@ -1,13 +1,18 @@
 /**
  * How many test workers run at once. Each has its own backend with its own wiki and users, and its
- * own port of the app, so tests of different workers cannot see each other. At most 6: the extra
- * backends of single tests start at port 17420.
+ * own port of the app, so tests of different workers cannot see each other.
  */
 export const WORKERS = Number(process.env.E2E_WORKERS ?? 4)
 
 export const backendPort = (worker: number) =>
   Number(process.env.E2E_BACKEND_PORT ?? 17414) + worker
 export const webPort = (worker: number) => Number(process.env.E2E_WEB_PORT ?? 4174) + worker
+
+/**
+ * For a test that needs a backend of its own, stopped before the test ends. One per worker: a worker
+ * runs one test at a time.
+ */
+export const extraBackendPort = () => Number(process.env.E2E_BACKEND_PORT ?? 17414) + 100 + WORKER
 
 /** The worker this code runs in. Outside of a worker (config, global setup) this is 0. */
 export const WORKER = Number(process.env.TEST_PARALLEL_INDEX ?? 0)

@@ -17,11 +17,11 @@ import {
 import { addVirtualAuthenticator, totp } from './authenticators'
 import { backendBinary, createWiki, startBackend, TMP, waitForLog, writeConfig } from './backend'
 import { backendRequest, login, skipPasskeyStep } from './helpers'
-import { BACKEND_URL, BROWSER_BACKEND_URL, WEB_PORT } from './ports'
+import { BACKEND_URL, BROWSER_BACKEND_URL, extraBackendPort, WEB_PORT } from './ports'
 
 test.describe('accounts', () => {
   test('the setup link creates the first admin', async ({ browser }, testInfo) => {
-    const port = 17440 + (testInfo.project.name === 'phone' ? 1 : 0)
+    const port = extraBackendPort()
     const workDir = path.join(TMP, `setup-${testInfo.project.name}`)
     rmSync(workDir, { recursive: true, force: true })
     mkdirSync(workDir, { recursive: true })
@@ -522,7 +522,7 @@ test.describe('accounts', () => {
 })
 
 test('too many attempts are slowed down with a clear message', async ({ browser }, testInfo) => {
-  const port = 17442 + (testInfo.project.name === 'phone' ? 1 : 0)
+  const port = extraBackendPort()
   const workDir = path.join(TMP, `ratelimit-${testInfo.project.name}`)
   rmSync(workDir, { recursive: true, force: true })
   mkdirSync(workDir, { recursive: true })

@@ -1,5 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { reactive } from 'vue'
 
 import { ApiClient, setApiClient } from '@/api'
@@ -28,8 +28,6 @@ const names = (wrapper: Awaited<ReturnType<typeof setup>>['wrapper'], testid: st
   wrapper.findAll(`[data-testid="${testid}"]`).map((e) => e.find('.v-list-item-title').text())
 
 describe('TreeBrowser', () => {
-  afterEach(() => setApiClient(null))
-
   it('lists a folder, opens folders and picks other items', async () => {
     const { wrapper, props, picked } = await setup()
     expect(wrapper.find('[data-testid="browser-current"]').text()).toBe('Kuchen')

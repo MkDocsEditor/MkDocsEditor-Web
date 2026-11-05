@@ -37,7 +37,6 @@ const ref = (type: string, id: string) => ({ type, id, path: `x/${id}`, name: id
 
 describe('redirects', () => {
   afterEach(() => {
-    setApiClient(null)
     resetRescued()
   })
 
