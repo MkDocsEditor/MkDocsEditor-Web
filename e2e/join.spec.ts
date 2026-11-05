@@ -53,9 +53,10 @@ test.describe('join links', () => {
     )
     await login(page, USERS.bob)
     await page.goto(link)
-    await expect(page.locator('.cm-activeLine')).toContainText('Zeile 150', { timeout: 15_000 })
-    await expect(page.locator('.cm-activeLine')).toBeInViewport()
-    await expect(page.locator('.cm-content')).toBeFocused()
+    await expect(page.getByTestId('following')).toBeVisible({ timeout: 15_000 })
+    // not line 150 itself: the cursor of the sender splits its text
+    await expect(page.getByText('Zeile 149', { exact: true })).toBeInViewport()
+    await expect(page.locator('.cm-remote-caret')).toBeInViewport()
     expect(new URL(page.url()).search).toBe('')
     const stored = await page.evaluate(() => localStorage.getItem('mkdocseditor.documentMode'))
     expect(stored).toBe(JSON.stringify('preview'))
@@ -63,7 +64,7 @@ test.describe('join links', () => {
     // readers follow too, in a read-only editor
     const reader = await userPage(browser, USERS.carol)
     await reader.goto(link)
-    await expect(reader.locator('.cm-activeLine')).toContainText('Zeile 150', { timeout: 15_000 })
+    await expect(reader.getByText('Zeile 149', { exact: true })).toBeInViewport({ timeout: 15_000 })
     await expect(reader.locator('.cm-content')).toHaveAttribute('contenteditable', 'false')
   })
 
@@ -80,7 +81,7 @@ test.describe('join links', () => {
     const page = await userPage(browser, USERS.bob)
     await expect(async () => {
       await page.goto(`/join/${id}?from=${from}`)
-      await expect(page.locator('.cm-activeLine')).toContainText('Zeile 150', { timeout: 3000 })
+      await expect(page.getByText('Zeile 149', { exact: true })).toBeInViewport({ timeout: 3000 })
     }).toPass({ timeout: 30_000 })
   })
 

@@ -3,10 +3,12 @@ import { ref, shallowRef } from 'vue'
 import type {
   AuthorRun,
   DocumentSession,
+  Ghost,
   Peer,
   SessionStatus,
   SessionUser,
   TextChange,
+  TextRange,
   TextSelection,
 } from '@/sync/session'
 import { applyChanges } from '@/sync/session'
@@ -17,12 +19,15 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
   const listeners = new Set<(changes: readonly TextChange[]) => void>()
   const localChanges: TextChange[][] = []
   const selections: TextSelection[][] = []
+  const viewports: (TextRange | null)[] = []
   const status = ref<SessionStatus>({
     connection: 'online',
     readOnly: options.readOnly ?? false,
     unsynced: false,
   })
   const peers = shallowRef<Peer[]>([])
+  const ghosts = shallowRef<Ghost[]>([])
+  const presenceKnown = ref(true)
   const authorship = shallowRef<AuthorRun[]>([])
   const me = shallowRef<SessionUser | null>({ username: 'me', displayName: 'Ich', color: '#000' })
 
@@ -30,6 +35,8 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     status,
     lastPositionOf: () => null,
     peers,
+    ghosts,
+    presenceKnown,
     authorship,
     me,
     ready: Promise.resolve(),
@@ -40,6 +47,9 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     },
     setLocalSelections(s) {
       selections.push([...s])
+    },
+    setLocalViewport(viewport) {
+      viewports.push(viewport)
     },
     onRemoteChanges(listener) {
       listeners.add(listener)
@@ -52,6 +62,7 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     session,
     localChanges,
     selections,
+    viewports,
     get text() {
       return text
     },

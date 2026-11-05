@@ -7,6 +7,12 @@ import type { SessionUser } from './session'
  * fields are optional where the session has a fallback for older or incomplete answers.
  */
 
+/** Two cursors in the format of selections: the first and the last visible character. */
+export interface ViewportInfo {
+  top: string
+  bottom: string
+}
+
 export interface PresenceInfo {
   clientId: string
   /** The stable id of the account; absent on older servers. */
@@ -18,12 +24,28 @@ export interface PresenceInfo {
   /** Stamped by the server: the last presence message of this connection, or when it connected. */
   lastActiveAt?: string
   selections?: { anchor: string; head: string }[]
+  viewport?: ViewportInfo
 }
 
-/** Where an account's cursor was last in this document, also if it is offline now. */
+/** Where an account was last in this document, also if it is offline now. */
 export interface LastPosition {
   accountId: string
+  username?: string
+  displayName?: string
+  color?: string
   selections?: { anchor: string; head: string }[]
+  viewport?: ViewportInfo
+  /** How much longer the account stays as a ghost; only while it is one. */
+  ghostMs?: number
+}
+
+/** The last connection of an account left. Without `ghostMs` there is no ghost. */
+export interface PresenceLeave {
+  clientId: string
+  accountId?: string
+  selections?: { anchor: string; head: string }[]
+  viewport?: ViewportInfo
+  ghostMs?: number
 }
 
 export type ServerMessage =
@@ -38,7 +60,7 @@ export type ServerMessage =
   | { type: 'sync-request'; syncMessage?: string }
   | ({ type: 'presence' } & PresenceInfo)
   | { type: 'presence-snapshot'; peers?: PresenceInfo[]; lastPositions?: LastPosition[] }
-  | { type: 'presence-leave'; clientId: string }
+  | ({ type: 'presence-leave' } & PresenceLeave)
   | ({ type: 'actor' } & ActorInfo)
   | { type: 'document-renamed'; newDocumentId?: string }
   | { type: 'document-deleted' }

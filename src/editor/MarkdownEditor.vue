@@ -18,13 +18,14 @@ import type { DocumentSession } from '@/sync/session'
 
 import { authorship, setAuthorship } from './authorship'
 import type { AuthorHighlightMode } from './authorship'
-import { sessionBinding } from './binding'
+import { isLocalEdit, sessionBinding } from './binding'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { formattingKeymap } from './formatting'
 import type { FormatName } from './formatting'
 import { remoteCursors, setPeers } from './remoteCursors'
 import { fileUpload } from './upload'
 import type { UploadFiles } from './upload'
+import { createViewportPublisher } from './viewportPublisher'
 
 const props = defineProps<{
   session: DocumentSession
@@ -35,18 +36,23 @@ const props = defineProps<{
   lineNumbers?: boolean
   /** Replaces formatting shortcuts, for example Ctrl+K with the link picker. */
   formatOverride?: Partial<Record<FormatName, () => boolean>>
+  /** Whether the pane of the editor is on screen, which followers of this user need to know. */
+  shown?: boolean
 }>()
 const emit = defineEmits<{
   /** The first visible source line (0-based), for scrolling the preview along. */
   topLine: [line: number]
   /** The text changed (local or remote edit). */
   change: [text: string]
+  /** This user changed the text. */
+  localEdit: []
 }>()
 
 const host = ref<HTMLElement | null>(null)
 const readOnly = new Compartment()
 const gutter = new Compartment()
 let view: EditorView | null = null
+let viewportPublisher: ReturnType<typeof createViewportPublisher> | null = null
 
 function readOnlyExtensions(value: boolean) {
   return [EditorState.readOnly.of(value), EditorView.editable.of(!value)]
@@ -86,17 +92,22 @@ onMounted(() => {
       props.upload ? fileUpload(props.upload) : [],
       EditorView.updateListener.of((update) => {
         if (update.docChanged) emit('change', update.state.doc.toString())
+        if (update.transactions.some(isLocalEdit)) emit('localEdit')
+        if (update.docChanged || update.geometryChanged) viewportPublisher?.publish()
       }),
     ],
   })
   view = new EditorView({ state, parent: host.value! })
   view.scrollDOM.addEventListener('scroll', emitTopLine, { passive: true })
+  viewportPublisher = createViewportPublisher(view, props.session)
+  viewportPublisher.publish()
   pushPeers()
   pushAuthorship()
 })
 
 function pushPeers(): void {
-  view?.dispatch({ effects: setPeers.of(props.session.peers.value) })
+  const ghosts = props.session.ghosts.value.map((ghost) => ({ ...ghost, ghost: true }))
+  view?.dispatch({ effects: setPeers.of([...props.session.peers.value, ...ghosts]) })
 }
 
 function pushAuthorship(): void {
@@ -108,7 +119,12 @@ function pushAuthorship(): void {
   })
 }
 
-watch(() => props.session.peers.value, pushPeers)
+watch([() => props.session.peers.value, () => props.session.ghosts.value], pushPeers)
+watch(
+  () => props.shown,
+  () => viewportPublisher?.publish(),
+  { flush: 'post' },
+)
 watch([() => props.session.authorship.value, () => props.authorHighlight], pushAuthorship)
 watch(
   () => props.lineNumbers,
@@ -120,6 +136,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  viewportPublisher?.destroy()
+  viewportPublisher = null
   view?.destroy()
   view = null
 })

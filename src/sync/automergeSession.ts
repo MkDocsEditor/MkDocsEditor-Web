@@ -337,7 +337,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         presence.replaceAll(message.peers ?? [], message.lastPositions ?? [])
         break
       case 'presence-leave':
-        presence.remove(message.clientId)
+        presence.remove(message)
         break
       case 'actor':
         authors.rememberUser(message)
@@ -558,6 +558,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   return {
     status,
     peers: presence.peers,
+    ghosts: presence.ghosts,
+    presenceKnown: presence.known,
     lastPositionOf: presence.lastPositionOf,
     authorship: authors.authorship,
     me,
@@ -578,6 +580,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       connection.check(false)
     },
     setLocalSelections: presence.setLocalSelections,
+    setLocalViewport: presence.setLocalViewport,
     onRemoteChanges(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)

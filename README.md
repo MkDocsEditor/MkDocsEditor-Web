@@ -18,8 +18,9 @@ together, in real time, from a phone or a desktop browser. It talks to the
 - New accounts by invite link only; the first admin comes from a one-time setup link. A
   forgotten password is reset with a single-use link from an admin. No email needed.
 - Share a page with a link (`/join/{id}?from={account}`). It holds no secret and grants nothing: it
-  opens the editor at the sender's position, or where the sender was last. Someone without an
-  account can sign in or ask for access, and an admin decides under Admin → Requests.
+  follows a sender who is still there, and otherwise opens the editor where the sender was last.
+  Someone without an account can sign in or ask for access, and an admin decides under
+  Admin → Requests.
 - Account page: profile and colour, password, authenticator app, recovery codes, passkeys,
   and the signed-in devices (sign out one or all others).
 - Connect the Android app: Account → Devices creates a single-use link (5 minutes), shown as
@@ -35,6 +36,10 @@ together, in real time, from a phone or a desktop browser. It talks to the
 - Edit together in real time: the Markdown editor (CodeMirror 6) syncs with
   [Automerge](https://automerge.org). Everyone sees the others' cursors and selections with
   names and colours, plus a list of who is online.
+- Follow someone by clicking their avatar: the editor stays on what they are looking at, without
+  moving your cursor. Scrolling pauses it for 5 seconds, and for up to 40 seconds if you scroll again
+  right after it resumed. Typing ends it. A user who leaves stays as a faint cursor for as long as
+  the server says (60 seconds), and following ends when that is gone.
 - Editing works offline. Changes are kept in the browser and merged after the reconnect, even
   when the server lost its state meanwhile. The connection state is always visible, and text
   is never thrown away silently. Each account has its own local copies, so unsynced edits only

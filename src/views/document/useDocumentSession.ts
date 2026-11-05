@@ -49,15 +49,21 @@ export function useDocumentSession(id: () => string, onRenamed: (newId: string) 
 
   const status = computed(() => session.value?.status.value)
   const peers = computed(() => session.value?.peers.value ?? [])
+  const ghosts = computed(() => session.value?.ghosts.value ?? [])
+  const presenceKnown = computed(() => session.value?.presenceKnown.value ?? false)
   /** Online users: distinct usernames (one user can have several tabs or devices). */
   const onlineUsers = computed(() => {
-    const seen = new Map<string, { name: string; color: string }>()
+    const seen = new Map<string, { name: string; color: string; accountId?: string }>()
     for (const peer of peers.value) {
       if (!seen.has(peer.username))
-        seen.set(peer.username, { name: peer.displayName || peer.username, color: peer.color })
+        seen.set(peer.username, {
+          name: peer.displayName || peer.username,
+          color: peer.color,
+          accountId: peer.accountId,
+        })
     }
     return [...seen.values()]
   })
 
-  return { session, text, ready, status, peers, onlineUsers }
+  return { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers }
 }
