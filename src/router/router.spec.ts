@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createMemoryHistory } from 'vue-router'
 
 import { ApiClient, setApiClient } from '@/api'
@@ -23,7 +23,6 @@ describe('router guard', () => {
     localStorage.clear()
     setActivePinia(createPinia())
   })
-  afterEach(() => setApiClient(null))
 
   it('sends logged-out users to the login page and keeps the target', async () => {
     backend(null)

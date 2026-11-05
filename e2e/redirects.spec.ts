@@ -9,6 +9,7 @@ import {
   testName,
   typeAt,
 } from './helpers'
+import { browserNow, storedCopyWritten } from './storedCopies'
 
 type Item = { id: string; name: string }
 
@@ -70,7 +71,7 @@ test('offline edits of a closed page reach it after it moved', async ({
   await typeAt(page, 'end', ' Offline.')
   // leave the page while offline; the copy stays in IndexedDB (written 300 ms after the last
   // change, or when the page is hidden)
-  await page.waitForTimeout(1000)
+  await storedCopyWritten(page, doc.id, await browserNow(page))
   await page.close()
 
   const renamed = await rename('document', doc.id, 'Neu')

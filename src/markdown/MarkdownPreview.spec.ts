@@ -1,5 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
 import { useTreeStore } from '@/stores/tree'
@@ -25,8 +25,6 @@ async function setup(text: string) {
 }
 
 describe('MarkdownPreview', () => {
-  afterEach(() => setApiClient(null))
-
   it('loads relative images from resources with auth', async () => {
     const { wrapper } = await setup('![Logo](../../logo.png)')
     await flushPromises()

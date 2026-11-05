@@ -35,7 +35,6 @@ async function setup(id: string) {
 
 describe('ResourceView', () => {
   afterEach(() => {
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 

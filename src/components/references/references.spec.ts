@@ -1,5 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
 import type { Backlink, ItemRef } from '@/api'
@@ -53,8 +53,6 @@ describe('backlink helpers', () => {
 })
 
 describe('BacklinksList', () => {
-  afterEach(() => setApiClient(null))
-
   it('lists the pages that link to an item, opening them at the line', async () => {
     const mock = createFetchMock({
       'GET /section/s-kuchen/backlinks/': () =>
@@ -86,8 +84,6 @@ describe('BacklinksList', () => {
 })
 
 describe('ReferencesView', () => {
-  afterEach(() => setApiClient(null))
-
   it('lists broken links with fixes and unused files', async () => {
     const mock = createFetchMock({
       'GET /section/': () => json(sampleTree()),

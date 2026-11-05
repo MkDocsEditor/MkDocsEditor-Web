@@ -1,5 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { nextTick, reactive } from 'vue'
 
 import { ApiClient, setApiClient } from '@/api'
@@ -26,8 +26,6 @@ async function setup(text: string, props = reactive({ text, documentId: 'd-apfel
 }
 
 describe('ResourcesPanel', () => {
-  afterEach(() => setApiClient(null))
-
   it('lists used files, missing ones and the rest of the folder', async () => {
     const { wrapper } = await setup(
       '![a](apfel.png)\n\n![again](./apfel.png)\n\n[weg](fehlt.pdf) [page](../Kürbissuppe.md)',

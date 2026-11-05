@@ -1,5 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
 import { passkeyReminderDue } from '@/services/passkeyReminder'
@@ -54,7 +54,6 @@ describe('LinkView', () => {
     localStorage.clear()
     passkeys.createPasskey.mockClear()
   })
-  afterEach(() => setApiClient(null))
 
   it('reads the token from the fragment, removes it from the address and shows the invite', async () => {
     const mock = backend({ 'POST /auth/link/inspect/': () => json(invite) })

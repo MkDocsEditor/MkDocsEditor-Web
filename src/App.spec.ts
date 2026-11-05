@@ -21,7 +21,6 @@ function signedIn(overrides: Parameters<typeof user>[0] = {}, routes = {}) {
 
 describe('App', () => {
   afterEach(() => {
-    setApiClient(null)
     localStorage.clear()
   })
 

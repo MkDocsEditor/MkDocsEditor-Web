@@ -74,7 +74,6 @@ async function setup(
 
 describe('LinkPickerDialog', () => {
   afterEach(() => {
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 
@@ -124,7 +123,6 @@ describe('LinkPickerDialog', () => {
 
 describe('ResourcePickerDialog', () => {
   afterEach(() => {
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 

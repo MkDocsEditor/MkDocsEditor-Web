@@ -16,3 +16,4 @@ e2e/.tmp/
 public/config.json
 dist-e2e
 dist-preview
+.claude/worktrees/

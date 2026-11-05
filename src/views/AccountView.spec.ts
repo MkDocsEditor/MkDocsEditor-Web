@@ -262,7 +262,6 @@ describe('AccountView', () => {
     passkeys.getPasskey.mockClear()
   })
   afterEach(() => {
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 

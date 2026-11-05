@@ -227,7 +227,7 @@ of the app: the first worker uses the ports above, the next one `17415` and `417
 | `E2E_BACKEND_LOG`  |                    | Write the logs of the backends to this file                 |
 | `E2E_BACKEND_PORT` | `17414`            | Port of the test backend of the first worker                |
 | `E2E_WEB_PORT`     | `4174`             | Port of the app under test of the first worker              |
-| `E2E_WORKERS`      | `4`                | How many workers run at once, at most 6                     |
+| `E2E_WORKERS`      | `4`                | How many workers run at once                                |
 
 CI runs the same tests against the backend's `master`.
 

@@ -5,18 +5,15 @@ import {
   backendRequest,
   createDocument,
   documentContent,
-  dropDocumentSocket,
   editorText,
-  installBackgroundTab,
   login,
   openEditor,
-  setBackground,
   testName,
-  trackSockets,
   typeAt,
   userPage,
 } from './helpers'
 import { USERS } from './ports'
+import { dropDocumentSocket, installBackgroundTab, setBackground, trackSockets } from './tabs'
 
 test.describe('a tab in the background', () => {
   test('stays connected and receives edits right away', async ({ browser }, testInfo) => {

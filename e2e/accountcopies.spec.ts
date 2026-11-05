@@ -5,19 +5,23 @@ import { logout } from './accounts'
 import {
   authorOf,
   backendRequest,
-  blockableDocumentSockets,
   createDocument,
   documentContent,
   editorText,
   login,
-  makeStoredCopyOwnerless,
   openEditor,
-  storedCopyKeys,
   testName,
   typeAt,
   userPage,
 } from './helpers'
 import { USERS } from './ports'
+import {
+  browserNow,
+  makeStoredCopyOwnerless,
+  storedCopyKeys,
+  storedCopyWritten,
+} from './storedCopies'
+import { blockableDocumentSockets } from './tabs'
 
 const OFFLINE = ' Von Alice offline.'
 
@@ -35,9 +39,10 @@ async function aliceLeavesUnsyncedEdits(page: Page, id: string) {
     'title',
     'Offline – changes stay here',
   )
+  const edited = await browserNow(page)
   await logout(page)
   // the copy is written when the session closes
-  await page.waitForTimeout(500)
+  await storedCopyWritten(page, id, edited)
   sockets.unblock()
 }
 

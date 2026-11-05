@@ -34,7 +34,6 @@ describe('pages store', () => {
     setActivePinia(createPinia())
     await wikiCopy().clear()
   })
-  afterEach(() => setApiClient(null))
 
   it('fetches every page once, and only changed ones afterwards', async () => {
     const { tree, contentRequests } = backend((id) => new Response(`Text von ${id}`))
@@ -155,7 +154,6 @@ describe('tree load across a sign-out', () => {
     setActivePinia(createPinia())
     await wikiCopy().clear()
   })
-  afterEach(() => setApiClient(null))
 
   it('drops a load still running, and stores nothing for the next account', async () => {
     let answer!: (response: Response) => void
@@ -184,7 +182,6 @@ describe('signing out', () => {
     await wikiCopy().clear()
   })
   afterEach(() => {
-    setApiClient(null)
     localStorage.clear()
   })
 
@@ -220,7 +217,6 @@ describe('stored tree', () => {
     setActivePinia(createPinia())
     await wikiCopy().clear()
   })
-  afterEach(() => setApiClient(null))
 
   it('takes over when the server cannot be reached, but not when it refuses', async () => {
     let answer: () => Response = () => json(sampleTree())

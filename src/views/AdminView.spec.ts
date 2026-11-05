@@ -79,7 +79,6 @@ async function chooseOption(text: string): Promise<void> {
 describe('AdminView', () => {
   beforeEach(() => localStorage.clear())
   afterEach(() => {
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 

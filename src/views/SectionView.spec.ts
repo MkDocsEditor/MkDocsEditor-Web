@@ -22,7 +22,6 @@ async function setup(id?: string, extraRoutes: Parameters<typeof createFetchMock
 
 describe('SectionView', () => {
   afterEach(() => {
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 

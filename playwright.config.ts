@@ -24,7 +24,19 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'phone', use: { ...devices['Pixel 7'] } },
+    {
+      name: 'phone',
+      use: { ...devices['Pixel 7'] },
+      // Sync does not depend on the screen, and these specs are the slowest. The web client is meant
+      // for desktops; phones have the Android app. `editing.spec.ts` keeps a smoke test here.
+      testIgnore: [
+        '**/accountcopies.spec.ts',
+        '**/collab.spec.ts',
+        '**/epoch.spec.ts',
+        '**/reconnect.spec.ts',
+        '**/redirects.spec.ts',
+      ],
+    },
   ],
   webServer: {
     command: 'node e2e/web-server.ts',

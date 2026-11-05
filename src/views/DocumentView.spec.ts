@@ -31,7 +31,6 @@ async function setup() {
 
 describe('DocumentView', () => {
   afterEach(() => {
-    setApiClient(null)
     localStorage.clear()
     fakes.length = 0
   })

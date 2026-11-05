@@ -52,7 +52,6 @@ const qa = (selector: string) => [...document.querySelectorAll(selector)]
 
 describe('HistoryDialog', () => {
   afterEach(() => {
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 

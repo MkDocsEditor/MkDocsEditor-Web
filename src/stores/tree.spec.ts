@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
 import type { SectionModel } from '@/api'
@@ -75,7 +75,6 @@ describe('tree helpers', () => {
 
 describe('tree store', () => {
   beforeEach(() => setActivePinia(createPinia()))
-  afterEach(() => setApiClient(null))
 
   function backend() {
     let tree = sampleTree()

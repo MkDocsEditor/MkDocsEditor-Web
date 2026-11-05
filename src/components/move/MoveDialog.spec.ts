@@ -90,7 +90,6 @@ async function settle() {
 describe('MoveDialog', () => {
   afterEach(() => {
     vi.useRealTimers()
-    setApiClient(null)
     document.body.innerHTML = ''
   })
 
