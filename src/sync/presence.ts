@@ -2,7 +2,7 @@ import { shallowRef } from 'vue'
 
 import { UNKNOWN_USER_COLOR } from './authors'
 import type { AmDoc, AutomergeApi } from './automerge'
-import type { PresenceInfo, SendMessage } from './protocol'
+import type { LastPosition, PresenceInfo, SendMessage } from './protocol'
 import type { Peer, TextSelection } from './session'
 
 interface PeerState {
@@ -27,6 +27,7 @@ export interface PresenceOptions {
  */
 export function createPresence(options: PresenceOptions) {
   const peers = shallowRef<Peer[]>([])
+  const lastPositions = shallowRef<readonly LastPosition[]>([])
   const states = new Map<string, PeerState>()
   let pendingSelections: readonly TextSelection[] = []
   let lastSent = 0
@@ -67,6 +68,8 @@ export function createPresence(options: PresenceOptions) {
       if (ok) state.resolved = resolved
       list.push({
         clientId: state.info.clientId,
+        accountId: state.info.accountId,
+        lastActiveAt: state.info.lastActiveAt,
         username: state.info.username,
         displayName: state.info.displayName ?? state.info.username,
         color: state.info.color ?? UNKNOWN_USER_COLOR,
@@ -99,7 +102,8 @@ export function createPresence(options: PresenceOptions) {
       resolve()
     },
     /** The complete list of peers. */
-    replaceAll(list: readonly PresenceInfo[]): void {
+    replaceAll(list: readonly PresenceInfo[], last: readonly LastPosition[] = []): void {
+      lastPositions.value = last
       states.clear()
       for (const info of list) states.set(info.clientId, { info, resolved: [] })
       resolve()
@@ -107,6 +111,16 @@ export function createPresence(options: PresenceOptions) {
     remove(clientId: string): void {
       states.delete(clientId)
       resolve()
+    },
+    /** Where the cursor of this account was last; null if unknown or not resolvable here. */
+    lastPositionOf(accountId: string): number | null {
+      const head = lastPositions.value.find((p) => p.accountId === accountId)?.selections?.[0]?.head
+      if (head === undefined || !options.doc()) return null
+      try {
+        return cursorPosition(head)
+      } catch {
+        return null // points into a change we do not have
+      }
     },
     /** The connection ended: nobody is known to be here. */
     clear(): void {

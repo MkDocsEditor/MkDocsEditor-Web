@@ -59,5 +59,5 @@ export function useDocumentSession(id: () => string, onRenamed: (newId: string) 
     return [...seen.values()]
   })
 
-  return { session, text, ready, status, onlineUsers }
+  return { session, text, ready, status, peers, onlineUsers }
 }

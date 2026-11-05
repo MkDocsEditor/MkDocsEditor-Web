@@ -29,7 +29,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
 import { usePagesStore } from '@/stores/pages'
 import { useMoveStore } from '@/stores/move'
-import { describeError } from '@/stores/notify'
+import { describeError, useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
 const auth = useAuthStore()
@@ -98,6 +98,18 @@ watch(
   { immediate: true },
 )
 onBeforeUnmount(() => live.stop())
+
+/** Access requests that wait for this admin: a badge, and a message when there are more. */
+const pendingRequests = computed(() => (auth.isAdmin ? live.pendingAccessRequests : 0))
+watch(pendingRequests, (pending, before) => {
+  if (pending <= before) return
+  if (route.name === 'admin' && route.params.tab === 'requests') return
+  useNotifyStore().withAction(
+    pending === 1 ? 'Someone asks for access.' : `${pending} access requests are waiting.`,
+    'Show',
+    () => void router.push({ name: 'admin', params: { tab: 'requests' } }),
+  )
+})
 
 const stopFollowing = live.onItemsMoved((moves) => followMovedRoute(router, moves))
 // expanded folders keep their state under their new ids
@@ -183,12 +195,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <template v-if="showShell" #append>
         <v-menu v-if="!auth.anonymous">
           <template #activator="{ props }">
-            <v-btn
-              v-bind="props"
-              :icon="mdiAccountCircle"
-              aria-label="Account"
-              data-testid="account-menu"
-            />
+            <v-badge
+              :model-value="pendingRequests > 0"
+              :content="pendingRequests"
+              color="error"
+              offset-x="8"
+              offset-y="8"
+              data-testid="access-requests-badge"
+            >
+              <v-btn
+                v-bind="props"
+                :icon="mdiAccountCircle"
+                aria-label="Account"
+                data-testid="account-menu"
+              />
+            </v-badge>
           </template>
           <v-list>
             <v-list-item
@@ -212,9 +233,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               v-if="auth.isAdmin"
               :prepend-icon="mdiShieldAccount"
               title="Admin"
-              :to="{ name: 'admin' }"
+              :to="{ name: 'admin', params: { tab: pendingRequests > 0 ? 'requests' : undefined } }"
               data-testid="menu-admin"
-            />
+            >
+              <template v-if="pendingRequests > 0" #append>
+                <v-badge inline color="error" :content="pendingRequests" />
+              </template>
+            </v-list-item>
             <v-list-item
               :prepend-icon="mdiLogout"
               title="Sign out"

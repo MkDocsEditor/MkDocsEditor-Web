@@ -161,6 +161,32 @@ export interface CreatedLink {
 
 export interface InstanceSettings {
   require2FA: boolean
+  /** People without an account may ask for an invite. Absent on older servers. */
+  accessRequestsEnabled?: boolean
+}
+
+export type AccessRequestStatus = 'pending' | 'approved' | 'rejected' | 'expired'
+
+/** `name` and `message` are untrusted plain text: show them as text only. */
+export interface AccessRequest {
+  id: string
+  name: string
+  message: string
+  status: AccessRequestStatus
+  createdAt: string
+  expiresAt: string
+  documentId: string | null
+  documentPath: string | null
+  invitedByAccountId: string | null
+  invitedByName: string | null
+}
+
+export interface CreatedAccessRequest {
+  requestId: string
+  /** Shown only once. */
+  token: string
+  status: AccessRequestStatus
+  expiresAt: string
 }
 
 export interface AuditEvent {
@@ -222,4 +248,6 @@ export interface ServerInfo {
   passkeys: { enabled: boolean; rpId?: string }
   loginMethods: string[]
   require2FA: boolean
+  /** Optional API features of this server, for example `access-requests`. */
+  features?: string[]
 }

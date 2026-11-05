@@ -51,6 +51,12 @@ export function describeAuthError(error: unknown): string | null {
       return error.retryAfter
         ? `Too many attempts. Please wait ${waitText(error.retryAfter)}.`
         : 'Too many attempts. Please wait a moment.'
+    case 'access-requests-disabled':
+      return 'This server does not accept access requests right now.'
+    case 'too-many-access-requests':
+      return 'Too many requests are waiting for an admin. Please try again later.'
+    case 'invalid-access-request':
+      return 'This access request no longer exists. Please send a new one.'
     case 'invalid-link':
       return 'This link is invalid, expired or already used. Please ask for a new one.'
     case 'invalid-username':

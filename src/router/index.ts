@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { Router, RouterHistory } from 'vue-router'
 
+import { takeJoinTarget } from '@/services/join'
 import { useAuthStore } from '@/stores/auth'
 import LinkView from '@/views/LinkView.vue'
 import LoginView from '@/views/LoginView.vue'
@@ -49,6 +50,14 @@ export function buildRouter(history: RouterHistory): Router {
         component: () => import('@/views/ConnectView.vue'),
         meta: { public: true },
       },
+      {
+        // Android App Links need exactly this path.
+        path: '/join/:id',
+        name: 'join',
+        component: () => import('@/views/JoinView.vue'),
+        props: true,
+        meta: { public: true },
+      },
       { path: '/', name: 'home', component: SectionView },
       { path: '/section/:id', name: 'section', component: SectionView, props: true },
       {
@@ -83,7 +92,7 @@ export function buildRouter(history: RouterHistory): Router {
         meta: { standalone: true },
       },
       {
-        path: '/admin/:tab(users|invites|audit|settings)?',
+        path: '/admin/:tab(users|invites|requests|audit|settings)?',
         name: 'admin',
         component: () => import('@/views/AdminView.vue'),
         props: true,
@@ -105,6 +114,11 @@ export function buildRouter(history: RouterHistory): Router {
     if (auth.secondFactorSetupRequired && !(to.name === 'account' && to.params.tab === 'security'))
       return { name: 'account', params: { tab: 'security' } }
     if (to.meta.admin && !auth.isAdmin) return { name: 'home' }
+    // A join link was opened before the sign-in, the passkey step or the invite.
+    if (to.name === 'home') {
+      const target = takeJoinTarget()
+      if (target) return target
+    }
     return true
   })
 

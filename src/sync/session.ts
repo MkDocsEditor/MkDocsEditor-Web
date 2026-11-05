@@ -40,6 +40,8 @@ export interface SessionUser {
 
 export interface Peer extends SessionUser {
   clientId: string
+  accountId?: string
+  lastActiveAt?: string
   /** Resolved to indices of the local text. Empty when the peer's editor is not focused. */
   selections: TextSelection[]
 }
@@ -76,6 +78,11 @@ export interface DocumentSession {
   getText(): string
   /** Applies edits made in the local editor. */
   applyLocalChanges(changes: readonly TextChange[]): void
+  /**
+   * Where the cursor of an account was last in this document, also if it is offline; null if
+   * unknown or not resolvable. Reactive: it changes with the presence snapshot.
+   */
+  lastPositionOf(accountId: string): number | null
   /** Publishes the local cursor and selections (empty when the editor is not focused). */
   setLocalSelections(selections: readonly TextSelection[]): void
   /** Subscribes to text changes made by others (or by a resync). Returns an unsubscribe function. */

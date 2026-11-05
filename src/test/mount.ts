@@ -22,6 +22,7 @@ const Stub = { render: () => null }
 export function stubRoutes(): RouteRecordRaw[] {
   return [
     { path: '/login', name: 'login', component: Stub, meta: { public: true } },
+    { path: '/join/:id', name: 'join', component: Stub, props: true, meta: { public: true } },
     { path: '/', name: 'home', component: Stub },
     { path: '/section/:id', name: 'section', component: Stub, props: true },
     { path: '/document/:id', name: 'document', component: Stub, props: true },

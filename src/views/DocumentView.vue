@@ -9,6 +9,7 @@ import {
   mdiOpenInNew,
   mdiImageSearchOutline,
   mdiPaperclip,
+  mdiShareVariant,
   mdiViewSplitVertical,
 } from '@mdi/js'
 import { computed, ref, watch } from 'vue'
@@ -28,11 +29,14 @@ import type { AuthorHighlightMode } from '@/editor/authorship'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { isImage, resourceKind } from '@/services/icons'
+import { copyText } from '@/services/clipboard'
+import { joinLink } from '@/services/join'
 import { linkDestination } from '@/services/linkPath'
 import { initials } from '@/services/names'
 import { useStored } from '@/composables/useStored'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
+import { useAuthStore } from '@/stores/auth'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
@@ -40,6 +44,7 @@ import { useTreeStore } from '@/stores/tree'
 import { connectionBadge } from './document/connectionBadge'
 import { useDocumentSession } from './document/useDocumentSession'
 import { useEditorInsertion } from './document/useEditorInsertion'
+import { useJoinJump } from './document/useJoinJump'
 import { useSearchText } from './document/useSearchText'
 
 const props = defineProps<{ id: string }>()
@@ -57,12 +62,16 @@ const wikiUrl = computed(() => (page.value ? wikiPageUrl(page.value.url) : null)
 
 type Mode = 'edit' | 'split' | 'preview'
 const storedMode = useStored<Mode | null>('mkdocseditor.documentMode', null)
+/** Opened through a join link: into the editor, without changing the stored choice. */
+const joined = ref(false)
 const mode = computed<Mode>({
   get: () => {
     const m = storedMode.value ?? (mobile.value ? 'preview' : 'split')
+    if (joined.value && m === 'preview') return mobile.value ? 'edit' : 'split'
     return mobile.value && m === 'split' ? 'edit' : m
   },
   set: (m) => {
+    joined.value = false
     storedMode.value = m
   },
 })
@@ -93,7 +102,7 @@ function closeFilesOnPhone(): void {
 }
 const historyOpen = ref(false)
 
-const { session, text, ready, status, onlineUsers } = useDocumentSession(
+const { session, text, ready, status, peers, onlineUsers } = useDocumentSession(
   () => props.id,
   (newId) => {
     void tree.load().catch(() => undefined)
@@ -194,6 +203,40 @@ watch(
   // after the id watcher below, so a new page's line waits for that page's text
   { flush: 'post' },
 )
+
+const auth = useAuthStore()
+const jump = useJoinJump({
+  view: editorView,
+  ready: () => ready.value,
+  peers: () => peers.value,
+  lastPosition: (accountId) => session.value?.lastPositionOf(accountId) ?? null,
+  ownAccountId: () => auth.user?.id,
+  onSenderNotFound: () => notify.push('Could not find the position of the person who invited you.'),
+})
+
+/** `?join=1&from=…`, which `/join/` leads to. Only once, so a reload opens the page normally. */
+watch(
+  () => route.query.join,
+  (join) => {
+    if (!join) return
+    joined.value = true
+    jump.start(typeof route.query.from === 'string' ? route.query.from : undefined)
+    void router.replace({ query: { ...route.query, join: undefined, from: undefined } })
+  },
+  { immediate: true },
+)
+
+/** Shares the page with a link that leads others to where this user is right now. */
+async function share(): Promise<void> {
+  const url = joinLink(props.id, auth.user?.id)
+  if (mobile.value && typeof navigator.share === 'function') {
+    await navigator.share({ title: page.value?.name, url }).catch(() => undefined)
+  } else if (await copyText(url)) {
+    notify.success('Link copied. It leads to your position on this page.')
+  } else {
+    notify.push(url, 'warning')
+  }
+}
 </script>
 
 <template>
@@ -246,6 +289,16 @@ watch(
           />
           <v-btn value="preview" :icon="mdiEyeOutline" aria-label="Preview" />
         </v-btn-toggle>
+
+        <!-- keeps the focus in the editor, because the link needs this user's cursor -->
+        <v-btn
+          :icon="mdiShareVariant"
+          aria-label="Share this page"
+          title="Share this page"
+          data-testid="share-document"
+          @mousedown.prevent
+          @click="share"
+        />
 
         <v-btn
           :icon="mdiPaperclip"

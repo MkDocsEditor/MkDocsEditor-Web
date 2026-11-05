@@ -12,19 +12,29 @@ function retry(): void {
   notify.dismiss(notification.id)
   notification.retry?.()
 }
+
+function runAction(): void {
+  const notification = current.value
+  if (!notification) return
+  notify.dismiss(notification.id)
+  notification.action?.run()
+}
 </script>
 
 <template>
   <v-snackbar
     :model-value="current !== undefined"
     :color="current?.color"
-    :timeout="current?.color === 'error' ? 8000 : 3000"
+    :timeout="current?.color === 'error' || current?.action ? 8000 : 3000"
     location="bottom"
     @update:model-value="(open: boolean) => !open && current && notify.dismiss(current.id)"
   >
     {{ current?.text }}
     <template #actions>
       <v-btn v-if="current?.retry" data-testid="notification-retry" @click="retry"> Retry </v-btn>
+      <v-btn v-if="current?.action" data-testid="notification-action" @click="runAction">
+        {{ current.action.label }}
+      </v-btn>
       <v-btn @click="current && notify.dismiss(current.id)">OK</v-btn>
     </template>
   </v-snackbar>

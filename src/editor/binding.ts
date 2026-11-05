@@ -28,8 +28,12 @@ export function fromChangeSet(set: ChangeSet): TextChange[] {
   return changes
 }
 
+/**
+ * Not `view.hasFocus`, which is also false while another window is in front: someone who shares a
+ * join link goes to a messenger, and the link has to find their cursor.
+ */
 function selectionsOf(view: EditorView): TextSelection[] {
-  if (!view.hasFocus) return []
+  if (view.root.activeElement !== view.contentDOM) return []
   return view.state.selection.ranges.map((r) => ({ anchor: r.anchor, head: r.head }))
 }
 

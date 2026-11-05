@@ -17,6 +17,9 @@ together, in real time, from a phone or a desktop browser. It talks to the
   suggestion for a few days).
 - New accounts by invite link only; the first admin comes from a one-time setup link. A
   forgotten password is reset with a single-use link from an admin. No email needed.
+- Share a page with a link (`/join/{id}?from={account}`). It holds no secret and grants nothing: it
+  opens the editor at the sender's position, or where the sender was last. Someone without an
+  account can sign in or ask for access, and an admin decides under Admin → Requests.
 - Account page: profile and colour, password, authenticator app, recovery codes, passkeys,
   and the signed-in devices (sign out one or all others).
 - Connect the Android app: Account → Devices creates a single-use link (5 minutes), shown as

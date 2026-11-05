@@ -17,6 +17,8 @@ interface EventsHandlers {
   onItemsMoved?(moves: MovedItem[]): void
   /** The complete list of open documents and their users; replaces the previous one. */
   onOnline(documents: Map<string, OnlineUser[]>): void
+  /** How many access requests wait for a decision. Only sent to admins with a session. */
+  onAccessRequests?(pending: number): void
   /** A working connection was lost, or a new one works again after that. */
   onConnectionChanged?(connected: boolean): void
   /** The connection was refused for good (bad credentials); the caller should log out. */
@@ -158,7 +160,7 @@ export function connectEvents(options: EventsOptions): EventsConnection {
   function onMessage(data: unknown): void {
     lastReceived = Date.now()
     doubted = false
-    let message: { type?: string; documents?: unknown; moves?: unknown }
+    let message: { type?: string; documents?: unknown; moves?: unknown; pending?: unknown }
     try {
       message = JSON.parse(String(data)) as typeof message
     } catch {
@@ -193,6 +195,8 @@ export function connectEvents(options: EventsOptions): EventsConnection {
         options.onConnectionChanged?.(true)
       }
       options.onOnline(map)
+    } else if (message.type === 'access-requests') {
+      if (typeof message.pending === 'number') options.onAccessRequests?.(message.pending)
     }
   }
 
