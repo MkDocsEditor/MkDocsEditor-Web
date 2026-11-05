@@ -119,6 +119,14 @@ const theme = EditorView.baseTheme({
   },
   '.cm-remote-caret--ghost': {
     opacity: GHOST_OPACITY,
+    transition: 'opacity 120ms',
+  },
+  // a faint name is hard to read: pointing at it shows it in full
+  '.cm-remote-caret--ghost:hover': {
+    opacity: '1',
+  },
+  '.cm-remote-caret--ghost .cm-remote-caret-label': {
+    pointerEvents: 'auto',
   },
   '.cm-remote-caret-label': {
     position: 'absolute',

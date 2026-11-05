@@ -1,8 +1,8 @@
 import type { EditorView } from '@codemirror/view'
-import { EditorView as CodeMirror } from '@codemirror/view'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import type { Ghost, Peer } from '@/sync'
+import { scrollToCenter } from '@/editor/scrollToCenter'
 import { followTarget, isPresent } from '@/sync/followTarget'
 import { instanceName } from '@/sync/session'
 
@@ -94,11 +94,7 @@ export function useFollow(options: {
     [middle, paused, options.view] as const,
     ([position, isPaused, view]) => {
       if (position === null || isPaused || !view) return
-      view.dispatch({
-        effects: CodeMirror.scrollIntoView(Math.min(position, view.state.doc.length), {
-          y: 'center',
-        }),
-      })
+      scrollToCenter(view, position)
     },
     { flush: 'post' },
   )
