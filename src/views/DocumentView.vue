@@ -7,6 +7,7 @@ import {
   mdiFileDocumentEditOutline,
   mdiHistory,
   mdiOpenInNew,
+  mdiPaletteOutline,
   mdiImageSearchOutline,
   mdiPaperclip,
   mdiShareVariant,
@@ -23,6 +24,7 @@ import ResourcePickerDialog from '@/components/pickers/ResourcePickerDialog.vue'
 import BacklinksList from '@/components/references/BacklinksList.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
+import CursorColorDialog from '@/editor/CursorColorDialog.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import type { AuthorHighlightMode } from '@/editor/authorship'
@@ -34,6 +36,7 @@ import { joinLink } from '@/services/join'
 import { linkDestination } from '@/services/linkPath'
 import { initials } from '@/services/names'
 import { useStored } from '@/composables/useStored'
+import { instanceColor, instanceId } from '@/sync/instance'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
 import { useAuthStore } from '@/stores/auth'
@@ -216,27 +219,25 @@ const follow = useFollow({
 })
 const { following, paused: followPaused } = follow
 
-function startFollowing(accountId: string): void {
+function startFollowing(instanceId: string): void {
   editorWanted.value = true
-  follow.start(accountId)
+  follow.start(instanceId)
 }
 
-/** The users who can be followed: everybody but this user, in another tab or on another device. */
-function canFollow(accountId: string | undefined): accountId is string {
-  return !!accountId && accountId !== auth.user?.id
-}
-
-function followLabel(user: { name: string; accountId?: string }): string {
-  return following.value?.accountId === user.accountId
+function followLabel(user: { name: string; instanceId: string }): string {
+  return following.value?.instanceId === user.instanceId
     ? `Stop following ${user.name}`
     : `Follow ${user.name}`
 }
 
-function toggleFollowing(accountId: string | undefined): void {
-  if (!canFollow(accountId)) return
-  if (following.value?.accountId === accountId) follow.stop()
-  else startFollowing(accountId)
+/** Everybody listed can be followed, this user too: it is then another tab or device of theirs. */
+function toggleFollowing(instanceId: string): void {
+  if (following.value?.instanceId === instanceId) follow.stop()
+  else startFollowing(instanceId)
 }
+
+const cursorColorOpen = ref(false)
+watch(instanceColor, (color) => session.value?.setLocalColor(color))
 
 // nobody to follow on another page, and the rendered page cannot show where someone is
 watch(session, () => follow.stop())
@@ -252,25 +253,30 @@ const jump = useJoinJump({
   presenceKnown: () => presenceKnown.value,
   onFollow: startFollowing,
   lastPosition: (accountId) => session.value?.lastPositionOf(accountId) ?? null,
-  ownAccountId: () => auth.user?.id,
   onSenderNotFound: () => notify.push('Could not find the position of the person who invited you.'),
 })
 
-/** `?join=1&from=…`, which `/join/` leads to. Only once, so a reload opens the page normally. */
+/** `?join=1&from=…&instance=…`, which `/join/` leads to. Only once, so a reload opens the page normally. */
 watch(
   () => route.query.join,
   (join) => {
     if (!join) return
     editorWanted.value = true
-    jump.start(typeof route.query.from === 'string' ? route.query.from : undefined)
-    void router.replace({ query: { ...route.query, join: undefined, from: undefined } })
+    const { from, instance } = route.query
+    jump.start(
+      typeof from === 'string' ? from : undefined,
+      typeof instance === 'string' ? instance : undefined,
+    )
+    void router.replace({
+      query: { ...route.query, join: undefined, from: undefined, instance: undefined },
+    })
   },
   { immediate: true },
 )
 
 /** Shares the page with a link that leads others to where this user is right now. */
 async function share(): Promise<void> {
-  const url = joinLink(props.id, auth.user?.id)
+  const url = joinLink(props.id, auth.user?.id, session.value?.me.value?.instanceId ?? instanceId())
   if (mobile.value && typeof navigator.share === 'function') {
     await navigator.share({ title: page.value?.name, url }).catch(() => undefined)
   } else if (await copyText(url)) {
@@ -293,26 +299,25 @@ async function share(): Promise<void> {
         <v-avatar-group v-if="onlineUsers.length > 0" data-testid="online-users">
           <v-tooltip
             v-for="user in onlineUsers"
-            :key="user.name"
-            :text="canFollow(user.accountId) ? followLabel(user) : user.name"
+            :key="user.instanceId"
+            :text="followLabel(user)"
             location="bottom"
           >
             <template #activator="{ props: tip }">
               <v-avatar
                 v-bind="tip"
-                :tag="canFollow(user.accountId) ? 'button' : 'div'"
+                tag="button"
                 :color="user.color"
                 size="30"
                 class="text-body-small text-white"
                 :class="{
-                  'document-view__avatar--followed':
-                    user.accountId && following?.accountId === user.accountId,
+                  'document-view__avatar--followed': following?.instanceId === user.instanceId,
                 }"
-                :aria-label="canFollow(user.accountId) ? followLabel(user) : undefined"
+                :aria-label="followLabel(user)"
                 data-testid="online-user"
-                @click="toggleFollowing(user.accountId)"
+                @click="toggleFollowing(user.instanceId)"
               >
-                {{ initials(user.name) }}
+                {{ initials(user.initials) }}
               </v-avatar>
             </template>
           </v-tooltip>
@@ -387,6 +392,12 @@ async function share(): Promise<void> {
               :append-icon="authorHighlight === option.value ? mdiCheck : undefined"
               :data-testid="`author-highlight-${option.value}`"
               @click="authorHighlight = option.value"
+            />
+            <v-list-item
+              :prepend-icon="mdiPaletteOutline"
+              title="My cursor color…"
+              data-testid="cursor-color"
+              @click="cursorColorOpen = true"
             />
             <v-divider />
             <v-list-item
@@ -513,6 +524,7 @@ async function share(): Promise<void> {
       :selection="pickerSelection"
       @insert="insertFromPicker"
     />
+    <CursorColorDialog v-model="cursorColorOpen" :account-color="session?.me.value?.color" />
     <HistoryDialog v-model="historyOpen" :document-id="id" :read-only="status?.readOnly ?? true" />
   </div>
 </template>

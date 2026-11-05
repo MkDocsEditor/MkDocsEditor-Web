@@ -3,6 +3,7 @@ import { ref, shallowRef } from 'vue'
 import { UNKNOWN_USER_COLOR } from './authors'
 import type { AmDoc, AutomergeApi } from './automerge'
 import type {
+  GhostInfo,
   LastPosition,
   PresenceInfo,
   PresenceLeave,
@@ -16,6 +17,11 @@ const VIEWPORT_MS = 500
 
 type WireSelections = PresenceInfo['selections']
 
+/** Older servers have no instances: there, one account counts as one instance. */
+function instanceOf(info: PresenceInfo): string {
+  return info.instanceId ?? info.accountId ?? info.clientId
+}
+
 interface Resolved {
   selections: TextSelection[]
   viewport?: TextRange
@@ -27,10 +33,12 @@ interface PeerState {
 }
 
 interface GhostState {
+  instanceId: string
   accountId: string
   username: string
   displayName?: string
   color?: string
+  deviceName?: string
   selections: WireSelections
   viewport?: ViewportInfo
   timer: ReturnType<typeof setTimeout>
@@ -40,6 +48,8 @@ export interface PresenceOptions {
   automerge: () => AutomergeApi
   doc: () => AmDoc | null
   documentId: () => string
+  /** The instance of this connection: an old socket of it can still be listed. */
+  ownInstance: () => string | undefined
   /** Whether the current socket has received its initial content. */
   isSynced: () => boolean
   send: SendMessage
@@ -49,7 +59,7 @@ export interface PresenceOptions {
 /**
  * Who else has the document open and where their cursors and viewports are, and our own for them
  * (protocol section 6): Automerge cursors, plus the reserved strings `start` (empty text) and
- * `end` (caret after the last character). An account that leaves stays as a ghost for as long as
+ * `end` (caret after the last character). An instance that leaves stays as a ghost for as long as
  * the server says.
  */
 export function createPresence(options: PresenceOptions) {
@@ -63,6 +73,8 @@ export function createPresence(options: PresenceOptions) {
   /** Undefined until the editor has told us: then a message leaves the server's value alone. */
   let pendingViewport: TextRange | null | undefined
   let nextViewport: TextRange | null = null
+  /** Undefined when the server has the current value. */
+  let pendingColor: string | null | undefined
   let lastSent = 0
   let lastViewportAt = 0
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -117,20 +129,25 @@ export function createPresence(options: PresenceOptions) {
     if (!options.doc()) return
     const list: Peer[] = []
     for (const state of states.values()) {
+      if (instanceOf(state.info) === options.ownInstance()) continue
       state.resolved = resolved(state.info.selections, state.info.viewport, state.resolved)
       list.push({
         clientId: state.info.clientId,
+        instanceId: instanceOf(state.info),
         accountId: state.info.accountId,
+        deviceName: state.info.deviceName,
         lastActiveAt: state.info.lastActiveAt,
         username: state.info.username,
         displayName: state.info.displayName ?? state.info.username,
-        color: state.info.color ?? UNKNOWN_USER_COLOR,
+        color: state.info.instanceColor ?? state.info.color ?? UNKNOWN_USER_COLOR,
         ...state.resolved,
       })
     }
     peers.value = list
     ghosts.value = [...ghostStates.values()].map((ghost) => ({
+      instanceId: ghost.instanceId,
       accountId: ghost.accountId,
+      deviceName: ghost.deviceName,
       username: ghost.username,
       displayName: ghost.displayName ?? ghost.username,
       color: ghost.color ?? UNKNOWN_USER_COLOR,
@@ -138,12 +155,11 @@ export function createPresence(options: PresenceOptions) {
     }))
   }
 
-  function endGhost(accountId: string | undefined): void {
-    if (!accountId) return
-    const ghost = ghostStates.get(accountId)
+  function endGhost(instanceId: string): void {
+    const ghost = ghostStates.get(instanceId)
     if (!ghost) return
     clearTimeout(ghost.timer)
-    ghostStates.delete(accountId)
+    ghostStates.delete(instanceId)
   }
 
   function endAllGhosts(): void {
@@ -152,11 +168,11 @@ export function createPresence(options: PresenceOptions) {
   }
 
   function addGhost(ghost: Omit<GhostState, 'timer'>, ghostMs: number): void {
-    endGhost(ghost.accountId)
-    ghostStates.set(ghost.accountId, {
+    endGhost(ghost.instanceId)
+    ghostStates.set(ghost.instanceId, {
       ...ghost,
       timer: setTimeout(() => {
-        ghostStates.delete(ghost.accountId)
+        ghostStates.delete(ghost.instanceId)
         resolve()
       }, ghostMs),
     })
@@ -166,6 +182,14 @@ export function createPresence(options: PresenceOptions) {
     timer = null
     if (!options.doc() || !options.isSynced()) return
     lastSent = Date.now()
+    // a cursor that moved took the view along: it must not arrive without it, because this user
+    // can be gone before the viewport timer runs, and their ghost would show the old place
+    if (viewportTimer) {
+      clearTimeout(viewportTimer)
+      viewportTimer = null
+      lastViewportAt = lastSent
+      pendingViewport = nextViewport
+    }
     options.send({
       type: 'presence',
       documentId: options.documentId(),
@@ -181,7 +205,9 @@ export function createPresence(options: PresenceOptions) {
               bottom: cursorAt(pendingViewport.bottom),
             },
           }),
+      ...(pendingColor === undefined ? {} : { instanceColor: pendingColor }),
     })
+    pendingColor = undefined
   }
 
   function schedule(): void {
@@ -203,7 +229,7 @@ export function createPresence(options: PresenceOptions) {
     resolve,
     /** A peer's presence changed. */
     update(info: PresenceInfo): void {
-      endGhost(info.accountId)
+      endGhost(instanceOf(info))
       states.set(info.clientId, {
         info,
         resolved: states.get(info.clientId)?.resolved ?? { selections: [] },
@@ -211,24 +237,30 @@ export function createPresence(options: PresenceOptions) {
       resolve()
     },
     /** The complete list of peers. */
-    replaceAll(list: readonly PresenceInfo[], last: readonly LastPosition[] = []): void {
+    replaceAll(
+      list: readonly PresenceInfo[],
+      last: readonly LastPosition[] = [],
+      left: readonly GhostInfo[] = [],
+    ): void {
       lastPositions.value = last
       states.clear()
       for (const info of list) states.set(info.clientId, { info, resolved: { selections: [] } })
       endAllGhosts()
-      const online = new Set(list.map((info) => info.accountId))
-      for (const position of last) {
-        if (position.ghostMs === undefined || online.has(position.accountId)) continue
+      const online = new Set(list.map(instanceOf))
+      for (const ghost of left) {
+        if (online.has(ghost.instanceId)) continue
         addGhost(
           {
-            accountId: position.accountId,
-            username: position.username ?? '',
-            displayName: position.displayName,
-            color: position.color,
-            selections: position.selections,
-            viewport: position.viewport,
+            instanceId: ghost.instanceId,
+            accountId: ghost.accountId,
+            deviceName: ghost.deviceName,
+            username: ghost.username ?? '',
+            displayName: ghost.displayName,
+            color: ghost.instanceColor ?? ghost.color,
+            selections: ghost.selections,
+            viewport: ghost.viewport,
           },
-          position.ghostMs,
+          ghost.ghostMs,
         )
       }
       known.value = true
@@ -240,10 +272,12 @@ export function createPresence(options: PresenceOptions) {
       if (leave.accountId && leave.ghostMs !== undefined) {
         addGhost(
           {
+            instanceId: leave.instanceId ?? leave.accountId,
             accountId: leave.accountId,
+            deviceName: leave.deviceName ?? info?.deviceName,
             username: info?.username ?? '',
             displayName: info?.displayName,
-            color: info?.color,
+            color: leave.instanceColor ?? info?.instanceColor ?? info?.color,
             selections: leave.selections,
             viewport: leave.viewport,
           },
@@ -292,6 +326,10 @@ export function createPresence(options: PresenceOptions) {
           Math.max(0, VIEWPORT_MS - (Date.now() - lastViewportAt)),
         )
       }
+    },
+    setLocalColor(color: string | null): void {
+      pendingColor = color
+      schedule()
     },
     /** A new connection is ready: tells it where our cursor and viewport are. */
     sendCurrent(): void {

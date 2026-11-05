@@ -10,6 +10,7 @@ import { SENDER_WAIT_MS, useJoinJump } from './useJoinJump'
 function peer(accountId: string, head?: number): Peer {
   return {
     clientId: `c-${accountId}`,
+    instanceId: `i-${accountId}`,
     accountId,
     username: accountId,
     displayName: accountId,
@@ -18,7 +19,7 @@ function peer(accountId: string, head?: number): Peer {
   }
 }
 
-function setup(own = 'me') {
+function setup() {
   const dispatch = vi.fn()
   const focus = vi.fn()
   const view = { state: { doc: { length: 100 } }, dispatch, focus } as unknown as EditorView
@@ -29,7 +30,7 @@ function setup(own = 'me') {
   const last = ref<number | null>(null)
   const notFound = vi.fn()
   const onFollow = vi.fn()
-  let start: (accountId: string | undefined) => void = () => {}
+  let start: (accountId: string | undefined, instanceId?: string) => void = () => {}
   const wrapper = mount(
     defineComponent({
       setup() {
@@ -40,7 +41,6 @@ function setup(own = 'me') {
           ghosts: () => ghosts.value,
           presenceKnown: () => known.value,
           lastPosition: () => last.value,
-          ownAccountId: () => own,
           onFollow,
           onSenderNotFound: notFound,
         })
@@ -61,7 +61,7 @@ describe('useJoinJump', () => {
     peers.value = [peer('sender', 42)]
     start('sender')
     await nextTick()
-    expect(onFollow).toHaveBeenCalledExactlyOnceWith('sender')
+    expect(onFollow).toHaveBeenCalledExactlyOnceWith('i-sender')
     expect(dispatch).not.toHaveBeenCalled()
     expect(focus).not.toHaveBeenCalled()
     peers.value = [peer('sender', 50)]
@@ -70,10 +70,28 @@ describe('useJoinJump', () => {
     wrapper.unmount()
   })
 
+  it('follows the instance that sent the link, or else the one of the account active last', async () => {
+    const { wrapper, peers, onFollow, start } = setup()
+    const other = {
+      ...peer('sender', 1),
+      instanceId: 'tab-2',
+      lastActiveAt: '2026-01-02T00:00:00Z',
+    }
+    peers.value = [peer('sender', 42), other]
+    start('sender', 'i-sender')
+    await nextTick()
+    expect(onFollow).toHaveBeenLastCalledWith('i-sender')
+    start('sender', 'gone')
+    await nextTick()
+    expect(onFollow).toHaveBeenLastCalledWith('tab-2')
+    wrapper.unmount()
+  })
+
   it('follows a sender who is a ghost', async () => {
     const { wrapper, ghosts, onFollow, start } = setup()
     ghosts.value = [
       {
+        instanceId: 'i-sender',
         accountId: 'sender',
         username: 'sender',
         displayName: 'sender',
@@ -83,7 +101,7 @@ describe('useJoinJump', () => {
     ]
     start('sender')
     await nextTick()
-    expect(onFollow).toHaveBeenCalledWith('sender')
+    expect(onFollow).toHaveBeenCalledWith('i-sender')
     wrapper.unmount()
   })
 
@@ -93,7 +111,7 @@ describe('useJoinJump', () => {
     peers.value = [peer('sender')]
     start('sender')
     await nextTick()
-    expect(onFollow).toHaveBeenCalledWith('sender')
+    expect(onFollow).toHaveBeenCalledWith('i-sender')
     expect(dispatch).toHaveBeenCalledTimes(1)
     expect(dispatch.mock.calls[0]![0]).not.toHaveProperty('selection')
     wrapper.unmount()
@@ -113,7 +131,7 @@ describe('useJoinJump', () => {
     known.value = true
     peers.value = [peer('sender', 7)]
     await nextTick()
-    expect(onFollow).toHaveBeenCalledWith('sender')
+    expect(onFollow).toHaveBeenCalledWith('i-sender')
     await vi.advanceTimersByTimeAsync(10)
     expect(notFound).not.toHaveBeenCalled()
     wrapper.unmount()
@@ -159,10 +177,9 @@ describe('useJoinJump', () => {
     wrapper.unmount()
   })
 
-  it('does nothing for the own link', async () => {
-    const { wrapper, dispatch, peers, notFound, onFollow, start } = setup('me')
-    peers.value = [peer('me', 7)]
-    start('me')
+  it('does nothing for a link without a sender', async () => {
+    const { wrapper, dispatch, notFound, onFollow, start } = setup()
+    start(undefined)
     await nextTick()
     await vi.advanceTimersByTimeAsync(SENDER_WAIT_MS)
     expect(dispatch).not.toHaveBeenCalled()

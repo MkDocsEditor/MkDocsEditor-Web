@@ -8,6 +8,7 @@ import { createConnection } from './connection'
 import { sameHeads } from './automerge'
 import type { AmDoc, Automerge, AutomergeApi, DocContent } from './automerge'
 import type { OfflineStore, StoredCopy } from './offlineStore'
+import { instanceColor, instanceId, randomHexId } from './instance'
 import { createPresence } from './presence'
 import { fromBase64, toBase64 } from './protocol'
 import type { ServerMessage } from './protocol'
@@ -15,7 +16,7 @@ import { rebaseChanges } from './rebase'
 import { CLOSE_DELETED, CLOSE_PROTOCOL_ERROR, CLOSE_REFUSED, CLOSE_RENAMED } from './socket'
 import type { SocketLike } from './socket'
 import { diffText } from './session'
-import type { DocumentSession, SessionStatus, SessionUser, TextChange } from './session'
+import type { DocumentSession, SessionMe, SessionStatus, TextChange } from './session'
 import { createStoredCopy } from './storedCopy'
 
 /**
@@ -79,11 +80,7 @@ const DELETED_MESSAGE =
   'This page was deleted. Your text is still here – copy it if you want to keep it.'
 
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
-function randomActorId(): string {
-  const bytes = new Uint8Array(16)
-  crypto.getRandomValues(bytes)
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+const randomActorId = randomHexId
 
 /** Converts Automerge patches on `content` to sequential TextChanges, or null if unexpected. */
 function patchesToChanges(patches: readonly Automerge.Patch[]): TextChange[] | null {
@@ -107,7 +104,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   let documentId = options.documentId
 
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
-  const me = shallowRef<SessionUser | null>(null)
+  const me = shallowRef<SessionMe | null>(null)
   const listeners = new Set<(changes: readonly TextChange[]) => void>()
 
   let doc: AmDoc | null = null
@@ -164,9 +161,11 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         type: 'hello',
         documentId,
         actorId,
+        instanceId: instanceId(),
         ticket,
         client: options.clientName ?? 'MkDocsEditor-Web',
       }
+      if (instanceColor.value) hello.instanceColor = instanceColor.value
       if (doc && epoch) hello.epoch = epoch
       return hello
     },
@@ -181,6 +180,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   })
   const send = connection.send
   const presence = createPresence({
+    ownInstance: () => me.value?.instanceId,
     automerge: () => A,
     doc: () => doc,
     documentId: () => documentId,
@@ -334,7 +334,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         presence.update(message)
         break
       case 'presence-snapshot':
-        presence.replaceAll(message.peers ?? [], message.lastPositions ?? [])
+        presence.replaceAll(message.peers ?? [], message.lastPositions ?? [], message.ghosts ?? [])
         break
       case 'presence-leave':
         presence.remove(message)
@@ -443,6 +443,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         username: you.username,
         displayName: you.displayName || you.username,
         color: you.color,
+        instanceId: you.instanceId,
       }
       authors.rememberUser(you)
     }
@@ -581,6 +582,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     },
     setLocalSelections: presence.setLocalSelections,
     setLocalViewport: presence.setLocalViewport,
+    setLocalColor: presence.setLocalColor,
     onRemoteChanges(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)

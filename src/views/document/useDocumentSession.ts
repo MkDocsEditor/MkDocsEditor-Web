@@ -2,6 +2,15 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import { createDocumentSession } from '@/sync'
 import type { DocumentSession } from '@/sync'
+import { instanceName } from '@/sync/session'
+
+export interface OnlineInstance {
+  instanceId: string
+  name: string
+  /** The name of the person, for the avatar. */
+  initials: string
+  color: string
+}
 
 /**
  * The live session of the page `id` points at: a new one for every page, closed when leaving. A
@@ -51,18 +60,21 @@ export function useDocumentSession(id: () => string, onRenamed: (newId: string) 
   const peers = computed(() => session.value?.peers.value ?? [])
   const ghosts = computed(() => session.value?.ghosts.value ?? [])
   const presenceKnown = computed(() => session.value?.presenceKnown.value ?? false)
-  /** Online users: distinct usernames (one user can have several tabs or devices). */
+  /** Who is here: every client instance by itself, those of one person next to each other. */
   const onlineUsers = computed(() => {
-    const seen = new Map<string, { name: string; color: string; accountId?: string }>()
+    const seen = new Map<string, OnlineInstance>()
     for (const peer of peers.value) {
-      if (!seen.has(peer.username))
-        seen.set(peer.username, {
-          name: peer.displayName || peer.username,
+      if (!seen.has(peer.instanceId))
+        seen.set(peer.instanceId, {
+          instanceId: peer.instanceId,
+          name: instanceName(peer),
+          initials: peer.displayName || peer.username,
           color: peer.color,
-          accountId: peer.accountId,
         })
     }
-    return [...seen.values()]
+    return [...seen.values()].sort(
+      (a, b) => a.name.localeCompare(b.name) || a.instanceId.localeCompare(b.instanceId),
+    )
   })
 
   return { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers }

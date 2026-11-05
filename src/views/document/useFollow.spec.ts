@@ -15,6 +15,7 @@ import {
 
 const anna = (head?: number): Peer => ({
   clientId: 'c-1',
+  instanceId: 'anna',
   accountId: 'anna',
   username: 'anna',
   displayName: 'Anna',
@@ -23,6 +24,7 @@ const anna = (head?: number): Peer => ({
 })
 
 const annaGhost = (head: number): Ghost => ({
+  instanceId: 'anna',
   accountId: 'anna',
   username: 'anna',
   displayName: 'Anna',
@@ -68,7 +70,7 @@ describe('useFollow', () => {
     await nextTick()
     follow.start('anna')
     await nextTick()
-    expect(follow.following.value).toEqual({ accountId: 'anna', name: 'Anna' })
+    expect(follow.following.value).toEqual({ instanceId: 'anna', name: 'Anna' })
     expect(dispatch).toHaveBeenCalledTimes(1)
     expect(dispatch.mock.calls[0]![0]).not.toHaveProperty('selection')
     peers.value = [anna(20)]
@@ -211,7 +213,10 @@ describe('useFollow', () => {
 
   it('ends without a note when stopped by the user, and replaces the followed account', async () => {
     const { wrapper, peers, ended, follow } = setup()
-    peers.value = [anna(10), { ...anna(20), clientId: 'c-2', accountId: 'bob', displayName: 'Bob' }]
+    peers.value = [
+      anna(10),
+      { ...anna(20), clientId: 'c-2', instanceId: 'bob', displayName: 'Bob' },
+    ]
     await nextTick()
     follow.start('anna')
     follow.start('bob')

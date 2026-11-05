@@ -125,11 +125,15 @@ test.describe('join links', () => {
     const guest = await devicePage(browser, testInfo)
     await guest.goto(`/join/${id}?from=somebody`)
     await guest.getByTestId('join-request').click()
-    // the focus arrives late, and would take a fill of the message into the name
+    // the focus arrives late and can take a fill of the message into the name, so check both
     const nameInput = guest.getByTestId('join-name').locator('input')
-    await expect(nameInput).toBeFocused()
-    await nameInput.fill(name)
-    await guest.getByTestId('join-message').locator('textarea').fill('Markus sent me')
+    const message = guest.getByTestId('join-message').locator('textarea')
+    await expect(async () => {
+      await nameInput.fill(name)
+      await message.fill('Markus sent me')
+      await expect(nameInput).toHaveValue(name, { timeout: 500 })
+      await expect(message).toHaveValue('Markus sent me', { timeout: 500 })
+    }).toPass({ timeout: 15_000 })
     await guest.getByTestId('join-submit').click()
     await expect(guest.getByTestId('join-waiting')).toBeVisible()
     expect(guest.url()).not.toContain('mda_')

@@ -41,7 +41,10 @@ const instance = ref('')
 const canRequest = ref(false)
 
 const from = computed(() => (typeof route.query.from === 'string' ? route.query.from : undefined))
-const target = computed(() => joinPath(props.id, from.value))
+const senderInstance = computed(() =>
+  typeof route.query.instance === 'string' ? route.query.instance : undefined,
+)
+const target = computed(() => joinPath(props.id, from.value, senderInstance.value))
 
 const name = ref('')
 const message = ref('')
@@ -176,7 +179,11 @@ onMounted(async () => {
     await router.replace({
       name: 'document',
       params: { id: props.id },
-      query: { join: '1', ...(from.value ? { from: from.value } : {}) },
+      query: {
+        join: '1',
+        ...(from.value ? { from: from.value } : {}),
+        ...(senderInstance.value ? { instance: senderInstance.value } : {}),
+      },
     })
     return
   }

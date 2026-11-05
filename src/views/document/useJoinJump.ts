@@ -2,14 +2,16 @@ import { EditorView } from '@codemirror/view'
 import { onBeforeUnmount, ref, watch } from 'vue'
 
 import type { Ghost, Peer } from '@/sync'
-import { followTarget, isPresent } from '@/sync/followTarget'
+import { followTarget, isPresent, latestInstanceOf } from '@/sync/followTarget'
 
 /** How long a join link waits to learn who is here, and for the last position of its sender. */
 export const SENDER_WAIT_MS = 5_000
 
 /**
- * What a join link does, once: follow a sender who is here or a ghost, or else go to where the
- * sender was last. It stops waiting when the reader has started doing something on the page.
+ * What a join link does, once: follow the instance that sent it if it is here or a ghost, then the
+ * instance of the sender active last, or else go to where the sender was last. It stops waiting
+ * when the reader has started doing something on the page. The sender can be this user too:
+ * presence never lists this connection itself.
  */
 export function useJoinJump(options: {
   view: () => EditorView | null
@@ -18,11 +20,10 @@ export function useJoinJump(options: {
   ghosts: () => readonly Ghost[]
   presenceKnown: () => boolean
   lastPosition: (accountId: string) => number | null
-  ownAccountId: () => string | undefined
-  onFollow: (accountId: string) => void
+  onFollow: (instanceId: string) => void
   onSenderNotFound: () => void
 }) {
-  const sender = ref<string | null>(null)
+  const sender = ref<{ accountId: string; instanceId?: string } | null>(null)
   let timer: ReturnType<typeof setTimeout> | null = null
 
   function stop(): void {
@@ -32,10 +33,10 @@ export function useJoinJump(options: {
     for (const event of INTERACTIONS) window.removeEventListener(event, stop, true)
   }
 
-  function start(accountId: string | undefined): void {
+  function start(accountId: string | undefined, instanceId?: string): void {
     stop()
-    if (!accountId || accountId === options.ownAccountId()) return
-    sender.value = accountId
+    if (!accountId) return
+    sender.value = { accountId, instanceId }
     for (const event of INTERACTIONS) window.addEventListener(event, stop, true)
   }
 
@@ -49,11 +50,11 @@ export function useJoinJump(options: {
     view.focus()
   }
 
-  function follow(view: EditorView, accountId: string, last: number | null): void {
+  function follow(view: EditorView, instanceId: string, last: number | null): void {
     stop()
-    options.onFollow(accountId)
+    options.onFollow(instanceId)
     // here without a cursor yet: until they have one, the place they were last is the best guess
-    if (last !== null && !followTarget(options.peers(), options.ghosts(), accountId)) {
+    if (last !== null && !followTarget(options.peers(), options.ghosts(), instanceId)) {
       view.dispatch({
         effects: EditorView.scrollIntoView(Math.min(last, view.state.doc.length), { y: 'center' }),
       })
@@ -62,7 +63,7 @@ export function useJoinJump(options: {
 
   watch(
     () => {
-      const accountId = sender.value
+      const accountId = sender.value?.accountId
       return [
         accountId,
         options.ready(),
@@ -75,7 +76,12 @@ export function useJoinJump(options: {
     },
     ([accountId, ready, view, known, peers, ghosts, last]) => {
       if (!accountId || !ready || !view) return
-      if (known && isPresent(peers, ghosts, accountId)) return follow(view, accountId, last)
+      if (known) {
+        const sent = sender.value?.instanceId
+        const instance =
+          sent && isPresent(peers, ghosts, sent) ? sent : latestInstanceOf(peers, ghosts, accountId)
+        if (instance) return follow(view, instance, last)
+      }
       if (known && last !== null) return jump(view, last)
       timer ??= setTimeout(() => {
         const fallback = options.lastPosition(accountId)

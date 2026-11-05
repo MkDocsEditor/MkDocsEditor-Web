@@ -16,6 +16,7 @@ describe('join links', () => {
   it('holds the document and the sender', () => {
     expect(joinPath('d/1', 'a b')).toBe('/join/d%2F1?from=a%20b')
     expect(joinPath('d1')).toBe('/join/d1')
+    expect(joinPath('d1', 'acc', 'tab')).toBe('/join/d1?from=acc&instance=tab')
     expect(joinLink('d1', 'acc')).toBe(`${window.location.origin}/join/d1?from=acc`)
   })
 
