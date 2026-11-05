@@ -29,7 +29,7 @@ function download(): void {
 
 <template>
   <div>
-    <v-alert type="warning" variant="tonal" density="compact" class="mb-3">
+    <v-alert type="warning" class="mb-4">
       These codes are shown only now. Keep them safe: each code replaces the code from the app once.
     </v-alert>
     <ul class="codes" aria-label="Recovery codes" data-testid="recovery-codes">
@@ -37,9 +37,9 @@ function download(): void {
         <code>{{ code }}</code>
       </li>
     </ul>
-    <div class="d-flex flex-wrap ga-2 mt-3">
-      <v-btn :prepend-icon="mdiContentCopy" variant="tonal" @click="copy">Copy</v-btn>
-      <v-btn :prepend-icon="mdiDownload" variant="tonal" @click="download">Download</v-btn>
+    <div class="d-flex flex-wrap ga-2 mt-4">
+      <v-btn :prepend-icon="mdiContentCopy" variant="outlined" @click="copy">Copy</v-btn>
+      <v-btn :prepend-icon="mdiDownload" variant="outlined" @click="download">Download</v-btn>
     </div>
   </div>
 </template>
@@ -50,7 +50,8 @@ function download(): void {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  gap: 4px 16px;
-  font-size: 1.05rem;
+  gap: var(--app-space-1) var(--app-space-4);
+  font-size: var(--md-sys-typescale-body-large-size);
+  font-family: var(--app-font-mono);
 }
 </style>

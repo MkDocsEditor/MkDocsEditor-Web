@@ -1,0 +1,150 @@
+/*
+ * Brings Vuetify's components to the tokens, where its defaults (`plugins/vuetify.ts`) cannot.
+ * Vuetify keeps its styles in cascade layers, so these win without `!important`.
+ */
+
+/* Shape: Android's cards have 12dp corners and its dialogs 16dp. */
+.v-card,
+.v-alert,
+.v-list.rounded-lg {
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.v-dialog > .v-overlay__content > .v-card,
+.v-dialog > .v-overlay__content > form > .v-card {
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.v-dialog--fullscreen > .v-overlay__content > .v-card {
+  border-radius: var(--md-sys-shape-corner-none);
+}
+.v-list--nav .v-list-item {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+.v-list--nav .v-list-item-title {
+  font-size: var(--md-sys-typescale-body-medium-size);
+  font-weight: 400;
+}
+
+/* As on Android, text and outlined buttons are primary. Icon buttons are not. */
+.v-btn--variant-text:not(.v-btn--icon, [class*='text-']),
+.v-btn--variant-outlined:not(.v-btn--icon, [class*='text-']) {
+  color: rgb(var(--v-theme-primary));
+}
+.v-alert .v-btn--variant-text:not([class*='text-']),
+.v-snackbar .v-btn--variant-text:not([class*='text-']) {
+  color: inherit;
+}
+
+/* Motion: one speed and curve for state changes, instead of Vuetify's 150 to 350ms. */
+.v-btn,
+.v-chip,
+.v-list-item,
+.v-card,
+.v-navigation-drawer,
+.v-field__outline,
+.v-field__overlay {
+  transition-duration: var(--md-sys-motion-duration-short3);
+  transition-timing-function: var(--md-sys-motion-easing-standard);
+}
+.v-btn__overlay,
+.v-chip__overlay,
+.v-list-item__overlay,
+.v-card__overlay {
+  transition: opacity var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+.v-navigation-drawer {
+  transition-duration: var(--md-sys-motion-duration-medium1);
+}
+.v-expansion-panel,
+.v-expansion-panel-title,
+.v-expansion-panel-title__icon {
+  transition-duration: var(--md-sys-motion-duration-short4);
+  transition-timing-function: var(--md-sys-motion-easing-standard);
+}
+
+/* Overlays enter on a decelerating curve and leave faster, on an accelerating one. */
+.md-dialog-enter-active,
+.md-menu-enter-active,
+.md-docked-enter-active {
+  transition:
+    opacity var(--md-sys-motion-duration-short4) linear,
+    transform var(--md-sys-motion-duration-medium1)
+      var(--md-sys-motion-easing-emphasized-decelerate),
+    clip-path var(--md-sys-motion-duration-medium1)
+      var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.md-dialog-leave-active,
+.md-menu-leave-active,
+.md-docked-leave-active {
+  transition:
+    opacity var(--md-sys-motion-duration-short3) linear,
+    transform var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized-accelerate),
+    clip-path var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized-accelerate);
+}
+.md-dialog-enter-from,
+.md-dialog-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.md-menu-enter-from,
+.md-menu-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
+}
+/* grows downwards out of the search bar */
+.md-docked-enter-from,
+.md-docked-leave-to {
+  opacity: 0;
+  clip-path: inset(0 0 calc(100% - var(--app-search-height)) 0 round var(--app-search-height));
+}
+.md-docked-enter-to,
+.md-docked-leave-from {
+  clip-path: inset(0 0 0 0 round var(--md-sys-shape-corner-extra-large));
+}
+.md-fade-enter-active {
+  transition: opacity var(--md-sys-motion-duration-short3) linear;
+}
+.md-fade-leave-active {
+  transition: opacity var(--md-sys-motion-duration-short2) linear;
+}
+.md-fade-enter-from,
+.md-fade-leave-to {
+  opacity: 0;
+}
+.v-overlay__scrim.fade-transition-enter-active,
+.v-overlay__scrim.fade-transition-leave-active {
+  transition-duration: var(--md-sys-motion-duration-short3) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-dialog-enter-active,
+  .md-dialog-leave-active,
+  .md-menu-enter-active,
+  .md-menu-leave-active,
+  .md-docked-enter-active,
+  .md-docked-leave-active {
+    transition: opacity var(--md-sys-motion-duration-short2) linear;
+  }
+  .md-dialog-enter-from,
+  .md-dialog-leave-to,
+  .md-menu-enter-from,
+  .md-menu-leave-to,
+  .md-docked-enter-from,
+  .md-docked-leave-to {
+    transform: none;
+    clip-path: none;
+  }
+}
+
+/* A surface for things that stand on their own, such as the rows of a folder on Android. */
+.app-card-list {
+  background: transparent;
+  overflow: visible;
+}
+.app-card-list > .v-list-item {
+  margin-block-end: var(--app-space-2);
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: rgb(var(--v-theme-surface));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.3),
+    0 1px 3px 1px rgb(0 0 0 / 0.15);
+}

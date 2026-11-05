@@ -84,7 +84,6 @@ function onDrop(event: DragEvent, section: SectionModel): void {
       <template #prepend>
         <v-btn
           :icon="opened.has(sub.id) ? mdiChevronDown : mdiChevronRight"
-          variant="text"
           size="x-small"
           :aria-label="opened.has(sub.id) ? 'Collapse' : 'Expand'"
           @click.stop.prevent="emit('toggle', sub.id)"
@@ -146,7 +145,7 @@ function onDrop(event: DragEvent, section: SectionModel): void {
 
 <style scoped>
 :deep(.v-list-item__spacer) {
-  width: 4px !important;
+  width: var(--app-space-1) !important;
 }
 .nav-tree__spacer {
   display: inline-block;
@@ -160,7 +159,7 @@ function onDrop(event: DragEvent, section: SectionModel): void {
 }
 /* Files are secondary in the tree: smaller and quieter than pages. */
 .nav-tree__file :deep(.v-list-item-title) {
-  font-size: 0.8125rem;
+  font-size: var(--md-sys-typescale-body-medium-size);
   color: rgb(var(--v-theme-on-surface-variant));
 }
 </style>

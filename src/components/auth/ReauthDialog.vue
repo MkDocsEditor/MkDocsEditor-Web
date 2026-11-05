@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 
 import { ApiError, useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import PasswordField from '@/components/auth/PasswordField.vue'
 import { authErrorText, describeAuthError } from '@/services/authErrors'
 import {
@@ -99,9 +100,8 @@ function reload(): void {
 </script>
 
 <template>
-  <v-dialog
+  <AppDialog
     :model-value="reauth.open"
-    max-width="440"
     persistent
     @update:model-value="(open: boolean) => !open && reauth.finish(false)"
   >
@@ -159,13 +159,13 @@ function reload(): void {
             :autofocus="!needsPassword"
             data-testid="reauth-code"
           />
-          <v-alert v-if="error" type="error" variant="tonal" density="compact" role="alert">
+          <v-alert v-if="error" type="error" role="alert">
             {{ error }}
           </v-alert>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" :disabled="busy" @click="reauth.finish(false)">Cancel</v-btn>
+          <v-btn :disabled="busy" @click="reauth.finish(false)">Cancel</v-btn>
           <v-btn
             type="submit"
             color="primary"
@@ -179,5 +179,5 @@ function reload(): void {
         </v-card-actions>
       </v-form>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>

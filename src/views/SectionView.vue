@@ -15,6 +15,7 @@ import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api'
 import type { TreeItem } from '@/api'
+import PageHeader from '@/components/common/PageHeader.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
@@ -203,7 +204,6 @@ const deleteText = computed(() => {
   <v-container
     class="section-view pb-16"
     :class="{ 'section-view--dragging': dragging }"
-    max-width="960"
     @dragenter="onDragEnter"
     @dragleave="onDragLeave"
     @dragover.prevent
@@ -211,21 +211,21 @@ const deleteText = computed(() => {
   >
     <template v-if="section">
       <ItemBreadcrumbs v-if="!isRoot" :ancestors="ancestors" />
-      <h1 class="text-h5 mb-1" data-testid="section-title">{{ title }}</h1>
-      <SyncStatus class="mb-2" />
+      <PageHeader :title="title" testid="section-title">
+        <SyncStatus class="mt-1" />
+      </PageHeader>
       <v-progress-linear
         v-if="uploading"
         indeterminate
-        color="primary"
         class="mb-2"
         aria-label="Uploading files"
         data-testid="upload-progress"
       />
-      <div v-if="dragging" class="section-view__drop text-body-1 mb-2" data-testid="drop-zone">
+      <div v-if="dragging" class="section-view__drop text-body-large mb-2" data-testid="drop-zone">
         Drop files here to upload them into this folder
       </div>
 
-      <v-list v-if="entries.length > 0" lines="one" class="rounded-lg" border>
+      <v-list v-if="entries.length > 0" lines="one" class="app-card-list py-0">
         <v-list-item
           v-for="item in entries"
           :key="item.id"
@@ -256,13 +256,12 @@ const deleteText = computed(() => {
                 <v-btn
                   v-bind="menuProps"
                   :icon="mdiDotsVertical"
-                  variant="text"
                   size="small"
                   :aria-label="`Actions for ${item.name}`"
                   @click.stop.prevent
                 />
               </template>
-              <v-list density="compact">
+              <v-list>
                 <v-list-item
                   v-if="item.type === 'resource'"
                   :prepend-icon="mdiOpenInNew"
@@ -346,7 +345,7 @@ const deleteText = computed(() => {
       text="This folder does not exist (any more)."
     >
       <template #actions>
-        <v-btn color="primary" :to="{ name: 'home' }">To the start page</v-btn>
+        <v-btn color="primary" variant="flat" :to="{ name: 'home' }">To the start page</v-btn>
       </template>
     </v-empty-state>
 
@@ -393,8 +392,8 @@ const deleteText = computed(() => {
 }
 .section-view__drop {
   border: 2px dashed rgb(var(--v-theme-primary));
-  border-radius: 8px;
-  padding: 24px 16px;
+  border-radius: var(--md-sys-shape-corner-small);
+  padding: var(--app-space-6) var(--app-space-4);
   text-align: center;
   color: rgb(var(--v-theme-primary));
 }
@@ -403,8 +402,8 @@ const deleteText = computed(() => {
 }
 .section-view__fab {
   position: fixed;
-  right: calc(16px + env(safe-area-inset-right));
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  right: calc(var(--app-space-4) + env(safe-area-inset-right));
+  bottom: calc(var(--app-space-4) + env(safe-area-inset-bottom));
   z-index: 5;
 }
 </style>

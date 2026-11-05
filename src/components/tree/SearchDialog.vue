@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { mdiHistory, mdiMagnify } from '@mdi/js'
+import { mdiArrowLeft, mdiHistory, mdiMagnify } from '@mdi/js'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
 
+import AppDialog from '@/components/common/AppDialog.vue'
 import HighlightedText from '@/components/tree/HighlightedText.vue'
 import { useDebounced } from '@/composables/useDebounced'
 import { colorFor, formatSize, iconFor } from '@/services/icons'
@@ -19,6 +21,9 @@ const tree = useTreeStore()
 const pages = usePagesStore()
 const router = useRouter()
 
+// Material's search view: docked to the search bar from medium windows up, else the full screen
+const { smAndDown: fullScreen } = useDisplay()
+
 const input = ref<string | null>('')
 const query = computed(() => (input.value ?? '').trim())
 const recent = ref<string[]>([])
@@ -30,6 +35,7 @@ const found = computed(() => search(term.value))
 const results = computed(() => found.value.results)
 const tooShort = computed(() => query.value !== '' && !isSearchable(query.value))
 const settled = computed(() => term.value === query.value)
+const hasBody = computed(() => query.value !== '' || recent.value.length > 0)
 
 watch(open, (isOpen) => {
   if (!isOpen) return
@@ -75,14 +81,30 @@ function details(result: SearchResult): string {
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="640" :fullscreen="$vuetify.display.xs" scrollable>
-    <v-card>
-      <v-card-text class="pb-0 flex-grow-0">
+  <AppDialog
+    v-model="open"
+    class="search-view"
+    :class="{ 'search-view--docked': !fullScreen }"
+    :max-width="fullScreen ? undefined : 'var(--app-search-width)'"
+    :fullscreen="fullScreen"
+    :transition="fullScreen ? 'md-dialog' : 'md-docked'"
+    scrollable
+  >
+    <v-card color="surface-light" :elevation="3">
+      <div class="search-view__header">
+        <v-btn
+          v-if="fullScreen"
+          :icon="mdiArrowLeft"
+          aria-label="Close search"
+          @click="open = false"
+        />
         <v-text-field
           v-model="input"
-          :prepend-inner-icon="mdiMagnify"
+          :prepend-inner-icon="fullScreen ? undefined : mdiMagnify"
           placeholder="Search pages, folders and files…"
-          variant="solo-filled"
+          variant="solo"
+          density="compact"
+          bg-color="transparent"
           flat
           autofocus
           clearable
@@ -90,11 +112,12 @@ function details(result: SearchResult): string {
           data-testid="search-input"
           @keydown.enter="chooseFirst"
         />
-      </v-card-text>
-      <v-card-text class="px-2">
+      </div>
+      <v-divider v-if="hasBody" />
+      <v-card-text v-if="hasBody" class="px-2">
         <p
           v-if="pages.progress && query"
-          class="text-caption text-medium-emphasis px-4 pb-2"
+          class="text-body-small text-medium-emphasis px-4 pb-2"
           data-testid="search-progress"
         >
           Still fetching pages ({{ pages.progress.done }} of {{ pages.progress.total }}). Some text
@@ -102,7 +125,7 @@ function details(result: SearchResult): string {
         </p>
 
         <template v-if="query === ''">
-          <v-list v-if="recent.length > 0" density="compact" data-testid="search-recent">
+          <v-list v-if="recent.length > 0" data-testid="search-recent">
             <v-list-subheader>Recent searches</v-list-subheader>
             <v-list-item
               v-for="recentTerm in recent"
@@ -129,19 +152,19 @@ function details(result: SearchResult): string {
             </template>
             <div class="search-result__head">
               <HighlightedText
-                class="search-result__name text-subtitle-2"
+                class="search-result__name text-title-small"
                 :text="result.item.name"
                 :matches="findMatches(result.item.name, term)"
               />
               <span
                 v-if="result.matchCount > 0"
-                class="text-caption text-primary"
+                class="text-body-small text-primary"
                 data-testid="search-match-count"
               >
                 {{ plural(result.matchCount, 'match', 'matches') }}
               </span>
             </div>
-            <div class="search-result__meta text-caption text-medium-emphasis">
+            <div class="search-result__meta text-body-small text-medium-emphasis">
               <!-- the start is what gets cut: the folder right above the result tells the most -->
               <span class="search-result__path"
                 ><bdi>{{ result.path.join(' › ') || 'Top level' }}</bdi></span
@@ -156,7 +179,7 @@ function details(result: SearchResult): string {
               class="mt-1"
               data-testid="search-excerpt"
             >
-              <div v-if="excerpt.heading" class="search-result__heading text-caption">
+              <div v-if="excerpt.heading" class="search-result__heading text-body-small">
                 {{ excerpt.heading }}
               </div>
               <div class="search-result__line">
@@ -170,26 +193,44 @@ function details(result: SearchResult): string {
         <p v-else-if="settled" class="text-medium-emphasis pa-4">Nothing found.</p>
         <p
           v-if="query !== '' && !tooShort && found.total > results.length"
-          class="text-caption text-medium-emphasis px-4"
+          class="text-body-small text-medium-emphasis px-4"
           data-testid="search-limited"
         >
           Showing the best {{ results.length }} of {{ found.total }} results. Add a word to narrow
           them down.
         </p>
       </v-card-text>
-      <v-card-actions v-if="$vuetify.display.xs">
-        <v-spacer />
-        <v-btn @click="open = false">Close</v-btn>
-      </v-card-actions>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>
 
+<style>
+/* Not scoped: the overlay is rendered outside this component. */
+.search-view--docked.v-dialog {
+  align-items: flex-start;
+}
+.search-view--docked.v-dialog > .v-overlay__content {
+  margin: var(--app-space-2) 0 0;
+  /* the table of a docked search view takes up to 2/3 of the window */
+  max-height: 66.67vh;
+}
+.search-view--docked.v-dialog > .v-overlay__content > .v-card {
+  border-radius: var(--md-sys-shape-corner-extra-large);
+}
+</style>
+
 <style scoped>
+.search-view__header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-height: var(--app-search-height);
+  padding: var(--app-space-1);
+}
 .search-result__head,
 .search-result__meta {
   display: flex;
-  gap: 8px;
+  gap: var(--app-space-2);
   align-items: baseline;
 }
 .search-result__name,
@@ -215,10 +256,10 @@ function details(result: SearchResult): string {
 .search-result__line {
   background: rgb(var(--v-theme-code-background));
   color: rgb(var(--v-theme-code-text));
-  border-radius: 4px;
-  padding: 4px 6px;
-  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.75rem;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  padding: var(--app-space-1) var(--app-space-2);
+  font-family: var(--app-font-mono);
+  font-size: var(--md-sys-typescale-body-small-size);
   line-height: 1.4;
   overflow: hidden;
   display: -webkit-box;

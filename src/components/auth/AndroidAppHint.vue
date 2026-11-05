@@ -39,7 +39,7 @@ onMounted(markAndroidHintSeen)
 
 <template>
   <section class="android-hint" aria-labelledby="android-hint-title" data-testid="android-hint">
-    <h2 id="android-hint-title" class="text-h6 mb-2">Use the Android app</h2>
+    <h2 id="android-hint-title" class="text-title-medium mb-2">Use the Android app</h2>
     <p class="mb-2">
       On a phone, the app is easier to use and also works offline. It signs in to this account with
       one tap.
@@ -49,7 +49,7 @@ onMounted(markAndroidHintSeen)
       <a :href="OBTAINIUM_ADD_URL" target="_blank" rel="noopener">Obtainium</a> (turn on
       pre-releases for it).
     </p>
-    <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-3" role="alert">
+    <v-alert v-if="error" type="error" class="mb-4" role="alert">
       {{ error }}
     </v-alert>
     <div class="d-flex flex-wrap ga-2">
@@ -63,12 +63,7 @@ onMounted(markAndroidHintSeen)
       >
         Open in the app
       </v-btn>
-      <v-btn
-        variant="text"
-        :disabled="busy"
-        data-testid="android-hint-dismiss"
-        @click="emit('dismissed')"
-      >
+      <v-btn :disabled="busy" data-testid="android-hint-dismiss" @click="emit('dismissed')">
         Not now
       </v-btn>
     </div>

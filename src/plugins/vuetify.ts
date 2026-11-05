@@ -97,6 +97,9 @@ export const DARK: ThemeDefinition = {
   },
 }
 
+/** Android's `OutlinedTextField`, a step denser for a desktop screen. */
+const FIELD = { variant: 'outlined', density: 'comfortable' }
+
 export default createVuetify({
   icons: {
     defaultSet: 'mdi',
@@ -107,10 +110,34 @@ export default createVuetify({
     locale: 'en',
     messages: { en },
   },
-  // Closer to the Android app's Material 3 shapes: pill-shaped buttons, rounder cards.
+  // What the Android app gets from Compose Material 3. Call sites only state what differs: see
+  // "Design" in the README. `styles/vuetify.css` covers what props cannot.
   defaults: {
-    VBtn: { rounded: 'pill' },
-    VCard: { rounded: 'lg' },
+    VAlert: { variant: 'tonal', density: 'compact' },
+    VAppBar: { flat: true },
+    VAutocomplete: FIELD,
+    VBreadcrumbs: { density: 'compact' },
+    VBtn: { rounded: 'pill', variant: 'text' },
+    // Android's segmented button: a pill as a whole, square between its parts
+    VBtnToggle: { rounded: 'pill', VBtn: { rounded: 0 } },
+    // a filled card; the role of Android's surface container, in this palette
+    VCard: { variant: 'flat', color: 'surface-light' },
+    VChip: { variant: 'tonal' },
+    VContainer: { maxWidth: 960 },
+    VDialog: {
+      transition: 'md-dialog',
+      // on top of the page, so it keeps the surface colour and gets a shadow
+      VCard: { variant: 'elevated', color: 'surface', elevation: 6 },
+    },
+    VEmptyState: { iconSize: 48, size: 48 },
+    VList: { density: 'compact', bgColor: 'transparent' },
+    VMenu: { transition: 'md-menu', VList: { bgColor: 'surface-light' } },
+    VProgressLinear: { color: 'primary' },
+    VSelect: FIELD,
+    VSnackbar: { transition: 'md-menu' },
+    VTextarea: FIELD,
+    VTextField: FIELD,
+    VTooltip: { transition: 'md-fade' },
   },
   theme: {
     defaultTheme: 'system',

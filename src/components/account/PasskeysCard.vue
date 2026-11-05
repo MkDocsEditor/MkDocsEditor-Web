@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { useAuthApi } from '@/api'
 import type { AccountInfo, Passkey } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
 import { useLoad } from '@/composables/useLoad'
@@ -96,10 +97,10 @@ onMounted(load)
       <v-card-subtitle>Sign in with fingerprint, face, PIN or password manager</v-card-subtitle>
     </v-card-item>
     <v-card-text>
-      <v-alert v-if="!auth.passkeysEnabled" type="info" variant="tonal" density="compact">
+      <v-alert v-if="!auth.passkeysEnabled" type="info">
         Passkeys are not set up on this server.
       </v-alert>
-      <v-alert v-else-if="!passkeysSupported()" type="info" variant="tonal" density="compact">
+      <v-alert v-else-if="!passkeysSupported()" type="info">
         This browser does not support passkeys.
       </v-alert>
       <v-progress-linear v-if="loading" indeterminate />
@@ -120,14 +121,12 @@ onMounted(load)
           <template #append>
             <v-btn
               :icon="mdiPencil"
-              variant="text"
               size="small"
               :aria-label="`Rename ${passkey.name}`"
               @click="startRename(passkey)"
             />
             <v-btn
               :icon="mdiDelete"
-              variant="text"
               size="small"
               :aria-label="`Remove ${passkey.name}`"
               :disabled="busy"
@@ -143,7 +142,7 @@ onMounted(load)
       <v-btn
         :prepend-icon="mdiPlus"
         color="primary"
-        variant="tonal"
+        variant="outlined"
         :loading="busy"
         data-testid="passkey-add"
         @click="add"
@@ -152,11 +151,7 @@ onMounted(load)
       </v-btn>
     </v-card-actions>
 
-    <v-dialog
-      :model-value="renaming !== null"
-      max-width="420"
-      @update:model-value="renaming = null"
-    >
+    <AppDialog :model-value="renaming !== null" @update:model-value="renaming = null">
       <v-card title="Rename passkey">
         <v-form @submit.prevent="rename">
           <v-card-text>
@@ -170,14 +165,14 @@ onMounted(load)
           </v-card-text>
           <v-card-actions>
             <v-spacer />
-            <v-btn variant="text" @click="renaming = null">Cancel</v-btn>
+            <v-btn @click="renaming = null">Cancel</v-btn>
             <v-btn type="submit" color="primary" variant="flat" :disabled="!newName.trim()">
               Save
             </v-btn>
           </v-card-actions>
         </v-form>
       </v-card>
-    </v-dialog>
+    </AppDialog>
     <ConfirmDialog
       :model-value="deleting !== null"
       title="Remove the passkey?"

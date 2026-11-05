@@ -100,9 +100,6 @@ function crumbTitle(section: SectionModel): string {
       v-model="query"
       :prepend-inner-icon="mdiMagnify"
       :placeholder="searchPlaceholder"
-      variant="solo-filled"
-      density="compact"
-      flat
       clearable
       hide-details
       class="mb-2"
@@ -113,7 +110,6 @@ function crumbTitle(section: SectionModel): string {
         <v-btn
           :icon="mdiArrowUp"
           :disabled="!parent"
-          variant="text"
           size="small"
           aria-label="Up one folder"
           data-testid="browser-up"
@@ -130,7 +126,6 @@ function crumbTitle(section: SectionModel): string {
         <v-btn
           v-if="pickSections && current"
           :prepend-icon="mdiLinkVariant"
-          variant="text"
           size="small"
           data-testid="browser-pick-current"
           @click="emit('pick', current)"
@@ -138,7 +133,7 @@ function crumbTitle(section: SectionModel): string {
           This folder
         </v-btn>
       </div>
-      <v-list density="compact" class="py-0" data-testid="browser-list">
+      <v-list class="py-0" data-testid="browser-list">
         <v-list-item
           v-for="item in entries"
           :key="item.id"
@@ -154,9 +149,9 @@ function crumbTitle(section: SectionModel): string {
               v-if="item.type === 'resource'"
               :resource="item"
               :size="36"
-              class="me-3"
+              class="me-2"
             />
-            <span v-else class="tree-browser__icon me-3">
+            <span v-else class="tree-browser__icon me-2">
               <v-icon :icon="iconFor(item)" :color="colorFor(item)" />
             </span>
           </template>
@@ -164,7 +159,6 @@ function crumbTitle(section: SectionModel): string {
             <v-btn
               v-if="pickSections"
               :icon="mdiLinkVariant"
-              variant="text"
               size="small"
               :aria-label="`Link to the folder ${item.name}`"
               @click.stop="emit('pick', item)"
@@ -175,7 +169,7 @@ function crumbTitle(section: SectionModel): string {
         <v-list-item v-if="entries.length === 0" subtitle="Nothing here." />
       </v-list>
     </template>
-    <v-list v-else density="compact" class="py-0" data-testid="browser-results">
+    <v-list v-else class="py-0" data-testid="browser-results">
       <v-list-item
         v-for="hit in hits"
         :key="hit.item.id"
@@ -190,9 +184,9 @@ function crumbTitle(section: SectionModel): string {
             v-if="hit.item.type === 'resource'"
             :resource="hit.item"
             :size="36"
-            class="me-3"
+            class="me-2"
           />
-          <span v-else class="tree-browser__icon me-3">
+          <span v-else class="tree-browser__icon me-2">
             <v-icon :icon="iconFor(hit.item)" :color="colorFor(hit.item)" />
           </span>
         </template>

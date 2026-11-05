@@ -49,7 +49,7 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: var(--md-sys-shape-corner-small);
   overflow: hidden;
   background: rgba(var(--v-theme-on-surface), 0.05);
 }

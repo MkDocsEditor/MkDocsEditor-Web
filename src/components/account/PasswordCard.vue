@@ -104,7 +104,7 @@ async function save(): Promise<void> {
           class="mt-2"
           data-testid="new-password-repeat"
         />
-        <v-alert v-if="error" type="error" variant="tonal" density="compact" role="alert">
+        <v-alert v-if="error" type="error" role="alert">
           {{ error }}
         </v-alert>
       </v-card-text>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppDialog from '@/components/common/AppDialog.vue'
 defineProps<{ title: string; text: string; confirmText?: string; danger?: boolean }>()
 const open = defineModel<boolean>({ required: true })
 const emit = defineEmits<{ confirm: [] }>()
@@ -10,11 +11,11 @@ function confirm(): void {
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="440">
+  <AppDialog v-model="open">
     <v-card :title="title" :text="text">
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" @click="open = false">Cancel</v-btn>
+        <v-btn @click="open = false">Cancel</v-btn>
         <v-btn
           :color="danger ? 'error' : 'primary'"
           variant="flat"
@@ -25,5 +26,5 @@ function confirm(): void {
         </v-btn>
       </v-card-actions>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>

@@ -46,6 +46,6 @@ const code = computed(() => {
 <style scoped>
 .qr-code {
   display: block;
-  border-radius: 4px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
 }
 </style>

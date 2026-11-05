@@ -77,13 +77,13 @@ function onFilesChosen(event: Event): void {
 
 <template>
   <div class="resources-panel" data-testid="resources-panel">
-    <div class="d-flex align-center px-4 pt-3 pb-1">
-      <h2 class="text-subtitle-1 font-weight-medium flex-grow-1">Files</h2>
+    <div class="d-flex align-center px-4 pt-4 pb-1">
+      <h2 class="text-title-medium flex-grow-1">Files</h2>
       <v-btn
         v-if="!readOnly"
         :prepend-icon="mdiUpload"
         :loading="uploading"
-        variant="tonal"
+        variant="outlined"
         size="small"
         data-testid="panel-upload"
         @click="fileInput?.click()"
@@ -100,7 +100,7 @@ function onFilesChosen(event: Event): void {
       />
     </div>
 
-    <v-list density="compact" class="py-0">
+    <v-list class="py-0">
       <v-list-subheader>Used on this page</v-list-subheader>
       <v-list-item
         v-for="entry in resolved.used"
@@ -115,13 +115,12 @@ function onFilesChosen(event: Event): void {
         @click="emit('reveal', entry.reference)"
       >
         <template #prepend>
-          <ResourceThumb :resource="entry.resource" :size="36" class="me-3" />
+          <ResourceThumb :resource="entry.resource" :size="36" class="me-2" />
         </template>
         <template #append>
           <v-btn
             :icon="mdiOpenInNew"
             :to="{ name: 'resource', params: { id: entry.resource.id } }"
-            variant="text"
             size="small"
             :aria-label="`Show ${entry.resource.name}`"
             @click.stop
@@ -159,7 +158,7 @@ function onFilesChosen(event: Event): void {
         @click="emit('insert', resource)"
       >
         <template #prepend>
-          <ResourceThumb :resource="resource" :size="36" class="me-3" />
+          <ResourceThumb :resource="resource" :size="36" class="me-2" />
         </template>
         <template #append>
           <v-icon :icon="mdiPlus" size="small" :aria-label="`Insert ${resource.name}`" />

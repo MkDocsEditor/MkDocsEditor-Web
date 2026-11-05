@@ -39,7 +39,7 @@ const label = computed(() => `Open now by ${props.users.map((u) => u.displayName
 
 <style scoped>
 .online-avatars__avatar {
-  font-size: 0.65rem;
+  font-size: var(--md-sys-typescale-label-small-size);
   font-weight: 600;
 }
 </style>

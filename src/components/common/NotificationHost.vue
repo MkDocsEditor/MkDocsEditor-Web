@@ -24,10 +24,8 @@ function retry(): void {
   >
     {{ current?.text }}
     <template #actions>
-      <v-btn v-if="current?.retry" variant="text" data-testid="notification-retry" @click="retry">
-        Retry
-      </v-btn>
-      <v-btn variant="text" @click="current && notify.dismiss(current.id)">OK</v-btn>
+      <v-btn v-if="current?.retry" data-testid="notification-retry" @click="retry"> Retry </v-btn>
+      <v-btn @click="current && notify.dismiss(current.id)">OK</v-btn>
     </template>
   </v-snackbar>
 </template>

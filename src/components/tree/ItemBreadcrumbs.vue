@@ -17,7 +17,7 @@ const items = computed(() => [
 </script>
 
 <template>
-  <v-breadcrumbs :items="items" density="compact" class="px-0 flex-wrap">
+  <v-breadcrumbs :items="items" class="px-0 flex-wrap">
     <template #prepend>
       <v-icon :icon="mdiHome" size="small" class="me-1" />
     </template>

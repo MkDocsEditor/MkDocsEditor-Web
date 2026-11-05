@@ -12,6 +12,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useAuthApi } from '@/api'
 import { ROLES } from '@/api/authTypes'
 import type { AdminUser, CreatedLink, LinkInfo, Role } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import LinkResultDialog from '@/components/admin/LinkResultDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
 import LinkStatusChip from '@/components/admin/LinkStatusChip.vue'
@@ -221,8 +222,6 @@ onMounted(load)
                 :model-value="user.role"
                 :items="roleItems"
                 label="Role"
-                density="compact"
-                variant="outlined"
                 hide-details
                 class="role-select"
                 :disabled="busyId === user.id"
@@ -235,12 +234,11 @@ onMounted(load)
                   <v-btn
                     v-bind="props"
                     :icon="mdiDotsVertical"
-                    variant="text"
                     :aria-label="`Actions for ${user.username}`"
                     data-testid="user-actions"
                   />
                 </template>
-                <v-list density="compact">
+                <v-list>
                   <v-list-item
                     :prepend-icon="mdiKeyChange"
                     title="Reset link"
@@ -284,19 +282,13 @@ onMounted(load)
         >
           <template #append>
             <LinkStatusChip :status="link.status" class="mr-2" />
-            <v-btn variant="text" size="small" color="error" @click="revokeReset(link)">
-              Revoke
-            </v-btn>
+            <v-btn size="small" color="error" @click="revokeReset(link)"> Revoke </v-btn>
           </template>
         </v-list-item>
       </v-list>
     </v-card>
 
-    <v-dialog
-      :model-value="resetFor !== null"
-      max-width="460"
-      @update:model-value="resetFor = null"
-    >
+    <AppDialog :model-value="resetFor !== null" @update:model-value="resetFor = null">
       <v-card v-if="resetFor" :title="`Reset ${resetFor.displayName}`">
         <v-form @submit.prevent="createReset">
           <v-card-text>
@@ -313,7 +305,7 @@ onMounted(load)
           </v-card-text>
           <v-card-actions>
             <v-spacer />
-            <v-btn variant="text" @click="resetFor = null">Cancel</v-btn>
+            <v-btn @click="resetFor = null">Cancel</v-btn>
             <v-btn
               type="submit"
               color="primary"
@@ -326,7 +318,7 @@ onMounted(load)
           </v-card-actions>
         </v-form>
       </v-card>
-    </v-dialog>
+    </AppDialog>
 
     <LinkResultDialog :link="createdReset" title="Reset link" @close="createdReset = null" />
     <ConfirmDialog

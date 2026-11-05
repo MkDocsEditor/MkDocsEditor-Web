@@ -4,6 +4,7 @@ import { ref } from 'vue'
 
 import { useAuthApi } from '@/api'
 import type { AccountInfo, TotpEnrollment } from '@/api'
+import SectionHeader from '@/components/common/SectionHeader.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import CopyField from '@/components/auth/CopyField.vue'
 import QrCode from '@/components/auth/QrCode.vue'
@@ -121,12 +122,12 @@ async function regenerate(): Promise<void> {
     <v-card-text>
       <!-- recovery codes, shown once -->
       <template v-if="codes">
-        <v-alert v-if="justEnabled" type="success" variant="tonal" density="compact" class="mb-3">
+        <v-alert v-if="justEnabled" type="success" class="mb-4">
           The authenticator app is set up.
         </v-alert>
-        <h3 class="text-subtitle-1 mb-2">Your recovery codes</h3>
+        <SectionHeader title="Your recovery codes" :level="3" />
         <RecoveryCodes :codes="codes" :username="account.username" />
-        <v-btn class="mt-3" variant="text" @click="hideCodes">I have saved them</v-btn>
+        <v-btn class="mt-4" @click="hideCodes">I have saved them</v-btn>
       </template>
 
       <!-- enrolling -->
@@ -137,16 +138,18 @@ async function regenerate(): Promise<void> {
             Aegis, Google Authenticator).
           </li>
         </ol>
-        <div class="d-flex flex-wrap ga-4 align-start my-3">
+        <div class="d-flex flex-wrap ga-4 align-start my-4">
           <QrCode :value="enrollment.otpauthUri" label="QR code for the authenticator app" />
-          <div class="flex-grow-1 d-flex flex-column ga-3" style="min-width: 220px">
+          <div class="flex-grow-1 d-flex flex-column ga-4" style="min-width: 220px">
             <CopyField
               :value="grouped(enrollment.secret)"
               label="Key for typing in"
               testid="totp-secret"
             />
             <CopyField :value="enrollment.otpauthUri" label="otpauth link" testid="totp-uri" />
-            <a :href="enrollment.otpauthUri" class="text-body-2">Open in an app on this device</a>
+            <a :href="enrollment.otpauthUri" class="text-body-medium"
+              >Open in an app on this device</a
+            >
           </div>
         </div>
         <v-form data-testid="totp-confirm-form" @submit.prevent="confirm">
@@ -171,18 +174,11 @@ async function regenerate(): Promise<void> {
             autofocus
             data-testid="totp-confirm-code"
           />
-          <v-alert
-            v-if="error"
-            type="error"
-            variant="tonal"
-            density="compact"
-            role="alert"
-            class="mb-3"
-          >
+          <v-alert v-if="error" type="error" role="alert" class="mb-4">
             {{ error }}
           </v-alert>
           <div class="d-flex ga-2">
-            <v-btn variant="text" @click="enrollment = null">Cancel</v-btn>
+            <v-btn @click="enrollment = null">Cancel</v-btn>
             <v-spacer />
             <v-btn
               type="submit"
@@ -201,9 +197,9 @@ async function regenerate(): Promise<void> {
         <p data-testid="recovery-left">
           {{ account.recoveryCodesLeft }} of 10 recovery codes left.
         </p>
-        <div class="d-flex flex-wrap ga-2 mt-3">
+        <div class="d-flex flex-wrap ga-2 mt-4">
           <v-btn
-            variant="tonal"
+            variant="outlined"
             :disabled="busy"
             data-testid="totp-regenerate"
             @click="confirmRegenerate = true"
@@ -211,7 +207,7 @@ async function regenerate(): Promise<void> {
             New recovery codes
           </v-btn>
           <v-btn
-            variant="tonal"
+            variant="outlined"
             color="error"
             :disabled="busy"
             data-testid="totp-disable"
@@ -225,9 +221,9 @@ async function regenerate(): Promise<void> {
       <template v-else>
         <p>A code from an app as a second step after the password.</p>
         <v-btn
-          class="mt-3"
+          class="mt-4"
           color="primary"
-          variant="tonal"
+          variant="outlined"
           :loading="busy"
           data-testid="totp-enroll"
           @click="begin"
@@ -257,6 +253,6 @@ async function regenerate(): Promise<void> {
 
 <style scoped>
 .steps {
-  padding-left: 1.2rem;
+  padding-left: var(--app-space-6);
 }
 </style>

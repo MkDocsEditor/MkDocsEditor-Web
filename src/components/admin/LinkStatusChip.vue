@@ -12,7 +12,7 @@ const LABELS: Record<LinkStatus, { text: string; color: string }> = {
 </script>
 
 <template>
-  <v-chip size="small" :color="LABELS[status].color" variant="tonal" data-testid="link-status">
+  <v-chip size="small" :color="LABELS[status].color" data-testid="link-status">
     {{ LABELS[status].text }}
   </v-chip>
 </template>

@@ -32,6 +32,6 @@ const parts = computed(() => {
   background: rgb(var(--v-theme-primary-container));
   color: rgb(var(--v-theme-on-primary-container));
   font-weight: 600;
-  border-radius: 2px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
 }
 </style>

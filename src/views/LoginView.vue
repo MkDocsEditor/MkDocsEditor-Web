@@ -203,14 +203,7 @@ onBeforeUnmount(() => cancelPasskeyRequest())
 
 <template>
   <AuthCard title="Sign in" subtitle="Edit the wiki">
-    <v-alert
-      v-if="endedHint && !error"
-      type="info"
-      variant="tonal"
-      density="compact"
-      class="mb-4"
-      data-testid="session-ended"
-    >
+    <v-alert v-if="endedHint && !error" type="info" class="mb-4" data-testid="session-ended">
       Your session ended. Please sign in again. Unsaved changes are kept.
     </v-alert>
 
@@ -228,20 +221,13 @@ onBeforeUnmount(() => cancelPasskeyRequest())
         :disabled="loading"
       />
       <PasswordField id="login-password" v-model="password" :disabled="loading" />
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        class="my-3"
-        role="alert"
-        data-testid="login-error"
-      >
+      <v-alert v-if="error" type="error" class="my-4" role="alert" data-testid="login-error">
         {{ error }}
       </v-alert>
       <v-btn
         type="submit"
         color="primary"
-        size="large"
+        variant="flat"
         block
         class="mt-2"
         :loading="loading"
@@ -250,10 +236,9 @@ onBeforeUnmount(() => cancelPasskeyRequest())
         Sign in
       </v-btn>
       <template v-if="canUsePasskeys">
-        <div class="text-center text-medium-emphasis my-3">or</div>
+        <div class="text-center text-medium-emphasis my-4">or</div>
         <v-btn
           variant="outlined"
-          size="large"
           block
           :prepend-icon="mdiFingerprint"
           :disabled="loading"
@@ -300,20 +285,13 @@ onBeforeUnmount(() => cancelPasskeyRequest())
         :disabled="loading"
         data-testid="recovery-input"
       />
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        class="my-3"
-        role="alert"
-        data-testid="login-error"
-      >
+      <v-alert v-if="error" type="error" class="my-4" role="alert" data-testid="login-error">
         {{ error }}
       </v-alert>
       <v-btn
         type="submit"
         color="primary"
-        size="large"
+        variant="flat"
         block
         :loading="loading"
         :disabled="!code.trim()"
@@ -323,7 +301,6 @@ onBeforeUnmount(() => cancelPasskeyRequest())
       <div class="d-flex flex-column align-center ga-1 mt-4">
         <v-btn
           v-if="factor === 'totp' && challenge.methods.includes('recovery-code')"
-          variant="text"
           size="small"
           @click="((factor = 'recovery-code'), (code = ''), (error = ''))"
         >
@@ -331,7 +308,6 @@ onBeforeUnmount(() => cancelPasskeyRequest())
         </v-btn>
         <v-btn
           v-if="factor === 'recovery-code' && challenge.methods.includes('totp')"
-          variant="text"
           size="small"
           @click="((factor = 'totp'), (code = ''), (error = ''))"
         >
@@ -339,7 +315,6 @@ onBeforeUnmount(() => cancelPasskeyRequest())
         </v-btn>
         <v-btn
           v-if="challenge.methods.includes('passkey') && passkeysSupported()"
-          variant="text"
           size="small"
           :prepend-icon="mdiFingerprint"
           :disabled="loading"
@@ -347,9 +322,7 @@ onBeforeUnmount(() => cancelPasskeyRequest())
         >
           Use a passkey
         </v-btn>
-        <v-btn variant="text" size="small" :prepend-icon="mdiArrowLeft" @click="restart">
-          Back
-        </v-btn>
+        <v-btn size="small" :prepend-icon="mdiArrowLeft" @click="restart"> Back </v-btn>
       </div>
     </v-form>
   </AuthCard>

@@ -102,10 +102,11 @@ watch(
 </template>
 
 <style>
+/* stylelint-disable color-no-hex -- the highlight of ==marks==, which is not in the theme */
 .markdown-preview {
   height: 100%;
   overflow-y: auto;
-  padding: 12px 20px 48px;
+  padding: var(--app-space-2) var(--app-space-6) var(--app-space-8);
 
   /* the variables of preview.css, from the Vuetify theme */
   --md-primary: rgb(var(--v-theme-primary));

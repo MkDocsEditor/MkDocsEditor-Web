@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 
 import { ApiError, useApi } from '@/api'
 import type { MoveRequest, MoveResult, SectionModel, TreeItem } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import TreeBrowser from '@/components/tree/TreeBrowser.vue'
 import { ITEM_LABELS, plural, stripMarkdownExtension, validateName } from '@/services/names'
 import { followMovedRoute } from '@/composables/useMovedRedirect'
@@ -152,7 +153,7 @@ const title = computed(() => {
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="720" :fullscreen="$vuetify.display.xs" scrollable>
+  <AppDialog v-model="open" size="medium" scrollable>
     <v-card v-if="item" data-testid="move-dialog">
       <v-card-title class="text-wrap">{{ title }}</v-card-title>
       <v-card-text>
@@ -161,11 +162,10 @@ const title = computed(() => {
           label="Name"
           :suffix="item.type === 'document' ? '.md' : undefined"
           :error-messages="nameValid === true ? [] : [nameValid]"
-          density="compact"
           class="mb-1"
           data-testid="move-name"
         />
-        <p class="text-body-2 mb-1">
+        <p class="text-body-medium mb-1">
           Into <strong data-testid="move-target">{{ targetPath }}</strong>
         </p>
         <TreeBrowser
@@ -174,23 +174,10 @@ const title = computed(() => {
           :disabled-ids="blocked"
           search-placeholder="Search folders…"
         />
-        <v-divider class="my-3" />
+        <v-divider class="my-4" />
         <div class="move-dialog__preview" aria-live="polite" data-testid="move-preview">
-          <v-progress-linear
-            v-if="loading"
-            indeterminate
-            color="primary"
-            class="mb-2"
-            data-testid="move-loading"
-          />
-          <v-alert
-            v-if="problem"
-            type="warning"
-            variant="tonal"
-            density="compact"
-            :text="problem"
-            data-testid="move-problem"
-          />
+          <v-progress-linear v-if="loading" indeterminate class="mb-2" data-testid="move-loading" />
+          <v-alert v-if="problem" type="warning" :text="problem" data-testid="move-problem" />
           <p v-else-if="unchanged" class="text-medium-emphasis">Choose another folder or name.</p>
           <template v-else-if="preview">
             <p class="mb-2">
@@ -218,15 +205,15 @@ const title = computed(() => {
               >
                 <v-expansion-panel-title>
                   <div class="text-truncate">
-                    <div class="text-body-2 text-truncate">{{ doc.newPath }}</div>
-                    <div class="text-caption text-medium-emphasis">
+                    <div class="text-body-medium text-truncate">{{ doc.newPath }}</div>
+                    <div class="text-body-small text-medium-emphasis">
                       {{ plural(doc.edits.length, 'line') }}
                     </div>
                   </div>
                 </v-expansion-panel-title>
                 <v-expansion-panel-text>
                   <div v-for="edit in doc.edits" :key="edit.line" class="move-dialog__edit">
-                    <div class="text-caption text-medium-emphasis">Line {{ edit.line }}</div>
+                    <div class="text-body-small text-medium-emphasis">Line {{ edit.line }}</div>
                     <div
                       class="move-dialog__line move-dialog__line--before"
                       v-text="`− ${edit.before}`"
@@ -241,15 +228,15 @@ const title = computed(() => {
               <v-expansion-panel v-if="preview.config.length > 0" data-testid="move-config">
                 <v-expansion-panel-title>
                   <div>
-                    <div class="text-body-2">mkdocs.yml</div>
-                    <div class="text-caption text-medium-emphasis">
+                    <div class="text-body-medium">mkdocs.yml</div>
+                    <div class="text-body-small text-medium-emphasis">
                       {{ plural(preview.config.length, 'line') }} (navigation and theme)
                     </div>
                   </div>
                 </v-expansion-panel-title>
                 <v-expansion-panel-text>
                   <div v-for="edit in preview.config" :key="edit.line" class="move-dialog__edit">
-                    <div class="text-caption text-medium-emphasis">Line {{ edit.line }}</div>
+                    <div class="text-body-small text-medium-emphasis">Line {{ edit.line }}</div>
                     <div
                       class="move-dialog__line move-dialog__line--before"
                       v-text="`− ${edit.before}`"
@@ -267,7 +254,7 @@ const title = computed(() => {
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" :disabled="applying" @click="move.close()">Cancel</v-btn>
+        <v-btn :disabled="applying" @click="move.close()">Cancel</v-btn>
         <v-btn
           color="primary"
           variant="flat"
@@ -280,7 +267,7 @@ const title = computed(() => {
         </v-btn>
       </v-card-actions>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>
 
 <style scoped>
@@ -288,15 +275,15 @@ const title = computed(() => {
   min-height: 48px;
 }
 .move-dialog__edit + .move-dialog__edit {
-  margin-top: 8px;
+  margin-top: var(--app-space-2);
 }
 .move-dialog__line {
-  font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.8125rem;
+  font-family: var(--app-font-mono);
+  font-size: var(--md-sys-typescale-body-medium-size);
   white-space: pre-wrap;
   word-break: break-word;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: var(--app-space-half) var(--app-space-2);
+  border-radius: var(--md-sys-shape-corner-extra-small);
 }
 .move-dialog__line--before {
   color: rgb(var(--v-theme-code-deleted));

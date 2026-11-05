@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import type { CreatedLink } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import CopyField from '@/components/auth/CopyField.vue'
 import QrCode from '@/components/auth/QrCode.vue'
 import { roleLabel } from '@/services/accountRules'
@@ -20,10 +21,10 @@ const url = computed(() => {
 </script>
 
 <template>
-  <v-dialog :model-value="link !== null" max-width="480" @update:model-value="emit('close')">
+  <AppDialog :model-value="link !== null" @update:model-value="emit('close')">
     <v-card v-if="link" :title="title" data-testid="link-result">
       <v-card-text>
-        <p class="mb-3">
+        <p class="mb-4">
           Hand the link over in person (messenger, QR code). It works only once and is valid until
           {{ formatTime(link.link.expiresAt) }}.
           <template v-if="link.link.kind === 'invite'">
@@ -31,9 +32,7 @@ const url = computed(() => {
             >.
           </template>
         </p>
-        <v-alert type="warning" variant="tonal" density="compact" class="mb-4">
-          The link is shown only now.
-        </v-alert>
+        <v-alert type="warning" class="mb-4"> The link is shown only now. </v-alert>
         <div class="d-flex justify-center mb-4">
           <QrCode :value="url" :size="220" label="QR code of the link" />
         </div>
@@ -44,5 +43,5 @@ const url = computed(() => {
         <v-btn color="primary" variant="flat" @click="emit('close')">Done</v-btn>
       </v-card-actions>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>

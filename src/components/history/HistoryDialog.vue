@@ -5,6 +5,7 @@ import { useDisplay } from 'vuetify'
 
 import { useApi } from '@/api'
 import type { Revision } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
 import { diffStats, parseUnifiedDiff } from '@/services/diff'
@@ -141,7 +142,7 @@ const viewLabels: Record<View, string> = {
 </script>
 
 <template>
-  <v-dialog v-model="open" :fullscreen="mobile" max-width="1100" scrollable>
+  <AppDialog v-model="open" size="large" :fullscreen="mobile" scrollable>
     <v-card class="history" data-testid="history-dialog">
       <v-toolbar density="comfortable" color="surface">
         <v-btn
@@ -158,7 +159,7 @@ const viewLabels: Record<View, string> = {
       <v-divider />
 
       <v-card-text class="history__body pa-0">
-        <v-progress-linear v-if="loading" indeterminate color="primary" />
+        <v-progress-linear v-if="loading" indeterminate />
         <LoadError
           v-else-if="loadError"
           class="ma-4"
@@ -182,7 +183,6 @@ const viewLabels: Record<View, string> = {
             v-show="!mobile || !selected"
             class="history__list"
             lines="three"
-            density="compact"
             data-testid="history-list"
           >
             <v-list-item
@@ -195,24 +195,24 @@ const viewLabels: Record<View, string> = {
             >
               <v-list-item-title>{{ formatWhen(revision.time) }}</v-list-item-title>
               <v-list-item-subtitle>{{ authorLine(revision) }}</v-list-item-subtitle>
-              <v-list-item-subtitle class="text-caption">
+              <v-list-item-subtitle class="text-body-small">
                 {{ title(revision) }}
               </v-list-item-subtitle>
             </v-list-item>
           </v-list>
 
           <div v-if="selected" class="history__detail" data-testid="history-detail">
-            <div class="history__detail-head pa-3">
+            <div class="history__detail-head pa-4">
               <div class="flex-grow-1">
-                <div class="text-subtitle-1">{{ formatDate(selected.time) }}</div>
-                <div class="text-body-2 text-medium-emphasis">
+                <div class="text-title-medium">{{ formatDate(selected.time) }}</div>
+                <div class="text-body-medium text-medium-emphasis">
                   {{ authorLine(selected) }} · {{ title(selected) }} · {{ shortRev(selected) }}
                 </div>
               </div>
               <v-btn
                 v-if="!readOnly && selected !== revisions[0]"
                 color="primary"
-                variant="tonal"
+                variant="outlined"
                 :prepend-icon="mdiRestore"
                 :loading="restoring"
                 data-testid="history-restore"
@@ -221,25 +221,23 @@ const viewLabels: Record<View, string> = {
                 Restore
               </v-btn>
             </div>
-            <v-tabs v-model="view" density="compact" class="px-3">
+            <v-tabs v-model="view" class="px-4">
               <v-tab v-for="(label, key) in viewLabels" :key="key" :value="key">{{ label }}</v-tab>
             </v-tabs>
             <v-divider />
-            <v-progress-linear v-if="detailLoading" indeterminate color="primary" />
+            <v-progress-linear v-if="detailLoading" indeterminate />
             <v-alert
               v-if="restoreError"
               type="error"
-              variant="tonal"
-              density="compact"
               role="alert"
-              class="ma-3"
+              class="ma-4"
               title="Restore failed"
               :text="describeError(restoreError)"
               data-testid="history-restore-error"
             />
             <LoadError
               v-if="detailError"
-              class="ma-3"
+              class="ma-4"
               title="Could not load the version"
               :error="detailError"
               @retry="loadDetail"
@@ -248,7 +246,7 @@ const viewLabels: Record<View, string> = {
               content
             }}</pre>
             <template v-else>
-              <div v-if="!detailLoading" class="text-caption text-medium-emphasis px-3 py-1">
+              <div v-if="!detailLoading" class="text-body-small text-medium-emphasis px-4 py-1">
                 <template v-if="diffLines.length === 0">No differences</template>
                 <template v-else>
                   <span class="history__added">+{{ stats.added }}</span>
@@ -288,7 +286,7 @@ const viewLabels: Record<View, string> = {
       confirm-text="Restore"
       @confirm="restore"
     />
-  </v-dialog>
+  </AppDialog>
 </template>
 
 <style scoped>
@@ -314,19 +312,19 @@ const viewLabels: Record<View, string> = {
 .history__detail-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--app-space-2);
   flex-wrap: wrap;
 }
 .history__text,
 .history__diff {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--app-font-mono);
+  font-size: var(--md-sys-typescale-body-medium-size);
   line-height: 1.5;
   overflow: auto;
   flex: 1 1 auto;
 }
 .history__text {
-  padding: 12px 16px;
+  padding: var(--app-space-2) var(--app-space-4);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -334,7 +332,7 @@ const viewLabels: Record<View, string> = {
   display: flex;
   white-space: pre-wrap;
   word-break: break-word;
-  padding: 0 12px 0 0;
+  padding: 0 var(--app-space-2) 0 0;
 }
 .history__sign {
   flex: 0 0 24px;
@@ -342,20 +340,20 @@ const viewLabels: Record<View, string> = {
   user-select: none;
 }
 .history__line--add {
-  background: rgba(46, 160, 67, 0.18);
+  background: rgba(var(--v-theme-code-inserted), 0.18);
 }
 .history__line--del {
-  background: rgba(248, 81, 73, 0.18);
+  background: rgba(var(--v-theme-code-deleted), 0.18);
 }
 .history__line--hunk {
   color: rgba(var(--v-theme-on-surface), 0.5);
   background: rgba(var(--v-theme-on-surface), 0.04);
 }
 .history__added {
-  color: rgb(46, 160, 67);
+  color: rgb(var(--v-theme-code-inserted));
 }
 .history__removed {
-  color: rgb(207, 34, 46);
+  color: rgb(var(--v-theme-code-deleted));
 }
 @media (max-width: 959px) {
   .history__list {

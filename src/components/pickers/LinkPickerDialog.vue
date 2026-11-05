@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 
 import { useApi } from '@/api'
 import type { DocumentModel, TreeItem } from '@/api'
+import AppDialog from '@/components/common/AppDialog.vue'
 import TreeBrowser from '@/components/tree/TreeBrowser.vue'
 import { headingsOf } from '@/markdown/headings'
 import type { Heading } from '@/markdown/headings'
@@ -88,12 +89,12 @@ const ownPage = computed(() => page.value?.id === props.documentId)
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="640" :fullscreen="$vuetify.display.xs" scrollable>
+  <AppDialog v-model="open" size="medium" scrollable>
     <v-card data-testid="link-picker">
       <v-card-title class="d-flex align-center">
         <span class="flex-grow-1">Insert link</span>
       </v-card-title>
-      <v-tabs v-model="tab" density="compact" class="px-4">
+      <v-tabs v-model="tab" class="px-4">
         <v-tab value="wiki" data-testid="link-tab-wiki">In the wiki</v-tab>
         <v-tab value="web" data-testid="link-tab-web">Web address</v-tab>
       </v-tabs>
@@ -103,7 +104,6 @@ const ownPage = computed(() => page.value?.id === props.documentId)
           label="Link text"
           :placeholder="tab === 'wiki' ? 'Name of the target' : 'The address'"
           persistent-placeholder
-          density="compact"
           class="mb-2"
           hide-details
           data-testid="link-text"
@@ -113,7 +113,6 @@ const ownPage = computed(() => page.value?.id === props.documentId)
             <div class="d-flex align-center ga-2 mb-2">
               <v-btn
                 :icon="mdiArrowLeft"
-                variant="text"
                 size="small"
                 aria-label="Back"
                 data-testid="link-back"
@@ -121,7 +120,7 @@ const ownPage = computed(() => page.value?.id === props.documentId)
               />
               <strong class="text-truncate">{{ page.name }}</strong>
             </div>
-            <v-list density="compact" class="py-0">
+            <v-list class="py-0">
               <v-list-item
                 :prepend-icon="mdiFileDocumentOutline"
                 :title="ownPage ? 'This page' : 'The whole page'"
@@ -167,7 +166,7 @@ const ownPage = computed(() => page.value?.id === props.documentId)
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" @click="open = false">Cancel</v-btn>
+        <v-btn @click="open = false">Cancel</v-btn>
         <v-btn
           v-if="tab === 'web'"
           color="primary"
@@ -180,7 +179,7 @@ const ownPage = computed(() => page.value?.id === props.documentId)
         </v-btn>
       </v-card-actions>
     </v-card>
-  </v-dialog>
+  </AppDialog>
 </template>
 
 <style scoped>
