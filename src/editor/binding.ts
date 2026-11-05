@@ -8,6 +8,11 @@ import type { DocumentSession, TextChange, TextSelection } from '@/sync/session'
 /** Marks transactions that come from the session, so they are not sent back. */
 const remoteChange = Annotation.define<boolean>()
 
+/** Whether this user changed the text: not someone else, and not a resync. */
+export function isLocalEdit(tr: Transaction): boolean {
+  return tr.docChanged && !tr.annotation(remoteChange)
+}
+
 /** Sequential TextChanges (each relative to the result of the previous) as one ChangeSet. */
 export function toChangeSet(changes: readonly TextChange[], length: number): ChangeSet {
   let set = ChangeSet.empty(length)
@@ -69,7 +74,7 @@ export function sessionBinding(session: DocumentSession): Extension {
 
       update(update: ViewUpdate): void {
         for (const tr of update.transactions) {
-          if (tr.docChanged && !tr.annotation(remoteChange)) {
+          if (isLocalEdit(tr)) {
             session.applyLocalChanges(fromChangeSet(tr.changes))
           }
         }

@@ -6,23 +6,31 @@ import type { DecorationSet } from '@codemirror/view'
 import type { Peer } from '@/sync/session'
 
 /** Replaces the shown peers (their selections are indices of the current document). */
-export const setPeers = StateEffect.define<readonly Peer[]>()
+export const setPeers = StateEffect.define<readonly ShownPeer[]>()
+
+/** Someone whose cursor shows. A ghost has left and is faint. */
+export type ShownPeer = Pick<Peer, 'username' | 'displayName' | 'color' | 'selections'> & {
+  ghost?: boolean
+}
+
+const GHOST_OPACITY = 0.4
 
 class CursorWidget extends WidgetType {
   constructor(
     readonly name: string,
     readonly color: string,
+    readonly ghost: boolean,
   ) {
     super()
   }
 
   override eq(other: CursorWidget): boolean {
-    return other.name === this.name && other.color === this.color
+    return other.name === this.name && other.color === this.color && other.ghost === this.ghost
   }
 
   toDOM(): HTMLElement {
     const caret = document.createElement('span')
-    caret.className = 'cm-remote-caret'
+    caret.className = this.ghost ? 'cm-remote-caret cm-remote-caret--ghost' : 'cm-remote-caret'
     caret.style.borderColor = this.color
     caret.setAttribute('aria-hidden', 'true')
     const label = document.createElement('span')
@@ -55,7 +63,7 @@ export function withAlpha(color: string, alpha: number): string {
   return `#${full}${a}`
 }
 
-export function peerDecorations(peers: readonly Peer[], docLength: number): DecorationSet {
+export function peerDecorations(peers: readonly ShownPeer[], docLength: number): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const clamp = (n: number) => Math.max(0, Math.min(docLength, n))
   for (const peer of peers) {
@@ -69,12 +77,17 @@ export function peerDecorations(peers: readonly Peer[], docLength: number): Deco
         ranges.push(
           Decoration.mark({
             class: 'cm-remote-selection',
-            attributes: { style: `background-color: ${withAlpha(peer.color, 0.25)}` },
+            attributes: {
+              style: `background-color: ${withAlpha(peer.color, peer.ghost ? 0.25 * GHOST_OPACITY : 0.25)}`,
+            },
           }).range(from, to),
         )
       }
       ranges.push(
-        Decoration.widget({ widget: new CursorWidget(name, peer.color), side: 1 }).range(head),
+        Decoration.widget({
+          widget: new CursorWidget(name, peer.color, !!peer.ghost),
+          side: 1,
+        }).range(head),
       )
     }
   }
@@ -99,6 +112,9 @@ const theme = EditorView.baseTheme({
     borderLeft: '2px solid',
     marginLeft: '-1px',
     marginRight: '-1px',
+  },
+  '.cm-remote-caret--ghost': {
+    opacity: GHOST_OPACITY,
   },
   '.cm-remote-caret-label': {
     position: 'absolute',

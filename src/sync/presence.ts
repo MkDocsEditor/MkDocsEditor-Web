@@ -1,13 +1,39 @@
-import { shallowRef } from 'vue'
+import { ref, shallowRef } from 'vue'
 
 import { UNKNOWN_USER_COLOR } from './authors'
 import type { AmDoc, AutomergeApi } from './automerge'
-import type { LastPosition, PresenceInfo, SendMessage } from './protocol'
-import type { Peer, TextSelection } from './session'
+import type {
+  LastPosition,
+  PresenceInfo,
+  PresenceLeave,
+  SendMessage,
+  ViewportInfo,
+} from './protocol'
+import type { Ghost, Peer, TextRange, TextSelection } from './session'
+
+/** At most about twice per second while scrolling (protocol section 6, "Viewport"). */
+const VIEWPORT_MS = 500
+
+type WireSelections = PresenceInfo['selections']
+
+interface Resolved {
+  selections: TextSelection[]
+  viewport?: TextRange
+}
 
 interface PeerState {
   info: PresenceInfo
-  resolved: TextSelection[]
+  resolved: Resolved
+}
+
+interface GhostState {
+  accountId: string
+  username: string
+  displayName?: string
+  color?: string
+  selections: WireSelections
+  viewport?: ViewportInfo
+  timer: ReturnType<typeof setTimeout>
 }
 
 export interface PresenceOptions {
@@ -21,17 +47,26 @@ export interface PresenceOptions {
 }
 
 /**
- * Who else has the document open and where their cursors are, and our own cursor for them
+ * Who else has the document open and where their cursors and viewports are, and our own for them
  * (protocol section 6): Automerge cursors, plus the reserved strings `start` (empty text) and
- * `end` (caret after the last character).
+ * `end` (caret after the last character). An account that leaves stays as a ghost for as long as
+ * the server says.
  */
 export function createPresence(options: PresenceOptions) {
   const peers = shallowRef<Peer[]>([])
+  const ghosts = shallowRef<Ghost[]>([])
+  const known = ref(false)
   const lastPositions = shallowRef<readonly LastPosition[]>([])
   const states = new Map<string, PeerState>()
+  const ghostStates = new Map<string, GhostState>()
   let pendingSelections: readonly TextSelection[] = []
+  /** Undefined until the editor has told us: then a message leaves the server's value alone. */
+  let pendingViewport: TextRange | null | undefined
+  let nextViewport: TextRange | null = null
   let lastSent = 0
+  let lastViewportAt = 0
   let timer: ReturnType<typeof setTimeout> | null = null
+  let viewportTimer: ReturnType<typeof setTimeout> | null = null
 
   const text = () => options.doc()?.content ?? ''
 
@@ -48,24 +83,41 @@ export function createPresence(options: PresenceOptions) {
     return options.automerge().getCursorPosition(options.doc()!, ['content'], cursor)
   }
 
-  /** Publishes the peers, with their cursors at the positions in the current text. */
+  /** What the cursors mean in the current text; `previous` where they point into unknown changes. */
+  function resolved(
+    selections: WireSelections,
+    viewport: ViewportInfo | undefined,
+    previous: Resolved,
+  ): Resolved {
+    let nextSelections = previous.selections
+    try {
+      nextSelections = (selections ?? []).map((s) => ({
+        anchor: cursorPosition(s.anchor),
+        head: cursorPosition(s.head),
+      }))
+    } catch {
+      // the cursor points into a change we have not received yet
+    }
+    let nextView: TextRange | undefined
+    if (viewport) {
+      try {
+        nextView = {
+          top: cursorPosition(viewport.top),
+          bottom: cursorPosition(viewport.bottom),
+        }
+      } catch {
+        nextView = previous.viewport
+      }
+    }
+    return { selections: nextSelections, viewport: nextView }
+  }
+
+  /** Publishes the peers and ghosts, at their positions in the current text. */
   function resolve(): void {
     if (!options.doc()) return
     const list: Peer[] = []
     for (const state of states.values()) {
-      const resolved: TextSelection[] = []
-      let ok = true
-      for (const s of state.info.selections ?? []) {
-        try {
-          resolved.push({
-            anchor: cursorPosition(s.anchor),
-            head: cursorPosition(s.head),
-          })
-        } catch {
-          ok = false // the cursor points into a change we have not received yet
-        }
-      }
-      if (ok) state.resolved = resolved
+      state.resolved = resolved(state.info.selections, state.info.viewport, state.resolved)
       list.push({
         clientId: state.info.clientId,
         accountId: state.info.accountId,
@@ -73,10 +125,41 @@ export function createPresence(options: PresenceOptions) {
         username: state.info.username,
         displayName: state.info.displayName ?? state.info.username,
         color: state.info.color ?? UNKNOWN_USER_COLOR,
-        selections: state.resolved,
+        ...state.resolved,
       })
     }
     peers.value = list
+    ghosts.value = [...ghostStates.values()].map((ghost) => ({
+      accountId: ghost.accountId,
+      username: ghost.username,
+      displayName: ghost.displayName ?? ghost.username,
+      color: ghost.color ?? UNKNOWN_USER_COLOR,
+      ...resolved(ghost.selections, ghost.viewport, { selections: [] }),
+    }))
+  }
+
+  function endGhost(accountId: string | undefined): void {
+    if (!accountId) return
+    const ghost = ghostStates.get(accountId)
+    if (!ghost) return
+    clearTimeout(ghost.timer)
+    ghostStates.delete(accountId)
+  }
+
+  function endAllGhosts(): void {
+    for (const ghost of ghostStates.values()) clearTimeout(ghost.timer)
+    ghostStates.clear()
+  }
+
+  function addGhost(ghost: Omit<GhostState, 'timer'>, ghostMs: number): void {
+    endGhost(ghost.accountId)
+    ghostStates.set(ghost.accountId, {
+      ...ghost,
+      timer: setTimeout(() => {
+        ghostStates.delete(ghost.accountId)
+        resolve()
+      }, ghostMs),
+    })
   }
 
   function send(): void {
@@ -90,34 +173,92 @@ export function createPresence(options: PresenceOptions) {
         anchor: cursorAt(s.anchor),
         head: cursorAt(s.head),
       })),
+      ...(pendingViewport === undefined
+        ? {}
+        : {
+            viewport: pendingViewport && {
+              top: cursorAt(pendingViewport.top),
+              bottom: cursorAt(pendingViewport.bottom),
+            },
+          }),
     })
+  }
+
+  function schedule(): void {
+    if (timer) return
+    timer = setTimeout(send, Math.max(0, options.presenceMs - (Date.now() - lastSent)))
+  }
+
+  function applyViewport(): void {
+    viewportTimer = null
+    lastViewportAt = Date.now()
+    pendingViewport = nextViewport
+    schedule()
   }
 
   return {
     peers,
+    ghosts,
+    known,
     resolve,
     /** A peer's presence changed. */
     update(info: PresenceInfo): void {
-      states.set(info.clientId, { info, resolved: states.get(info.clientId)?.resolved ?? [] })
+      endGhost(info.accountId)
+      states.set(info.clientId, {
+        info,
+        resolved: states.get(info.clientId)?.resolved ?? { selections: [] },
+      })
       resolve()
     },
     /** The complete list of peers. */
     replaceAll(list: readonly PresenceInfo[], last: readonly LastPosition[] = []): void {
       lastPositions.value = last
       states.clear()
-      for (const info of list) states.set(info.clientId, { info, resolved: [] })
+      for (const info of list) states.set(info.clientId, { info, resolved: { selections: [] } })
+      endAllGhosts()
+      const online = new Set(list.map((info) => info.accountId))
+      for (const position of last) {
+        if (position.ghostMs === undefined || online.has(position.accountId)) continue
+        addGhost(
+          {
+            accountId: position.accountId,
+            username: position.username ?? '',
+            displayName: position.displayName,
+            color: position.color,
+            selections: position.selections,
+            viewport: position.viewport,
+          },
+          position.ghostMs,
+        )
+      }
+      known.value = true
       resolve()
     },
-    remove(clientId: string): void {
-      states.delete(clientId)
+    remove(leave: PresenceLeave): void {
+      const info = states.get(leave.clientId)?.info
+      states.delete(leave.clientId)
+      if (leave.accountId && leave.ghostMs !== undefined) {
+        addGhost(
+          {
+            accountId: leave.accountId,
+            username: info?.username ?? '',
+            displayName: info?.displayName,
+            color: info?.color,
+            selections: leave.selections,
+            viewport: leave.viewport,
+          },
+          leave.ghostMs,
+        )
+      }
       resolve()
     },
-    /** Where the cursor of this account was last; null if unknown or not resolvable here. */
+    /** Where this account was last; null if unknown or not resolvable here. */
     lastPositionOf(accountId: string): number | null {
-      const head = lastPositions.value.find((p) => p.accountId === accountId)?.selections?.[0]?.head
-      if (head === undefined || !options.doc()) return null
+      const entry = lastPositions.value.find((p) => p.accountId === accountId)
+      const position = entry?.selections?.[0]?.head ?? entry?.viewport?.top
+      if (position === undefined || !options.doc()) return null
       try {
-        return cursorPosition(head)
+        return cursorPosition(position)
       } catch {
         return null // points into a change we do not have
       }
@@ -125,23 +266,41 @@ export function createPresence(options: PresenceOptions) {
     /** The connection ended: nobody is known to be here. */
     clear(): void {
       states.clear()
+      endAllGhosts()
       peers.value = []
+      ghosts.value = []
+      known.value = false
     },
     /** Our own text changed, which moves the cursors of the others. */
     onLocalEdit(): void {
-      if (states.size > 0) resolve()
+      if (states.size > 0 || ghostStates.size > 0) resolve()
     },
     setLocalSelections(selections: readonly TextSelection[]): void {
       pendingSelections = selections
-      if (timer) return
-      timer = setTimeout(send, Math.max(0, options.presenceMs - (Date.now() - lastSent)))
+      schedule()
     },
-    /** A new connection is ready: tells it where our cursor is. */
+    setLocalViewport(viewport: TextRange | null): void {
+      nextViewport = viewport
+      if (viewport === null) {
+        // at once: followers must not stay on a place this user no longer looks at
+        if (viewportTimer) clearTimeout(viewportTimer)
+        applyViewport()
+      } else if (!viewportTimer) {
+        // the last value of a scroll is sent by this timer too, as the message when it stops
+        viewportTimer = setTimeout(
+          applyViewport,
+          Math.max(0, VIEWPORT_MS - (Date.now() - lastViewportAt)),
+        )
+      }
+    },
+    /** A new connection is ready: tells it where our cursor and viewport are. */
     sendCurrent(): void {
-      if (pendingSelections.length > 0) send()
+      if (pendingSelections.length > 0 || pendingViewport) send()
     },
     stop(): void {
       if (timer) clearTimeout(timer)
+      if (viewportTimer) clearTimeout(viewportTimer)
+      endAllGhosts()
     },
   }
 }

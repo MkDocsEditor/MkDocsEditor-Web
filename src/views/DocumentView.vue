@@ -44,6 +44,7 @@ import { useTreeStore } from '@/stores/tree'
 import { connectionBadge } from './document/connectionBadge'
 import { useDocumentSession } from './document/useDocumentSession'
 import { useEditorInsertion } from './document/useEditorInsertion'
+import { useFollow } from './document/useFollow'
 import { useJoinJump } from './document/useJoinJump'
 import { useSearchText } from './document/useSearchText'
 
@@ -62,16 +63,16 @@ const wikiUrl = computed(() => (page.value ? wikiPageUrl(page.value.url) : null)
 
 type Mode = 'edit' | 'split' | 'preview'
 const storedMode = useStored<Mode | null>('mkdocseditor.documentMode', null)
-/** Opened through a join link: into the editor, without changing the stored choice. */
-const joined = ref(false)
+/** Following someone needs the editor, without changing the stored choice. */
+const editorWanted = ref(false)
 const mode = computed<Mode>({
   get: () => {
     const m = storedMode.value ?? (mobile.value ? 'preview' : 'split')
-    if (joined.value && m === 'preview') return mobile.value ? 'edit' : 'split'
+    if (editorWanted.value && m === 'preview') return mobile.value ? 'edit' : 'split'
     return mobile.value && m === 'split' ? 'edit' : m
   },
   set: (m) => {
-    joined.value = false
+    editorWanted.value = false
     storedMode.value = m
   },
 })
@@ -102,13 +103,14 @@ function closeFilesOnPhone(): void {
 }
 const historyOpen = ref(false)
 
-const { session, text, ready, status, peers, onlineUsers } = useDocumentSession(
-  () => props.id,
-  (newId) => {
-    void tree.load().catch(() => undefined)
-    void router.replace({ name: 'document', params: { id: newId } })
-  },
-)
+const { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers } =
+  useDocumentSession(
+    () => props.id,
+    (newId) => {
+      void tree.load().catch(() => undefined)
+      void router.replace({ name: 'document', params: { id: newId } })
+    },
+  )
 useSearchText(() => props.id, text, ready)
 const connection = computed(() => connectionBadge(status.value))
 
@@ -205,10 +207,50 @@ watch(
 )
 
 const auth = useAuthStore()
+const follow = useFollow({
+  view: editorView,
+  peers: () => peers.value,
+  ghosts: () => ghosts.value,
+  presenceKnown: () => presenceKnown.value,
+  onEnded: (name) => notify.push(`${name} has left, no longer following.`),
+})
+const { following, paused: followPaused } = follow
+
+function startFollowing(accountId: string): void {
+  editorWanted.value = true
+  follow.start(accountId)
+}
+
+/** The users who can be followed: everybody but this user, in another tab or on another device. */
+function canFollow(accountId: string | undefined): accountId is string {
+  return !!accountId && accountId !== auth.user?.id
+}
+
+function followLabel(user: { name: string; accountId?: string }): string {
+  return following.value?.accountId === user.accountId
+    ? `Stop following ${user.name}`
+    : `Follow ${user.name}`
+}
+
+function toggleFollowing(accountId: string | undefined): void {
+  if (!canFollow(accountId)) return
+  if (following.value?.accountId === accountId) follow.stop()
+  else startFollowing(accountId)
+}
+
+// nobody to follow on another page, and the rendered page cannot show where someone is
+watch(session, () => follow.stop())
+watch(mode, (current) => {
+  if (current === 'preview') follow.stop()
+})
+
 const jump = useJoinJump({
   view: editorView,
   ready: () => ready.value,
   peers: () => peers.value,
+  ghosts: () => ghosts.value,
+  presenceKnown: () => presenceKnown.value,
+  onFollow: startFollowing,
   lastPosition: (accountId) => session.value?.lastPositionOf(accountId) ?? null,
   ownAccountId: () => auth.user?.id,
   onSenderNotFound: () => notify.push('Could not find the position of the person who invited you.'),
@@ -219,7 +261,7 @@ watch(
   () => route.query.join,
   (join) => {
     if (!join) return
-    joined.value = true
+    editorWanted.value = true
     jump.start(typeof route.query.from === 'string' ? route.query.from : undefined)
     void router.replace({ query: { ...route.query, join: undefined, from: undefined } })
   },
@@ -252,21 +294,41 @@ async function share(): Promise<void> {
           <v-tooltip
             v-for="user in onlineUsers"
             :key="user.name"
-            :text="user.name"
+            :text="canFollow(user.accountId) ? followLabel(user) : user.name"
             location="bottom"
           >
             <template #activator="{ props: tip }">
               <v-avatar
                 v-bind="tip"
+                :tag="canFollow(user.accountId) ? 'button' : 'div'"
                 :color="user.color"
                 size="30"
                 class="text-body-small text-white"
+                :class="{
+                  'document-view__avatar--followed':
+                    user.accountId && following?.accountId === user.accountId,
+                }"
+                :aria-label="canFollow(user.accountId) ? followLabel(user) : undefined"
+                data-testid="online-user"
+                @click="toggleFollowing(user.accountId)"
               >
                 {{ initials(user.name) }}
               </v-avatar>
             </template>
           </v-tooltip>
         </v-avatar-group>
+
+        <v-chip
+          v-if="following"
+          color="primary"
+          size="small"
+          closable
+          close-label="Stop following"
+          data-testid="following"
+          @click:close="follow.stop()"
+        >
+          Following {{ following.name }}<template v-if="followPaused"> (paused)</template>
+        </v-chip>
 
         <v-chip
           v-if="connection"
@@ -386,7 +448,9 @@ async function share(): Promise<void> {
           :upload="upload"
           :line-numbers="!mobile"
           :format-override="shortcutOverride"
+          :shown="mode !== 'preview'"
           @change="(t: string) => (text = t)"
+          @local-edit="follow.pause()"
           @top-line="(l: number) => (topLine = l)"
         />
       </div>
@@ -458,6 +522,10 @@ async function share(): Promise<void> {
   display: flex;
   flex-direction: column;
   height: calc(100dvh - var(--v-layout-top, 0px));
+}
+.document-view__avatar--followed {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 1px;
 }
 .document-view__panes {
   flex: 1;

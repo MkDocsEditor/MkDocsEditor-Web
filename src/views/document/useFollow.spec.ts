@@ -1,0 +1,168 @@
+import { mount } from '@vue/test-utils'
+import { EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, nextTick, ref, shallowRef } from 'vue'
+
+import type { Ghost, Peer } from '@/sync'
+
+import { FOLLOW_RESUME_MS, useFollow } from './useFollow'
+
+const anna = (head?: number): Peer => ({
+  clientId: 'c-1',
+  accountId: 'anna',
+  username: 'anna',
+  displayName: 'Anna',
+  color: '#000',
+  selections: head === undefined ? [] : [{ anchor: head, head }],
+})
+
+const annaGhost = (head: number): Ghost => ({
+  accountId: 'anna',
+  username: 'anna',
+  displayName: 'Anna',
+  color: '#000',
+  selections: [{ anchor: head, head }],
+})
+
+function setup() {
+  const view = new EditorView({
+    state: EditorState.create({ doc: 'x'.repeat(100), selection: { anchor: 3 } }),
+  })
+  const dispatch = vi.spyOn(view, 'dispatch')
+  const currentView = shallowRef<EditorView | null>(null)
+  const peers = shallowRef<Peer[]>([anna(10)])
+  const ghosts = shallowRef<Ghost[]>([])
+  const known = ref(true)
+  const ended = vi.fn()
+  let follow!: ReturnType<typeof useFollow>
+  const wrapper = mount(
+    defineComponent({
+      setup() {
+        follow = useFollow({
+          view: () => currentView.value,
+          peers: () => peers.value,
+          ghosts: () => ghosts.value,
+          presenceKnown: () => known.value,
+          onEnded: ended,
+        })
+        return () => null
+      },
+    }),
+  )
+  currentView.value = view
+  return { wrapper, view, dispatch, peers, ghosts, known, ended, follow }
+}
+
+describe('useFollow', () => {
+  beforeEach(() => void vi.useFakeTimers())
+  afterEach(() => void vi.useRealTimers())
+
+  it('scrolls to the account without moving the local cursor', async () => {
+    const { wrapper, view, dispatch, peers, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    await nextTick()
+    expect(follow.following.value).toEqual({ accountId: 'anna', name: 'Anna' })
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(dispatch.mock.calls[0]![0]).not.toHaveProperty('selection')
+    peers.value = [anna(20)]
+    await nextTick()
+    expect(dispatch).toHaveBeenCalledTimes(2)
+    expect(view.state.selection.main.head).toBe(3)
+    wrapper.unmount()
+  })
+
+  it('centers the middle of a viewport', async () => {
+    const { wrapper, dispatch, peers, follow } = setup()
+    peers.value = [{ ...anna(), viewport: { top: 10, bottom: 30 } }]
+    await nextTick()
+    follow.start('anna')
+    await nextTick()
+    const effect = [dispatch.mock.calls[0]![0].effects].flat()[0] as { value: { range: unknown } }
+    expect(effect.value.range).toMatchObject({ from: 20, to: 20 })
+    wrapper.unmount()
+  })
+
+  it('pauses on manual input, and catches up after the last of it', async () => {
+    const { wrapper, view, dispatch, peers, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    await nextTick()
+    dispatch.mockClear()
+    view.scrollDOM.dispatchEvent(new Event('wheel'))
+    expect(follow.paused.value).toBe(true)
+    peers.value = [anna(20)]
+    await nextTick()
+    expect(dispatch).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(FOLLOW_RESUME_MS - 1)
+    // inertia after the input keeps it paused
+    view.scrollDOM.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(FOLLOW_RESUME_MS - 1)
+    expect(follow.paused.value).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    await nextTick()
+    expect(follow.paused.value).toBe(false)
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('does not treat its own scrolling as manual input', async () => {
+    const { wrapper, view, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    await nextTick()
+    view.scrollDOM.dispatchEvent(new Event('scroll'))
+    expect(follow.paused.value).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('goes on with the ghost, and ends with it', async () => {
+    const { wrapper, dispatch, peers, ghosts, ended, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    await nextTick()
+    dispatch.mockClear()
+    peers.value = []
+    ghosts.value = [annaGhost(40)]
+    await nextTick()
+    expect(follow.following.value).not.toBeNull()
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    ghosts.value = []
+    await nextTick()
+    expect(follow.following.value).toBeNull()
+    expect(ended).toHaveBeenCalledWith('Anna')
+    wrapper.unmount()
+  })
+
+  it('does not end while disconnected, and resumes when the account is back', async () => {
+    const { wrapper, peers, known, ended, follow } = setup()
+    await nextTick()
+    follow.start('anna')
+    await nextTick()
+    known.value = false
+    peers.value = []
+    await nextTick()
+    expect(follow.following.value).not.toBeNull()
+    peers.value = [anna(30)]
+    known.value = true
+    await nextTick()
+    expect(follow.following.value).not.toBeNull()
+    expect(ended).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('ends without a note when stopped by the user, and replaces the followed account', async () => {
+    const { wrapper, peers, ended, follow } = setup()
+    peers.value = [anna(10), { ...anna(20), clientId: 'c-2', accountId: 'bob', displayName: 'Bob' }]
+    await nextTick()
+    follow.start('anna')
+    follow.start('bob')
+    expect(follow.following.value?.name).toBe('Bob')
+    follow.stop()
+    await nextTick()
+    expect(follow.following.value).toBeNull()
+    expect(ended).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+})

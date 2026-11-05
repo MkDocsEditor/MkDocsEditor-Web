@@ -1,23 +1,25 @@
 import { EditorView } from '@codemirror/view'
 import { onBeforeUnmount, ref, watch } from 'vue'
 
-import type { Peer } from '@/sync'
-import { senderPosition } from '@/sync/senderPosition'
+import type { Ghost, Peer } from '@/sync'
+import { followTarget, isPresent } from '@/sync/followTarget'
 
-/** How long a join link waits for the first cursor of its sender. */
+/** How long a join link waits to learn who is here, and for the last position of its sender. */
 export const SENDER_WAIT_MS = 5_000
 
 /**
- * The jump of a join link, once: to where the sender is now, or else where the sender was last. It
- * waits a moment for a sender who has no cursor yet, unless the reader has started doing something
- * on the page.
+ * What a join link does, once: follow a sender who is here or a ghost, or else go to where the
+ * sender was last. It stops waiting when the reader has started doing something on the page.
  */
 export function useJoinJump(options: {
   view: () => EditorView | null
   ready: () => boolean
   peers: () => readonly Peer[]
+  ghosts: () => readonly Ghost[]
+  presenceKnown: () => boolean
   lastPosition: (accountId: string) => number | null
   ownAccountId: () => string | undefined
+  onFollow: (accountId: string) => void
   onSenderNotFound: () => void
 }) {
   const sender = ref<string | null>(null)
@@ -47,6 +49,17 @@ export function useJoinJump(options: {
     view.focus()
   }
 
+  function follow(view: EditorView, accountId: string, last: number | null): void {
+    stop()
+    options.onFollow(accountId)
+    // here without a cursor yet: until they have one, the place they were last is the best guess
+    if (last !== null && !followTarget(options.peers(), options.ghosts(), accountId)) {
+      view.dispatch({
+        effects: EditorView.scrollIntoView(Math.min(last, view.state.doc.length), { y: 'center' }),
+      })
+    }
+  }
+
   watch(
     () => {
       const accountId = sender.value
@@ -54,17 +67,16 @@ export function useJoinJump(options: {
         accountId,
         options.ready(),
         options.view(),
+        options.presenceKnown(),
         options.peers(),
+        options.ghosts(),
         accountId ? options.lastPosition(accountId) : null,
       ] as const
     },
-    ([accountId, ready, view, peers, last]) => {
+    ([accountId, ready, view, known, peers, ghosts, last]) => {
       if (!accountId || !ready || !view) return
-      const live = senderPosition(peers, accountId)
-      if (live !== null) return jump(view, live)
-      // a sender who is online without a cursor may just be about to get one
-      const online = peers.some((peer) => peer.accountId === accountId)
-      if (!online && last !== null) return jump(view, last)
+      if (known && isPresent(peers, ghosts, accountId)) return follow(view, accountId, last)
+      if (known && last !== null) return jump(view, last)
       timer ??= setTimeout(() => {
         const fallback = options.lastPosition(accountId)
         const current = options.view()
