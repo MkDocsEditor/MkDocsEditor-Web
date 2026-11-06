@@ -17,6 +17,7 @@ import LinkResultDialog from '@/components/admin/LinkResultDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
 import LinkStatusChip from '@/components/admin/LinkStatusChip.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import { useLoad } from '@/composables/useLoad'
 import { roleLabel } from '@/services/accountRules'
 import { formatTime } from '@/services/time'
@@ -193,9 +194,14 @@ onMounted(load)
           :class="{ 'text-disabled': user.status === 'deleted' }"
         >
           <template #prepend>
-            <v-avatar :color="user.color" size="36" class="mr-1">
-              <span class="text-white">{{ (user.displayName || user.username).charAt(0) }}</span>
-            </v-avatar>
+            <UserAvatar
+              :name="user.displayName || user.username"
+              :color="user.color"
+              :account-id="user.id"
+              :avatar="user.avatar"
+              size="36"
+              class="mr-1"
+            />
           </template>
           <v-list-item-title>
             {{ user.displayName }}

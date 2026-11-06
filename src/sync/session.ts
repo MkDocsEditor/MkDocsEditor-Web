@@ -42,6 +42,10 @@ export interface SessionUser {
   username: string
   displayName: string
   color: string
+  /** The account, for its profile picture; absent on older servers. */
+  accountId?: string
+  /** Hash of the profile picture, see `avatarUrl`. */
+  avatar?: string | null
 }
 
 /** The user of this connection. */
@@ -64,7 +68,6 @@ export interface Peer extends SessionUser {
   clientId: string
   /** The client instance. Following and ghosts go by this: a reconnect has a new `clientId`. */
   instanceId: string
-  accountId?: string
   deviceName?: string
   lastActiveAt?: string
   /** Resolved to indices of the local text. Empty when the peer's editor is not focused. */

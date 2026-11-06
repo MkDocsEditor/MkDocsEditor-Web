@@ -163,6 +163,15 @@ export class AuthApi {
     return this.send('PATCH', '/account', patch)
   }
 
+  /** A JPEG, PNG or WebP of at most 5 MB. The server crops and scales it. */
+  setAvatar(image: Blob): Promise<AccountInfo> {
+    return this.api.json('PUT', '/account/avatar', { body: image })
+  }
+
+  deleteAvatar(): Promise<AccountInfo> {
+    return this.api.json('DELETE', '/account/avatar')
+  }
+
   changePassword(newPassword: string, currentPassword?: string): Promise<void> {
     return this.send('PUT', '/account/password', { newPassword, currentPassword })
   }

@@ -18,6 +18,8 @@ export interface UserInfo {
   displayName: string
   role: Role
   color: string
+  /** Hash of the profile picture, see `avatarUrl`; null without one, absent on older servers. */
+  avatar?: string | null
   secondFactorSetupRequired?: boolean
   /** Number of passkeys, for the passkey step after a sign-in. Missing on older backends. */
   passkeyCount?: number

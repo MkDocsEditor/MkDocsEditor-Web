@@ -289,6 +289,11 @@ export class ApiClient {
     return nullWhen([404, 405], this.json<MovedTo>('GET', urlPath`/moved/${id}`))
   }
 
+  /** A profile picture. The hash changes with every new picture, so the result never goes stale. */
+  async getAvatar(accountId: string, avatar: string): Promise<Blob> {
+    return (await this.request('GET', urlPath`/avatars/${accountId}/${avatar}`)).blob()
+  }
+
   async getResourceContent(id: string): Promise<Blob> {
     const response = await this.request('GET', urlPath`/resource/${id}/content`)
     return response.blob()

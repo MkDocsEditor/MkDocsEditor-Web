@@ -187,6 +187,28 @@ describe('presence', () => {
     })
   })
 
+  describe('profile picture', () => {
+    it('comes with the peer, stays with its ghost, and follows a change', () => {
+      const { presence } = setup()
+      presence.update({ ...anna, avatar: 'aaaa' })
+      expect(presence.peers.value[0]!).toMatchObject({ accountId: 'anna', avatar: 'aaaa' })
+      presence.update({ ...anna, avatar: 'bbbb' })
+      expect(presence.peers.value[0]!.avatar).toBe('bbbb')
+      presence.remove({ clientId: 'c-1', instanceId: 'tab-1', accountId: 'anna', ghostMs: 1_000 })
+      expect(presence.ghosts.value[0]!.avatar).toBe('bbbb')
+    })
+
+    it('comes with a ghost of the snapshot', () => {
+      const { presence } = setup()
+      presence.replaceAll(
+        [],
+        [],
+        [{ instanceId: 'tab-1', accountId: 'anna', username: 'anna', avatar: 'cccc', ghostMs: 9 }],
+      )
+      expect(presence.ghosts.value[0]!).toMatchObject({ accountId: 'anna', avatar: 'cccc' })
+    })
+  })
+
   describe('instance color', () => {
     it('shows instead of the color of the account', () => {
       const { presence } = setup()

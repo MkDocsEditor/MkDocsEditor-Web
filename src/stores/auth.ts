@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import { ApiError, setSessionEndedHandler, useApi, useAuthApi } from '@/api'
 import type { AuthStatus, UserInfo, WhoAmI } from '@/api'
+import { clearAvatarUrls } from '@/services/avatars'
 import { clearJoinTarget } from '@/services/join'
 import { clearResourceUrls } from '@/services/resourceUrls'
 import { local, readJson, remove, session, writeJson } from '@/services/storage'
@@ -79,6 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
   function clearLocal(): void {
     setUser(null)
     clearResourceUrls()
+    clearAvatarUrls()
   }
 
   /** The backend said the session is gone (expired, revoked, account disabled). */
