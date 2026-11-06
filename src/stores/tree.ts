@@ -107,6 +107,14 @@ export const useTreeStore = defineStore('tree', () => {
     return pathOf(index.value, id)
   }
 
+  /** The item at a path relative to the docs folder (as the feed names them), if there is one. */
+  function byPath(path: string): TreeItem | undefined {
+    const wanted = path.replace(/^\/+|\/+$/g, '')
+    for (const id of index.value.items.keys())
+      if (pathOf(index.value, id) === wanted) return index.value.items.get(id)
+    return undefined
+  }
+
   /** A folder's path for sentences; the root has no path of its own. */
   function folderLabel(id: string): string {
     return path(id) || 'Wiki (top folder)'
@@ -173,6 +181,7 @@ export const useTreeStore = defineStore('tree', () => {
     parentOf,
     ancestors,
     path,
+    byPath,
     folderLabel,
     linkTarget,
     search,

@@ -237,7 +237,7 @@ export interface FeedEntry {
   time: string
   kind: 'edited' | 'created' | 'moved' | 'deleted'
   itemType: 'document' | 'section'
-  /** The current id, while the item still exists at `path`. */
+  /** Only for a page that still exists at `path`: its current id. Folders are found by path. */
   documentId?: string
   path: string
   /** Only for `moved`. */

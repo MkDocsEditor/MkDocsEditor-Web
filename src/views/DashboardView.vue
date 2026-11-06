@@ -91,12 +91,13 @@ function canUnpin(scope: PinScope): boolean {
   return scope === 'personal' || pins.canPinForEveryone
 }
 
-/** Where an entry leads: the page or folder, while it still exists. */
+/** Where an entry leads: the page, or the folder found by its path, while it still exists. */
 function entryLink(entry: FeedEntry) {
-  if (!entry.documentId || entry.kind === 'deleted') return undefined
-  return entry.itemType === 'section'
-    ? { name: 'section', params: { id: entry.documentId } }
-    : { name: 'document', params: { id: entry.documentId } }
+  if (entry.kind === 'deleted') return undefined
+  if (entry.itemType === 'document')
+    return entry.documentId ? { name: 'document', params: { id: entry.documentId } } : undefined
+  const section = tree.byPath(entry.path)
+  return section?.type === 'section' ? { name: 'section', params: { id: section.id } } : undefined
 }
 </script>
 
