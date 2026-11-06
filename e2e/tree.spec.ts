@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
-import { createDocument, login, openEditor, testName, typeAt } from './helpers'
+import { createDocument, login, openEditor, openFiles, testName, typeAt } from './helpers'
 
 /** How many pages the local copy of the wiki holds. */
 function storedPageCount(page: Page): Promise<number> {
@@ -56,6 +56,7 @@ test('rejects a wrong password', async ({ page }) => {
 
 test('logs in, loads the tree and opens a page', async ({ page }) => {
   await login(page)
+  await openFiles(page)
   const main = page.locator('main')
   await expect(main.getByText('Rezepte')).toBeVisible()
   await expect(main.getByText('Urlaub')).toBeVisible()
@@ -74,6 +75,7 @@ test('logs in, loads the tree and opens a page', async ({ page }) => {
 
 test('creates, renames and deletes a folder', async ({ page }, testInfo) => {
   await login(page)
+  await openFiles(page)
   const name = testName('Ordner', testInfo)
   await page.getByTestId('create-fab').click()
   await page.getByTestId('create-section').click()

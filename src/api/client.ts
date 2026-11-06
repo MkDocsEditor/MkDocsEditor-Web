@@ -4,11 +4,14 @@ import type {
   Backlink,
   BrokenReference,
   DocumentModel,
+  FeedPage,
   ItemRef,
   ItemType,
   MovedTo,
   MoveRequest,
   MoveResult,
+  PinScope,
+  Pins,
   ResourceModel,
   Revision,
   SectionModel,
@@ -287,6 +290,23 @@ export class ApiClient {
    */
   async getMoved(id: string): Promise<MovedTo | null> {
     return nullWhen([404, 405], this.json<MovedTo>('GET', urlPath`/moved/${id}`))
+  }
+
+  /** The pinned pages, or null when the server has no pins. */
+  async getPins(): Promise<Pins | null> {
+    return nullWhen([404, 405], this.json<Pins>('GET', '/pins'))
+  }
+
+  /** Pins or unpins a page; returns all pins. Family pins need the editor or admin role. */
+  async setPin(scope: PinScope, documentId: string, pinned: boolean): Promise<Pins> {
+    return this.json<Pins>(pinned ? 'PUT' : 'DELETE', urlPath`/pins/${scope}/${documentId}`)
+  }
+
+  /** The changes of all pages, newest first; null when the server has no feed. */
+  async getFeed(before?: string, limit = 50): Promise<FeedPage | null> {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (before) query.set('before', before)
+    return nullWhen([404, 405], this.json<FeedPage>('GET', `/feed?${query}`))
   }
 
   /** A profile picture. The hash changes with every new picture, so the result never goes stale. */

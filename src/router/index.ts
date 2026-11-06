@@ -5,6 +5,7 @@ import { takeJoinTarget } from '@/services/join'
 import { useAuthStore } from '@/stores/auth'
 import LinkView from '@/views/LinkView.vue'
 import LoginView from '@/views/LoginView.vue'
+import HomeView from '@/views/HomeView.vue'
 import SectionView from '@/views/SectionView.vue'
 
 declare module 'vue-router' {
@@ -58,7 +59,9 @@ export function buildRouter(history: RouterHistory): Router {
         props: true,
         meta: { public: true },
       },
-      { path: '/', name: 'home', component: SectionView },
+      // "What's going on", or the files of the top folder (a setting of the device)
+      { path: '/', name: 'home', component: HomeView },
+      { path: '/files', name: 'files', component: SectionView },
       { path: '/section/:id', name: 'section', component: SectionView, props: true },
       {
         path: '/document/:id',

@@ -45,8 +45,12 @@ describe('connectEvents', () => {
     const onUnauthorized = vi.fn()
     const onItemsMoved = vi.fn()
     const onConnectionChanged = vi.fn()
+    const onPinsChanged = vi.fn()
+    const onFeedChanged = vi.fn()
     const connection = connectEvents({
       onItemsMoved,
+      onPinsChanged,
+      onFeedChanged,
       onConnectionChanged,
       wsTicket,
       wsUrl: (path) => `ws://b${path}`,
@@ -67,6 +71,8 @@ describe('connectEvents', () => {
       onUnauthorized,
       onItemsMoved,
       onConnectionChanged,
+      onPinsChanged,
+      onFeedChanged,
       connection,
       wsTicket,
     }
@@ -87,6 +93,16 @@ describe('connectEvents', () => {
 
     sockets[1]!.close()
     expect(onConnectionChanged.mock.calls).toEqual([[true], [false]])
+  })
+
+  it('passes changes of pins and of the feed on', async () => {
+    const { sockets, onPinsChanged, onFeedChanged } = setup()
+    await vi.advanceTimersByTimeAsync(0)
+    sockets[0]!.open()
+    sockets[0]!.receive({ type: 'pins-changed' })
+    sockets[0]!.receive({ type: 'feed-changed' })
+    expect(onPinsChanged).toHaveBeenCalledTimes(1)
+    expect(onFeedChanged).toHaveBeenCalledTimes(1)
   })
 
   it('passes moved items on', async () => {

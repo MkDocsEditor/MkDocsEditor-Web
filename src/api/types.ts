@@ -201,4 +201,56 @@ export interface Revision {
   path: string
 }
 
+/** Someone named on the dashboard, with the current name, colour and picture. */
+export interface ActivityPerson {
+  /** Absent for the server itself and for changes on disk. */
+  accountId?: string
+  username?: string
+  displayName: string
+  color: string
+  avatar: string | null
+}
+
+/** A pinned page (`GET /pins/`). */
+export interface Pin {
+  documentId: string
+  /** Relative to the docs folder, e.g. `guide/setup.md`. */
+  path: string
+  /** Without `.md`, as in the tree. */
+  name: string
+  pinnedBy: ActivityPerson
+  pinnedAt: string
+}
+
+/** Family pins are for everyone (set by editors and admins), personal ones for this account. */
+export type PinScope = 'family' | 'personal'
+
+export interface Pins {
+  family: Pin[]
+  personal: Pin[]
+}
+
+/** One change in the feed (`GET /feed/`). An editing session is one entry. */
+export interface FeedEntry {
+  id: string
+  /** The last change of the entry. */
+  time: string
+  kind: 'edited' | 'created' | 'moved' | 'deleted'
+  itemType: 'document' | 'section'
+  /** Only for a page that still exists at `path`: its current id. Folders are found by path. */
+  documentId?: string
+  path: string
+  /** Only for `moved`. */
+  oldPath?: string
+  authors: ActivityPerson[]
+  /** Only for `edited`: the headings of the sections the change touched, in document order. */
+  summary?: { linesAdded: number; linesRemoved: number; headings: string[] }
+}
+
+export interface FeedPage {
+  entries: FeedEntry[]
+  /** Cursor for the next (older) page, null at the end. */
+  next: string | null
+}
+
 export type * from './authTypes'

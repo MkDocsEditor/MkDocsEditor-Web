@@ -8,12 +8,14 @@ import {
   mdiPaperclipOff,
   mdiRefresh,
   mdiShieldAccount,
+  mdiViewDashboardOutline,
 } from '@mdi/js'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
 import { ApiError } from '@/api'
+import { startPage } from '@/composables/useStartPage'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
 import MoveDialog from '@/components/move/MoveDialog.vue'
@@ -29,6 +31,7 @@ import { useStored } from '@/composables/useStored'
 import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
 import { usePagesStore } from '@/stores/pages'
+import { usePinsStore } from '@/stores/pins'
 import { useMoveStore } from '@/stores/move'
 import { describeError, useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
@@ -51,6 +54,11 @@ const showFiles = useStored('mkdocseditor.treeShowFiles', true)
 
 const activeId = computed(() =>
   typeof route.params.id === 'string' ? route.params.id : tree.root?.id,
+)
+
+/** The files of the top folder are open: on `/files`, or on `/` without "What's going on". */
+const rootActive = computed(
+  () => route.name === 'files' || (route.name === 'home' && startPage.value === 'files'),
 )
 
 // Open the drawer tree along the path to the current item.
@@ -151,6 +159,7 @@ watch(
     live.stop()
     tree.reset()
     pages.reset()
+    usePinsStore().reset()
     if (!route.meta.public && !loggingOut) {
       void router.push({ name: 'login', query: { redirect: route.fullPath } })
     }
@@ -225,6 +234,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               data-testid="menu-account"
             />
             <v-list-item
+              :prepend-icon="mdiViewDashboardOutline"
+              title="Start page"
+              :subtitle="startPage === 'dashboard' ? 'What’s going on' : 'Files of the top folder'"
+              data-testid="menu-start-page"
+              @click="startPage = startPage === 'dashboard' ? 'files' : 'dashboard'"
+            />
+            <v-list-item
               :prepend-icon="mdiLinkVariantOff"
               title="Broken links and unused files"
               :to="{ name: 'references' }"
@@ -261,8 +277,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     >
       <v-list nav class="py-1">
         <v-list-item
-          :to="{ name: 'home' }"
-          :active="activeId === tree.root?.id"
+          :to="{ name: 'files' }"
+          :active="rootActive"
           title="Wiki"
           class="font-weight-bold"
           :class="{ 'app-tree__drop': tree.root && dropTarget === tree.root.id }"
