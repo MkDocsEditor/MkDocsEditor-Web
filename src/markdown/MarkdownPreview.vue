@@ -11,20 +11,21 @@ import { useTreeStore } from '@/stores/tree'
 
 import './preview.css'
 import { renderMarkdown } from './render'
-import { topSourceLine, visibleSourceLines } from './sourceLines'
+import { previewAnchor, previewScrollTop, visibleSourceLines } from './sourceLines'
+import type { ScrollAnchor } from './sourceLines'
 
 const props = defineProps<{
   text: string
   /** Folder of the document, for relative links and images. */
   sectionId?: string
-  /** First visible source line of the editor; the preview scrolls to it. */
-  topLine?: number
+  /** Where the editor is (split mode, while it drives); the preview shows the same place. */
+  anchor?: ScrollAnchor
 }>()
 const emit = defineEmits<{
   /** The source lines on screen (0-based, inclusive), after every scroll, render or resize. */
   visibleLines: [lines: { first: number; last: number } | null]
-  /** The source line at the top, after a scroll, for scrolling the editor along. */
-  topLine: [line: number]
+  /** The reading place after a scroll, for scrolling the editor along. */
+  anchor: [anchor: ScrollAnchor]
 }>()
 
 const tree = useTreeStore()
@@ -82,6 +83,11 @@ async function onClick(event: MouseEvent): Promise<void> {
   else notify.push(`Link target not found: ${href}`, 'warning')
 }
 
+/** The last line of the text that is rendered right now. */
+function lastLine(): number {
+  return debounced.value.split('\n').length - 1
+}
+
 /** Measures at most once per frame. */
 let frame = 0
 let scrolledSince = false
@@ -92,11 +98,11 @@ function measure(scrolled = false): void {
     frame = 0
     const root = container.value
     if (!root) return
-    emit('visibleLines', visibleSourceLines(root, props.text.split('\n').length - 1))
+    emit('visibleLines', visibleSourceLines(root, lastLine()))
     if (!scrolledSince) return
     scrolledSince = false
-    const line = topSourceLine(root)
-    if (line !== null) emit('topLine', line)
+    const anchor = previewAnchor(root, lastLine())
+    if (anchor) emit('anchor', anchor)
   })
 }
 
@@ -110,21 +116,21 @@ onBeforeUnmount(() => {
   resizes?.disconnect()
   cancelAnimationFrame(frame)
 })
-watch(html, () => void nextTick(() => measure()))
+function showAnchor(): void {
+  const root = container.value
+  if (!props.anchor || !root) return
+  const top = previewScrollTop(root, lastLine(), props.anchor)
+  if (top !== null) root.scrollTo({ top })
+}
 
-watch(
-  () => props.topLine,
-  (line) => {
-    const root = container.value
-    if (line === undefined || !root) return
-    let target: HTMLElement | null = null
-    for (const el of root.querySelectorAll<HTMLElement>('[data-source-line]')) {
-      if (Number(el.dataset.sourceLine) <= line) target = el
-      else break
-    }
-    root.scrollTo({ top: target ? target.offsetTop - root.offsetTop : 0 })
-  },
+watch(html, () =>
+  nextTick(() => {
+    // the new text moved the blocks: the place of the editor is somewhere else now
+    showAnchor()
+    measure()
+  }),
 )
+watch(() => props.anchor, showAnchor)
 </script>
 
 <template>
