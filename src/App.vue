@@ -348,8 +348,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   color: rgb(var(--v-theme-on-surface)) !important;
 }
 
+/* a flex box, not inline: inline it sits on the text baseline, above the middle of the bar */
 .app-title {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--app-space-2);
   color: inherit;
@@ -357,6 +358,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .app-logo {
+  display: block;
   flex: none;
 }
 </style>
