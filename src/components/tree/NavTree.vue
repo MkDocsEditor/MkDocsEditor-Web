@@ -9,6 +9,7 @@ import { useTreeStore } from '@/stores/tree'
 import { sortByName } from '@/services/treeIndex'
 
 import { canDropInto, dragged, dropTarget } from './dragState'
+import ItemActionsMenu from './ItemActionsMenu.vue'
 
 const props = defineProps<{
   section: SectionModel
@@ -54,6 +55,16 @@ function onDragLeave(section: SectionModel): void {
   if (dropTarget.value === section.id) dropTarget.value = null
 }
 
+/** A right click opens the actions of the row, as its ⋮ button does. */
+function onContextMenu(event: MouseEvent): void {
+  const button = (event.currentTarget as HTMLElement).querySelector<HTMLElement>(
+    '.nav-tree__actions',
+  )
+  if (!button) return
+  event.preventDefault()
+  button.click()
+}
+
 function onDrop(event: DragEvent, section: SectionModel): void {
   const item = dragged.value
   onDragEnd()
@@ -80,7 +91,11 @@ function onDrop(event: DragEvent, section: SectionModel): void {
       @dragover="onDragOver($event, sub)"
       @dragleave="onDragLeave(sub)"
       @drop="onDrop($event, sub)"
+      @contextmenu="onContextMenu"
     >
+      <template #append>
+        <ItemActionsMenu :item="sub" size="x-small" class="nav-tree__actions" />
+      </template>
       <template #prepend>
         <v-btn
           :icon="opened.has(sub.id) ? mdiChevronDown : mdiChevronRight"
@@ -115,7 +130,11 @@ function onDrop(event: DragEvent, section: SectionModel): void {
     @click="emit('navigate')"
     @dragstart="onDragStart($event, doc)"
     @dragend="onDragEnd"
+    @contextmenu="onContextMenu"
   >
+    <template #append>
+      <ItemActionsMenu :item="doc" size="x-small" class="nav-tree__actions" />
+    </template>
     <template #prepend>
       <span class="nav-tree__spacer" />
       <v-icon :icon="iconFor(doc)" :color="colorFor(doc)" size="small" class="me-2" />
@@ -135,7 +154,11 @@ function onDrop(event: DragEvent, section: SectionModel): void {
     @click="emit('navigate')"
     @dragstart="onDragStart($event, resource)"
     @dragend="onDragEnd"
+    @contextmenu="onContextMenu"
   >
+    <template #append>
+      <ItemActionsMenu :item="resource" size="x-small" class="nav-tree__actions" />
+    </template>
     <template #prepend>
       <span class="nav-tree__spacer" />
       <v-icon :icon="iconFor(resource)" :color="colorFor(resource)" size="small" class="me-2" />
@@ -156,6 +179,21 @@ function onDrop(event: DragEvent, section: SectionModel): void {
   outline: 2px dashed rgb(var(--v-theme-primary));
   outline-offset: -2px;
   background: rgba(var(--v-theme-primary), 0.08);
+}
+/* The ⋮ of a row shows while it is pointed at, focused, or open; always without a mouse. */
+:deep(.nav-tree__actions) {
+  opacity: 0;
+  transition: opacity 100ms;
+}
+.v-list-item:hover :deep(.nav-tree__actions),
+.v-list-item:focus-within :deep(.nav-tree__actions),
+:deep(.nav-tree__actions[aria-expanded='true']) {
+  opacity: 1;
+}
+@media (hover: none) {
+  :deep(.nav-tree__actions) {
+    opacity: 1;
+  }
 }
 /* Files are secondary in the tree: smaller and quieter than pages. */
 .nav-tree__file :deep(.v-list-item-title) {

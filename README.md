@@ -29,8 +29,11 @@ together, in real time, from a phone or a desktop browser. It talks to the
   the app with [Obtainium](https://obtainium.imranr.dev) (with pre-releases turned on).
 - Admin pages: users (role, disable, delete, reset link), invites with QR code, audit log, and
   "second factor required" for everyone.
-- Browse the wiki as a folder tree, search names and page text (Ctrl+K), create, rename and
-  delete pages and folders.
+- Browse the wiki as a folder tree, search names and page text (Ctrl+K), create pages and
+  folders. Rename, move and delete folders, pages and files from the ⋮ menu of an entry (in the
+  tree also with a right click), from the header of an open folder, and from the menu of an open
+  page or file. A rename updates the links to the item, like a move. Deleting the open page or
+  folder goes to the folder above.
 - Upload files into a folder (menu or drag and drop). Paste or drop an image into the editor
   and it is uploaded next to the page and embedded.
 - Edit together in real time: the Markdown editor (CodeMirror 6) syncs with

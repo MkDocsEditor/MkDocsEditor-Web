@@ -17,6 +17,7 @@ import { ApiError } from '@/api'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
 import MoveDialog from '@/components/move/MoveDialog.vue'
+import DeleteDialogs from '@/components/tree/DeleteDialogs.vue'
 import { canDropInto, dragged, dropTarget } from '@/components/tree/dragState'
 import NavTree from '@/components/tree/NavTree.vue'
 import SearchBar from '@/components/tree/SearchBar.vue'
@@ -313,6 +314,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
     <SearchDialog v-if="showWiki" v-model="searchOpen" />
     <MoveDialog v-if="showWiki" />
+    <DeleteDialogs v-if="showWiki" />
     <ReauthDialog v-if="showShell" />
     <NotificationHost />
   </v-app>

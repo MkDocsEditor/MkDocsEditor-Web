@@ -32,7 +32,10 @@ function storedPageCount(page: Page): Promise<number> {
  */
 async function menuAction(page: Page, entry: string, action: string, opens: Locator) {
   await expect(async () => {
-    await page.getByRole('button', { name: `Actions for ${entry}` }).click()
+    await page
+      .locator('main')
+      .getByRole('button', { name: `Actions for ${entry}` })
+      .click()
     const item = page.locator('.v-overlay--active').getByText(action, { exact: true })
     await item.evaluate((element) => {
       const menu = element.closest('.v-overlay__content') ?? element
@@ -79,12 +82,17 @@ test('creates, renames and deletes a folder', async ({ page }, testInfo) => {
   const main = page.locator('main')
   await expect(main.getByText(name, { exact: true })).toBeVisible()
 
-  await menuAction(page, name, 'Rename', page.getByTestId('name-input'))
-  await page.getByTestId('name-input').locator('input').fill(`${name} neu`)
-  await page.getByTestId('name-confirm').click()
+  // renaming goes through the move dialog, without its folder picker
+  const dialog = page.getByTestId('move-dialog')
+  await menuAction(page, name, 'Rename…', dialog)
+  await expect(dialog.getByPlaceholder('Search folders…')).toHaveCount(0)
+  await dialog.getByTestId('move-name').locator('input').fill(`${name} neu`)
+  await expect(dialog.getByTestId('move-new-path')).toHaveText(`${name} neu`)
+  await dialog.getByTestId('move-apply').click()
+  await expect(dialog).toBeHidden()
   await expect(main.getByText(`${name} neu`, { exact: true })).toBeVisible()
 
-  await menuAction(page, `${name} neu`, 'Delete', page.getByTestId('confirm-button'))
+  await menuAction(page, `${name} neu`, 'Delete…', page.getByTestId('confirm-button'))
   await page.getByTestId('confirm-button').click()
   await expect(main.getByText(`${name} neu`, { exact: true })).toHaveCount(0)
 })
