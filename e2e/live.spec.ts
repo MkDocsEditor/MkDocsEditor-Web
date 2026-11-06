@@ -1,12 +1,20 @@
 import { expect, test } from '@playwright/test'
 
-import { backendRequest, createDocument, openEditor, testName, userPage } from './helpers'
+import {
+  backendRequest,
+  createDocument,
+  openEditor,
+  openFiles,
+  testName,
+  userPage,
+} from './helpers'
 import { USERS } from './ports'
 
 test('the file browser follows changes and shows who edits a page', async ({
   browser,
 }, testInfo) => {
   const alice = await userPage(browser, USERS.alice, testInfo.project.use)
+  await openFiles(alice)
   const main = alice.locator('main')
   await expect(main.getByText('Rezepte')).toBeVisible()
 

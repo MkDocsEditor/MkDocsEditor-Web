@@ -17,6 +17,12 @@ export const useLiveStore = defineStore('live', () => {
   const connectionLost = ref(false)
   /** Access requests that wait for an admin. */
   const pendingAccessRequests = ref(0)
+  /**
+   * Go up when pins or the feed may have changed: on their events, and after every connect,
+   * because events are lost while disconnected.
+   */
+  const pinsVersion = ref(0)
+  const feedVersion = ref(0)
   let connection: EventsConnection | null = null
   let reloadRunning = false
   let reloadAgain = false
@@ -63,10 +69,17 @@ export const useLiveStore = defineStore('live', () => {
       createSocket: options.createSocket,
       clientName: `MkDocsEditor-Web/${import.meta.env.VITE_APP_VERSION ?? 'dev'}`,
       onTreeChanged: () => void reloadTree(),
+      onPinsChanged: () => pinsVersion.value++,
+      onFeedChanged: () => feedVersion.value++,
       onItemsMoved: itemsMoved,
       onOnline: (documents) => (online.value = documents),
       onAccessRequests: (pending) => (pendingAccessRequests.value = pending),
-      onConnectionChanged: (connected) => (connectionLost.value = !connected),
+      onConnectionChanged: (connected) => {
+        connectionLost.value = !connected
+        if (!connected) return
+        pinsVersion.value++
+        feedVersion.value++
+      },
       onUnauthorized: options.onUnauthorized,
     })
   }
@@ -87,6 +100,8 @@ export const useLiveStore = defineStore('live', () => {
     online,
     connectionLost,
     pendingAccessRequests,
+    pinsVersion,
+    feedVersion,
     start,
     stop,
     usersOf,

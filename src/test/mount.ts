@@ -24,6 +24,7 @@ export function stubRoutes(): RouteRecordRaw[] {
     { path: '/login', name: 'login', component: Stub, meta: { public: true } },
     { path: '/join/:id', name: 'join', component: Stub, props: true, meta: { public: true } },
     { path: '/', name: 'home', component: Stub },
+    { path: '/files', name: 'files', component: Stub },
     { path: '/section/:id', name: 'section', component: Stub, props: true },
     { path: '/document/:id', name: 'document', component: Stub, props: true },
     { path: '/resource/:id', name: 'resource', component: Stub, props: true },

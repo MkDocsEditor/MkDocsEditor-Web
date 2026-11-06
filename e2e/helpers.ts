@@ -27,14 +27,20 @@ export async function login(page: Page, user: User = E2E_USER): Promise<void> {
  * without one, and on phones the Android app hint. Tests that are not about them skip both.
  */
 export async function skipPasskeyStep(page: Page): Promise<void> {
-  const title = page.getByTestId('section-title')
+  const title = page.getByTestId('dashboard-title')
   const later = page.getByTestId('passkey-step-later')
   const notNow = page.getByTestId('android-hint-dismiss')
   await expect(async () => {
     if (await later.isVisible()) await later.click()
     if (await notNow.isVisible()) await notNow.click()
-    await expect(title).toHaveText('Wiki', { timeout: 1000 })
+    await expect(title).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
+}
+
+/** The files of the top folder, which `/` shows only when the start page is set to them. */
+export async function openFiles(page: Page): Promise<void> {
+  await page.goto('/files')
+  await expect(page.getByTestId('section-title')).toHaveText('Wiki')
 }
 
 /** A logged-in page in its own browser context (own storage, like another device). */

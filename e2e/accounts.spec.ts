@@ -69,7 +69,7 @@ test.describe('accounts', () => {
       await page.getByRole('button', { name: 'Create account' }).click()
       await expect(page.getByTestId('link-done')).toContainText('Welcome, Markus')
       await page.getByTestId('done-continue').click()
-      await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+      await expect(page.getByTestId('dashboard-title')).toBeVisible()
 
       const status = (await (await fetch(`http://127.0.0.1:${port}/auth/status/`)).json()) as {
         setupRequired: boolean
@@ -114,7 +114,7 @@ test.describe('accounts', () => {
     await form.getByLabel('Repeat the password').fill('a guest with a hat 7')
     await guest.getByRole('button', { name: 'Create account' }).click()
     await guest.getByTestId('done-continue').click()
-    await expect(guest.getByTestId('section-title')).toHaveText('Wiki')
+    await expect(guest.getByTestId('dashboard-title')).toBeVisible()
     await guest.getByTestId('account-menu').click()
     await expect(guest.getByText('signed in (Reader)')).toBeVisible()
 
@@ -198,7 +198,7 @@ test.describe('accounts', () => {
     // virtual authenticator answers that request on its own, like picking it from the list.
     // Signing out lands on the login page, which signs in again right away.
     await accountMenu(page, 'menu-logout')
-    await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+    await expect(page.getByTestId('dashboard-title')).toBeVisible()
 
     // The button, in a browser without passkey autofill: the autofill request would answer
     // first. Presence is off until the reload, so signing out does not sign in again.
@@ -213,7 +213,7 @@ test.describe('accounts', () => {
     await authenticator.setPresence(true)
     await expect(page.getByTestId('passkey-login')).toBeVisible()
     await page.getByTestId('passkey-login').click()
-    await expect(page.getByTestId('section-title')).toHaveText('Wiki')
+    await expect(page.getByTestId('dashboard-title')).toBeVisible()
   })
 
   test('a passkey confirms a sensitive action', async ({ browser }, testInfo) => {
@@ -442,7 +442,7 @@ test.describe('accounts', () => {
     await newDevice.getByRole('button', { name: 'Set password' }).click()
     await expect(newDevice.getByTestId('link-done')).toContainText('New password set')
     await newDevice.getByTestId('done-continue').click()
-    await expect(newDevice.getByTestId('section-title')).toHaveText('Wiki')
+    await expect(newDevice.getByTestId('dashboard-title')).toBeVisible()
 
     await oldDevice.reload()
     await expect(oldDevice).toHaveURL(/\/login/)

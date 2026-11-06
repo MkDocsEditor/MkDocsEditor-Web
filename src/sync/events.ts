@@ -21,6 +21,10 @@ interface EventsHandlers {
   onItemsMoved?(moves: MovedItem[]): void
   /** The complete list of open documents and their users; replaces the previous one. */
   onOnline(documents: Map<string, OnlineUser[]>): void
+  /** Pins of this account or of everyone changed: fetch them again. */
+  onPinsChanged?(): void
+  /** The feed has new entries: fetch its first page again. At most every 10 seconds. */
+  onFeedChanged?(): void
   /** How many access requests wait for a decision. Only sent to admins with a session. */
   onAccessRequests?(pending: number): void
   /** A working connection was lost, or a new one works again after that. */
@@ -172,6 +176,10 @@ export function connectEvents(options: EventsOptions): EventsConnection {
     }
     if (message.type === 'tree-changed') {
       options.onTreeChanged()
+    } else if (message.type === 'pins-changed') {
+      options.onPinsChanged?.()
+    } else if (message.type === 'feed-changed') {
+      options.onFeedChanged?.()
     } else if (message.type === 'items-moved') {
       const moves = (Array.isArray(message.moves) ? message.moves : []).filter(
         (m: Partial<MovedItem>): m is MovedItem =>

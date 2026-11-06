@@ -71,7 +71,7 @@ async function remove(item: TreeItem | null, force = false): Promise<void> {
     await router.replace(
       parent && parent !== tree.root?.id
         ? { name: 'section', params: { id: parent } }
-        : { name: 'home' },
+        : { name: 'files' },
     )
   }
   try {

@@ -9,7 +9,7 @@ const props = defineProps<{ ancestors: SectionModel[]; current?: string }>()
 const items = computed(() => [
   ...props.ancestors.map((section, i) => ({
     title: i === 0 ? 'Wiki' : section.name,
-    to: i === 0 ? { name: 'home' } : { name: 'section', params: { id: section.id } },
+    to: i === 0 ? { name: 'files' } : { name: 'section', params: { id: section.id } },
     disabled: false,
   })),
   ...(props.current ? [{ title: props.current, disabled: true }] : []),

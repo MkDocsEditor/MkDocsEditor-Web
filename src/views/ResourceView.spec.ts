@@ -81,7 +81,7 @@ describe('ResourceView', () => {
     await vi.waitFor(() => expect(requests.some((r) => r.method === 'DELETE')).toBe(true))
     await flushPromises()
     expect(useNotifyStore().queue.at(-1)?.text).toBe('Deleted “notes.txt”')
-    expect(router.currentRoute.value.name).toBe('home')
+    expect(router.currentRoute.value.name).toBe('files')
     wrapper.unmount()
   })
 

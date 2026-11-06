@@ -29,6 +29,11 @@ together, in real time, from a phone or a desktop browser. It talks to the
   the app with [Obtainium](https://obtainium.imranr.dev) (with pre-releases turned on).
 - Admin pages: users (role, disable, delete, reset link), invites with QR code, audit log, and
   "second factor required" for everyone.
+- "What’s going on" is the start page: the wiki's `index.md` first, then the pinned pages (for
+  everyone, set by editors and admins, and your own), then the changes of all pages: who edited,
+  created, moved or deleted what, when and where, with the headings an edit touched. Pin a page
+  from its menu. Account menu → Start page switches `/` back to the files on this device; they
+  are always at `/files`.
 - Browse the wiki as a folder tree, search names and page text (Ctrl+K), create pages and
   folders. Rename, move and delete folders, pages and files from the ⋮ menu of an entry (in the
   tree also with a right click), from the header of an open folder, and from the menu of an open
