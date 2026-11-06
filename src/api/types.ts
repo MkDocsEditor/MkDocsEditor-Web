@@ -157,6 +157,8 @@ export interface WhoAmI {
   displayName?: string
   role?: 'admin' | 'editor' | 'reader'
   color?: string
+  /** Hash of the profile picture, see `avatarUrl`; null without one, absent on older servers. */
+  avatar?: string | null
   authMethod?: 'session' | 'app-token' | 'basic' | 'anonymous'
   secondFactorSetupRequired?: boolean
   sessionId?: string
