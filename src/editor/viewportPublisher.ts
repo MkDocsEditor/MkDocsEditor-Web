@@ -15,12 +15,22 @@ export function visibleRange(view: EditorView): TextRange | null {
 
 /**
  * Tells the session what the editor shows, for those who follow this user. `publish` is for
- * whatever else changes it without a scroll: edits, a new size, the pane being shown or hidden.
+ * whatever else changes it without a scroll: edits, a new size, the pane being shown. While the
+ * editor is hidden it says nothing: the preview tells the session then.
  */
-export function createViewportPublisher(view: EditorView, session: DocumentSession) {
+export function createViewportPublisher(
+  view: EditorView,
+  session: DocumentSession,
+  shown: () => boolean = () => true,
+) {
   let last: TextRange | null | undefined
 
   function publish(): void {
+    if (!shown()) {
+      // when it shows again, it tells its range even if that did not change
+      last = undefined
+      return
+    }
     view.requestMeasure({
       key: 'viewport-publisher',
       read: visibleRange,

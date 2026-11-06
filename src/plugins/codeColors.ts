@@ -124,6 +124,9 @@ export const CODE_DARK: CodePalette = {
   cursor: '#e3e3dc',
 }
 
+/** The surface of each theme, which the editor is drawn on. */
+export const SURFACE = { light: '#fdfdf5', dark: '#1a1c18' } as const
+
 /** Background colours of the palette, the rest are text colours. */
 export const CODE_BACKGROUNDS = [
   'codeBackground',

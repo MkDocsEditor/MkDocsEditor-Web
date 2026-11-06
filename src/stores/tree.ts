@@ -107,6 +107,11 @@ export const useTreeStore = defineStore('tree', () => {
     return pathOf(index.value, id)
   }
 
+  /** The server answered elsewhere (a page synced): "Synced …" counts it like a load. */
+  function markAnswered(): void {
+    if (root.value) lastSync.value = Date.now()
+  }
+
   /** The item at a path relative to the docs folder (as the feed names them), if there is one. */
   function byPath(path: string): TreeItem | undefined {
     const wanted = path.replace(/^\/+|\/+$/g, '')
@@ -182,6 +187,7 @@ export const useTreeStore = defineStore('tree', () => {
     ancestors,
     path,
     byPath,
+    markAnswered,
     folderLabel,
     linkTarget,
     search,

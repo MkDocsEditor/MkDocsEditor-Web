@@ -7,7 +7,7 @@ vi.mock('@/api', () => ({ useApi: () => ({ getAvatar }) }))
 
 import { clearAvatarUrls } from '@/services/avatars'
 
-import { remoteCursors, setPeers } from './remoteCursors'
+import { faintOn, remoteCursors, setPeers } from './remoteCursors'
 import type { ShownPeer } from './remoteCursors'
 
 const anna: ShownPeer = {
@@ -56,5 +56,25 @@ describe('remote cursors', () => {
     expect(label.firstElementChild?.className).toBe('cm-remote-caret-avatar')
     expect(label.textContent).toBe('Anna')
     expect(getAvatar).toHaveBeenCalledWith('a-1', 'ab12')
+  })
+
+  it('outlines a flag that is hard to see on the surface, and keeps its colour', () => {
+    expect(faintOn('#1a1c18')).toEqual(['dark'])
+    expect(faintOn('#fff')).toEqual(['light'])
+    expect(faintOn('#d32f2f')).toEqual([])
+    expect(faintOn('red')).toEqual([])
+
+    const view = show({ ...anna, color: '#1a1c18' })
+    const caret = view.dom.querySelector('.cm-remote-caret')!
+    expect(caret.classList).toContain('cm-remote-caret--faint-dark')
+    expect(caret.classList).not.toContain('cm-remote-caret--faint-light')
+    expect(caret.querySelector<HTMLElement>('.cm-remote-caret-label')!.style.backgroundColor).toBe(
+      'rgb(26, 28, 24)',
+    )
+    // the outline follows the app theme, which sits around the editor
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent).join('\n')
+    expect(css).toMatch(
+      /\.v-theme--dark \.\S+ \.cm-remote-caret--faint-dark \.cm-remote-caret-label/,
+    )
   })
 })

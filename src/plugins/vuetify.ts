@@ -5,7 +5,7 @@ import type { ThemeDefinition } from 'vuetify'
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg'
 import { en } from 'vuetify/locale'
 
-import { CODE_DARK, CODE_LIGHT, codeThemeColors } from './codeColors'
+import { CODE_DARK, CODE_LIGHT, SURFACE, codeThemeColors } from './codeColors'
 
 /**
  * Icon colours of tree items: folders and pages as in the Android app's file browser
@@ -56,9 +56,9 @@ export const LIGHT: ThemeDefinition = {
     'on-tertiary': '#ffffff',
     error: '#ba1a1a',
     'on-error': '#ffffff',
-    background: '#fdfdf5',
+    background: SURFACE.light,
     'on-background': '#1a1c18',
-    surface: '#fdfdf5',
+    surface: SURFACE.light,
     'on-surface': '#1a1c18',
     'surface-bright': '#fdfdf5',
     'surface-light': '#f1f1ea',
@@ -84,9 +84,9 @@ export const DARK: ThemeDefinition = {
     'on-tertiary': '#003256',
     error: '#ffb4ab',
     'on-error': '#690005',
-    background: '#1a1c18',
+    background: SURFACE.dark,
     'on-background': '#e3e3dc',
-    surface: '#1a1c18',
+    surface: SURFACE.dark,
     'on-surface': '#e3e3dc',
     'surface-bright': '#2f312c',
     'surface-light': '#2f312c',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useDebounced } from '@/composables/useDebounced'
@@ -11,6 +11,7 @@ import { useTreeStore } from '@/stores/tree'
 
 import './preview.css'
 import { renderMarkdown } from './render'
+import { topSourceLine, visibleSourceLines } from './sourceLines'
 
 const props = defineProps<{
   text: string
@@ -18,6 +19,12 @@ const props = defineProps<{
   sectionId?: string
   /** First visible source line of the editor; the preview scrolls to it. */
   topLine?: number
+}>()
+const emit = defineEmits<{
+  /** The source lines on screen (0-based, inclusive), after every scroll, render or resize. */
+  visibleLines: [lines: { first: number; last: number } | null]
+  /** The source line at the top, after a scroll, for scrolling the editor along. */
+  topLine: [line: number]
 }>()
 
 const tree = useTreeStore()
@@ -75,6 +82,36 @@ async function onClick(event: MouseEvent): Promise<void> {
   else notify.push(`Link target not found: ${href}`, 'warning')
 }
 
+/** Measures at most once per frame. */
+let frame = 0
+let scrolledSince = false
+function measure(scrolled = false): void {
+  scrolledSince ||= scrolled
+  if (frame) return
+  frame = requestAnimationFrame(() => {
+    frame = 0
+    const root = container.value
+    if (!root) return
+    emit('visibleLines', visibleSourceLines(root, props.text.split('\n').length - 1))
+    if (!scrolledSince) return
+    scrolledSince = false
+    const line = topSourceLine(root)
+    if (line !== null) emit('topLine', line)
+  })
+}
+
+let resizes: ResizeObserver | null = null
+onMounted(() => {
+  // also when the pane appears: it grows from nothing
+  resizes = new ResizeObserver(() => measure())
+  if (container.value) resizes.observe(container.value)
+})
+onBeforeUnmount(() => {
+  resizes?.disconnect()
+  cancelAnimationFrame(frame)
+})
+watch(html, () => void nextTick(() => measure()))
+
 watch(
   () => props.topLine,
   (line) => {
@@ -97,6 +134,7 @@ watch(
     class="markdown-preview"
     data-testid="markdown-preview"
     @click="onClick"
+    @scroll.passive="measure(true)"
     v-html="html"
   />
 </template>
