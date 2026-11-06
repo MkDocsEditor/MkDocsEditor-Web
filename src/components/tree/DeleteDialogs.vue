@@ -9,11 +9,13 @@ import { useBreakWarning } from '@/components/references/backlinks'
 import { ITEM_LABELS } from '@/services/names'
 import { useItemActionsStore } from '@/stores/itemActions'
 import { useNotifyStore } from '@/stores/notify'
+import { useTransfersStore } from '@/stores/transfers'
 import { useTreeStore } from '@/stores/tree'
 
 /** The delete confirmation of `useItemActionsStore`, once for the whole app. */
 const actions = useItemActionsStore()
 const tree = useTreeStore()
+const transfers = useTransfersStore()
 const notify = useNotifyStore()
 const route = useRoute()
 const router = useRouter()
@@ -53,10 +55,13 @@ function isInUse(error: unknown): boolean {
   return error instanceof ApiError && error.status === 409
 }
 
-async function deleteItem(item: TreeItem, force: boolean): Promise<void> {
-  if (item.type === 'section') await tree.deleteSection(item.id, force)
-  else if (item.type === 'document') await tree.deleteDocument(item.id, force)
-  else await tree.deleteResource(item.id)
+/** A big folder takes the server a while: the transfers indicator shows it is still at work. */
+function deleteItem(item: TreeItem, force: boolean): Promise<void> {
+  return transfers.track(`Deleting “${item.name}”`, async () => {
+    if (item.type === 'section') await tree.deleteSection(item.id, force)
+    else if (item.type === 'document') await tree.deleteDocument(item.id, force)
+    else await tree.deleteResource(item.id)
+  })
 }
 
 /** How long the server may take to notice that our own editor closed. */

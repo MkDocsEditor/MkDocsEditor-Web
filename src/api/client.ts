@@ -84,9 +84,14 @@ export interface ApiClientOptions {
   onSessionEnded?: () => void
 }
 
+/** Bytes sent or received so far; `total` is null when the size is unknown. */
+export type Progress = (loaded: number, total: number | null) => void
+
 export interface RequestInitOptions {
   body?: BodyInit
   json?: unknown
+  /** Reports the bytes of the body as they go out (uploads). */
+  onUploadProgress?: Progress
   /** Do not report a 401 to `onSessionEnded` (login and link endpoints, the start check). */
   quiet401?: boolean
 }
@@ -98,11 +103,14 @@ export interface RequestInitOptions {
 export class ApiClient {
   private readonly baseUrl: string
   private readonly fetchFn: typeof fetch
+  /** Tests bring their own fetch; uploads with progress then go through it too, without it. */
+  private readonly ownFetch: boolean
   onSessionEnded: (() => void) | undefined
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
     this.fetchFn = options.fetchFn ?? ((...args) => fetch(...args))
+    this.ownFetch = options.fetchFn === undefined
     this.onSessionEnded = options.onSessionEnded
   }
 
@@ -134,12 +142,15 @@ export class ApiClient {
 
     let response: Response
     try {
-      response = await this.fetchFn(this.url(path), {
-        method,
-        headers,
-        body,
-        credentials: 'include',
-      })
+      response =
+        init.onUploadProgress && this.ownFetch && typeof XMLHttpRequest !== 'undefined'
+          ? await sendWithProgress(method, this.url(path), headers, body, init.onUploadProgress)
+          : await this.fetchFn(this.url(path), {
+              method,
+              headers,
+              body,
+              credentials: 'include',
+            })
     } catch (error) {
       throw new ApiError(
         `Server unreachable (${error instanceof Error ? error.message : String(error)})`,
@@ -314,9 +325,9 @@ export class ApiClient {
     return (await this.request('GET', urlPath`/avatars/${accountId}/${avatar}`)).blob()
   }
 
-  async getResourceContent(id: string): Promise<Blob> {
+  async getResourceContent(id: string, onProgress?: Progress): Promise<Blob> {
     const response = await this.request('GET', urlPath`/resource/${id}/content`)
-    return response.blob()
+    return onProgress ? readWithProgress(response, onProgress) : response.blob()
   }
 
   /** A scaled-down JPEG or PNG of an image resource (newer backends, `thumbnail: true`). */
@@ -325,10 +336,18 @@ export class ApiClient {
     return response.blob()
   }
 
-  async uploadResource(parentId: string, name: string, file: Blob): Promise<ResourceModel> {
+  async uploadResource(
+    parentId: string,
+    name: string,
+    file: Blob,
+    onProgress?: Progress,
+  ): Promise<ResourceModel> {
     const form = new FormData()
     form.append('file', file, name)
-    return this.json<ResourceModel>('POST', urlPath`/resource/${parentId}/${name}`, { body: form })
+    return this.json<ResourceModel>('POST', urlPath`/resource/${parentId}/${name}`, {
+      body: form,
+      onUploadProgress: onProgress,
+    })
   }
 
   async renameResource(id: string, name: string): Promise<ResourceModel> {
@@ -350,6 +369,76 @@ async function nullWhen<T>(statuses: readonly number[], request: Promise<T>): Pr
     if (error instanceof ApiError && statuses.includes(error.status)) return null
     throw error
   }
+}
+
+/**
+ * A request through XMLHttpRequest, the only way to see an upload's progress, answered as a
+ * fetch `Response`. Like fetch, it has no time limit: a slow server is not an error.
+ */
+function sendWithProgress(
+  method: string,
+  url: string,
+  headers: Headers,
+  body: BodyInit | undefined,
+  onProgress: Progress,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open(method, url)
+    xhr.withCredentials = true
+    headers.forEach((value, key) => xhr.setRequestHeader(key, value))
+    xhr.upload.onprogress = (event) =>
+      onProgress(event.loaded, event.lengthComputable ? event.total : null)
+    xhr.onload = () => {
+      const responseHeaders = new Headers()
+      for (const line of xhr
+        .getAllResponseHeaders()
+        .trim()
+        .split(/[\r\n]+/)) {
+        const cut = line.indexOf(':')
+        if (cut > 0) responseHeaders.append(line.slice(0, cut).trim(), line.slice(cut + 1).trim())
+      }
+      const empty = xhr.status === 204 || xhr.status === 304
+      resolve(
+        new Response(empty ? null : xhr.responseText, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: responseHeaders,
+        }),
+      )
+    }
+    xhr.onerror = () => reject(new Error('connection failed'))
+    xhr.onabort = () => reject(new Error('aborted'))
+    xhr.send(body as XMLHttpRequestBodyInit | null | undefined)
+  })
+}
+
+/** The body of a response, reporting the bytes as they arrive. */
+async function readWithProgress(response: Response, onProgress: Progress): Promise<Blob> {
+  const length = Number(response.headers.get('Content-Length'))
+  const total = Number.isFinite(length) && length > 0 ? length : null
+  const type = response.headers.get('Content-Type') ?? ''
+  if (!response.body) return response.blob()
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let loaded = 0
+  onProgress(0, total)
+  for (;;) {
+    let next: ReadableStreamReadResult<Uint8Array>
+    try {
+      next = await reader.read()
+    } catch (error) {
+      throw new ApiError(
+        `Connection lost (${error instanceof Error ? error.message : String(error)})`,
+        0,
+      )
+    }
+    if (next.done) break
+    chunks.push(next.value)
+    loaded += next.value.byteLength
+    onProgress(loaded, total)
+  }
+  return new Blob(chunks as BlobPart[], { type })
 }
 
 async function toApiError(response: Response): Promise<ApiError> {

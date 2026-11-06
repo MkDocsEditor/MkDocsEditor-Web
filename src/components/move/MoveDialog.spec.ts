@@ -114,6 +114,38 @@ describe('MoveDialog', () => {
     wrapper.unmount()
   })
 
+  it('says so when the server takes long, without giving up', async () => {
+    vi.useFakeTimers()
+    let answer!: (response: Response) => void
+    const late = new Promise<Response>((resolve) => (answer = resolve))
+    const { move, wrapper } = await setup()
+    // the dry run waits until the test lets it answer
+    setApiClient(
+      new ApiClient({
+        baseUrl: 'http://b',
+        fetchFn: (() => late) as unknown as typeof fetch,
+      }),
+    )
+    move.open(useTreeStore().get('s-kuchen')!)
+    await flushPromises()
+    const input = el('move-name').querySelector('input')!
+    input.value = 'Torten'
+    input.dispatchEvent(new Event('input'))
+    await settle()
+    expect(el('move-slow')).toBeNull()
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(el('move-slow')).not.toBeNull()
+    answer(
+      json(
+        result({ type: 'section', id: 's-kuchen', name: 'Torten', dryRun: true }, 'Rezepte/Torten'),
+      ),
+    )
+    await flushPromises()
+    expect(el('move-slow')).toBeNull()
+    expect(el('move-new-path')?.textContent).toBe('Rezepte/Torten')
+    wrapper.unmount()
+  })
+
   it('renames without a folder picker, and updates the links like a move', async () => {
     vi.useFakeTimers()
     const { move, requests, router, wrapper } = await setup()

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 
 import { useDebounced } from '@/composables/useDebounced'
 import { isExternalUrl } from '@/services/linkPath'
-import { openResource } from '@/services/resources'
+import { openFile } from '@/composables/useOpenFile'
 import { resourceObjectUrl } from '@/services/resourceUrls'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
@@ -51,9 +51,9 @@ async function loadImages(): Promise<void> {
 }
 watch([html, () => tree.root], loadImages, { immediate: true })
 
-function openWithRetry(id: string): void {
-  openResource(id).catch((e: unknown) =>
-    notify.error(e, 'Could not open the file', () => openWithRetry(id)),
+function openWithRetry(id: string, name: string): void {
+  openFile(id, name).catch((e: unknown) =>
+    notify.error(e, 'Could not open the file', () => openWithRetry(id, name)),
   )
 }
 
@@ -71,7 +71,7 @@ async function onClick(event: MouseEvent): Promise<void> {
   const item = resolve(href)
   if (item?.type === 'document') await router.push({ name: 'document', params: { id: item.id } })
   else if (item?.type === 'section') await router.push({ name: 'section', params: { id: item.id } })
-  else if (item?.type === 'resource') openWithRetry(item.id)
+  else if (item?.type === 'resource') openWithRetry(item.id, item.name)
   else notify.push(`Link target not found: ${href}`, 'warning')
 }
 

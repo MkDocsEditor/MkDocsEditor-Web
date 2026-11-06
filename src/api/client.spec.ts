@@ -77,6 +77,44 @@ describe('ApiClient', () => {
     expect((body as FormData).get('file')).toBeInstanceOf(Blob)
   })
 
+  it('reports the progress of a download', async () => {
+    const { api } = client({
+      'GET /resource/r1/content/': () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array(3))
+              controller.enqueue(new Uint8Array(2))
+              controller.close()
+            },
+          }),
+          { headers: { 'Content-Length': '5', 'Content-Type': 'image/png' } },
+        ),
+    })
+    const seen: [number, number | null][] = []
+    const blob = await api.getResourceContent('r1', (loaded, total) => seen.push([loaded, total]))
+    expect(blob.size).toBe(5)
+    expect(blob.type).toBe('image/png')
+    expect(seen.at(-1)).toEqual([5, 5])
+  })
+
+  it('says the connection was lost when a download breaks off', async () => {
+    const { api } = client({
+      'GET /resource/r1/content/': () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new Uint8Array(3))
+              controller.error(new TypeError('network'))
+            },
+          }),
+        ),
+    })
+    await expect(api.getResourceContent('r1', () => undefined)).rejects.toMatchObject({
+      status: 0,
+    })
+  })
+
   it('turns error responses into ApiErrors with the backend message', async () => {
     const { api } = client({
       'DELETE /document/d1/': () => json({ name: 'Conflict', message: 'still open' }, 409),

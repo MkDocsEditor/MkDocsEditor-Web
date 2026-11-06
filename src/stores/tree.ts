@@ -3,6 +3,7 @@ import { computed, ref, shallowRef } from 'vue'
 
 import { ApiError, useApi } from '@/api'
 import type { DocumentModel, ResourceModel, SectionModel, TreeItem } from '@/api'
+import { useTransfersStore } from './transfers'
 import type { LinkTarget } from '@/services/linkPath'
 import { sanitizeFileName, shrinkImage, uniqueName } from '@/services/upload'
 import { wikiCopy } from '@/sync/wikiCopy'
@@ -140,18 +141,27 @@ export const useTreeStore = defineStore('tree', () => {
    * Uploads files into a section under unique, safe names (large photos are scaled down).
    * Returns the created resources in order. Reloads the tree once at the end.
    */
+  /** Uploads one file after the other, with their progress in the transfers indicator. */
   async function uploadFiles(sectionId: string, files: readonly File[]): Promise<ResourceModel[]> {
     const created: ResourceModel[] = []
+    const label = (i: number, name: string) =>
+      files.length === 1
+        ? `Uploading “${name}”`
+        : `Uploading ${i + 1} of ${files.length}: “${name}”`
     try {
-      for (const file of files) {
-        const current = section(sectionId)
-        if (!current) throw new Error('Folder not found')
-        const name = uniqueName(
-          { ...current, resources: [...current.resources, ...created] },
-          sanitizeFileName(file.name),
-        )
-        created.push(await api().uploadResource(sectionId, name, await shrinkImage(file)))
-      }
+      await useTransfersStore().track(label(0, files[0]?.name ?? ''), async (transfer) => {
+        for (const [i, file] of files.entries()) {
+          const current = section(sectionId)
+          if (!current) throw new Error('Folder not found')
+          const name = uniqueName(
+            { ...current, resources: [...current.resources, ...created] },
+            sanitizeFileName(file.name),
+          )
+          transfer.relabel(label(i, name))
+          const body = await shrinkImage(file)
+          created.push(await api().uploadResource(sectionId, name, body, transfer.progress))
+        }
+      })
     } finally {
       await load()
     }

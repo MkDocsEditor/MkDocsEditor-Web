@@ -15,13 +15,14 @@ import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import { useApi } from '@/api'
 import { copyText, downloadUrl } from '@/services/clipboard'
 import { KIND_LABELS, colorFor, formatSize, iconFor, resourceKind } from '@/services/icons'
-import { openResource } from '@/services/resources'
+import { openFile } from '@/composables/useOpenFile'
 import { resourceObjectUrl } from '@/services/resourceUrls'
 import { useMovedRedirect } from '@/composables/useMovedRedirect'
 import { formatDate } from '@/services/time'
 import { useItemActionsStore } from '@/stores/itemActions'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
+import { useTransfersStore } from '@/stores/transfers'
 import { useTreeStore } from '@/stores/tree'
 
 const props = defineProps<{ id: string }>()
@@ -30,6 +31,7 @@ const tree = useTreeStore()
 const notify = useNotifyStore()
 const moveStore = useMoveStore()
 const actions = useItemActionsStore()
+const transfers = useTransfersStore()
 
 const resource = computed(() => {
   const item = tree.get(props.id)
@@ -63,11 +65,15 @@ watch(
     if (!id || !resource.value) return
     try {
       if (kind.value === 'text') {
-        const blob = await useApi().getResourceContent(id)
+        const blob = await transfers.track(`Loading “${resource.value.name}”`, (t) =>
+          useApi().getResourceContent(id, t.progress),
+        )
         const text = await blob.slice(0, MAX_TEXT).text()
         if (resource.value?.id === id) previewText.value = text
       } else if (['image', 'pdf', 'video', 'audio'].includes(kind.value)) {
-        const url = await resourceObjectUrl(id)
+        const url = await transfers.track(`Loading “${resource.value.name}”`, (t) =>
+          resourceObjectUrl(id, t.progress),
+        )
         if (resource.value?.id === id) previewUrl.value = url
       }
     } catch {
@@ -79,7 +85,7 @@ watch(
 
 async function open(): Promise<void> {
   try {
-    await openResource(props.id)
+    await openFile(props.id, resource.value?.name ?? 'file')
   } catch (error) {
     notify.error(error, 'Could not open the file', () => void open())
   }
@@ -89,7 +95,10 @@ async function download(): Promise<void> {
   const item = resource.value
   if (!item) return
   try {
-    downloadUrl(item.name, await resourceObjectUrl(item.id))
+    const url = await transfers.track(`Downloading “${item.name}”`, (t) =>
+      resourceObjectUrl(item.id, t.progress),
+    )
+    downloadUrl(item.name, url)
   } catch (error) {
     notify.error(error, 'Download failed', () => void download())
   }

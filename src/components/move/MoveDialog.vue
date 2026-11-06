@@ -8,6 +8,7 @@ import AppDialog from '@/components/common/AppDialog.vue'
 import TreeBrowser from '@/components/tree/TreeBrowser.vue'
 import { ITEM_LABELS, plural, stripMarkdownExtension, validateName } from '@/services/names'
 import { followMovedRoute } from '@/composables/useMovedRedirect'
+import { useTakesLong } from '@/composables/useTakesLong'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
@@ -38,6 +39,8 @@ const preview = ref<MoveResult | null>(null)
 const problem = ref('')
 const loading = ref(false)
 const applying = ref(false)
+/** Moving a big folder rewrites many pages: no limit, only a note. */
+const takesLong = useTakesLong(() => loading.value || applying.value)
 
 const originalName = computed(() => item.value?.name ?? '')
 const parentId = computed(() => (item.value ? (tree.parentOf(item.value.id)?.id ?? '') : ''))
@@ -177,7 +180,19 @@ const title = computed(() => {
         </template>
         <v-divider class="my-4" />
         <div class="move-dialog__preview" aria-live="polite" data-testid="move-preview">
-          <v-progress-linear v-if="loading" indeterminate class="mb-2" data-testid="move-loading" />
+          <v-progress-linear
+            v-if="loading || applying"
+            indeterminate
+            class="mb-2"
+            data-testid="move-loading"
+          />
+          <p
+            v-if="takesLong"
+            class="text-body-small text-medium-emphasis mb-2"
+            data-testid="move-slow"
+          >
+            The server is still working on it. This takes longer than usual.
+          </p>
           <v-alert v-if="problem" type="warning" :text="problem" data-testid="move-problem" />
           <p v-else-if="unchanged" class="text-medium-emphasis">
             {{ move.renameOnly ? 'Enter a new name.' : 'Choose another folder or name.' }}
