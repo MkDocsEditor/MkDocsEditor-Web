@@ -254,24 +254,38 @@ test.describe('following another user', () => {
     const preview = page.getByTestId('markdown-preview')
     const editor = page.locator('.cm-scroller')
 
-    // the preview drives: the editor goes along, with the same line at the top
+    // the preview drives: the editor shows its reading line at the same height
     await preview.hover()
     await page.mouse.wheel(0, 3000)
-    const topOfPreview = await preview.evaluate((root) => {
-      const top = root.getBoundingClientRect().top
-      const first = [...root.querySelectorAll('p')].find(
-        (p) => p.getBoundingClientRect().top >= top,
+    await expect.poll(() => preview.evaluate((root) => root.scrollTop)).toBeGreaterThan(1000)
+    const reading = await preview.evaluate((root) => {
+      const max = root.scrollHeight - root.clientHeight
+      const progress = max > 0 ? root.scrollTop / max : 0
+      const box = root.getBoundingClientRect()
+      const y = box.top + progress * root.clientHeight
+      const line = [...root.querySelectorAll('p')].find(
+        (p) => p.getBoundingClientRect().bottom >= y,
       )
-      return first?.textContent ?? ''
+      return { text: line?.textContent ?? '', progress }
     })
-    expect(topOfPreview).toMatch(/^Zeile \d+$/)
-    expect(topOfPreview).not.toBe('Zeile 1')
-    await expect(editor.getByText(topOfPreview, { exact: true })).toBeInViewport()
+    expect(reading.text).toMatch(/^Zeile \d+$/)
+    expect(reading.text).not.toBe('Zeile 1')
+    await expect(editor.getByText(reading.text, { exact: true })).toBeInViewport()
 
-    // and back: the editor drives
+    // both reach the end together
+    await page.mouse.wheel(0, 100_000)
+    await expect(preview.getByText('Zeile 300', { exact: true })).toBeInViewport()
+    await expect(editor.getByText('Zeile 300', { exact: true })).toBeInViewport()
+
+    // and back: the editor drives, and both start together
     await editor.hover()
     await page.mouse.wheel(0, -100_000)
     await expect(editor.getByText('Zeile 1', { exact: true })).toBeInViewport()
     await expect(preview.getByText('Zeile 1', { exact: true })).toBeInViewport()
+
+    // typing: the preview shows the line with the caret
+    await page.keyboard.press('ControlOrMeta+End')
+    await page.keyboard.insertText('\n\nGanz unten')
+    await expect(preview.getByText('Ganz unten', { exact: true })).toBeInViewport()
   })
 })

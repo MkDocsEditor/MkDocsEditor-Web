@@ -32,6 +32,7 @@ import type { AuthorHighlightMode } from '@/editor/authorship'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { lineRange } from '@/markdown/sourceLines'
+import type { ScrollAnchor } from '@/markdown/sourceLines'
 import { isImage, resourceKind } from '@/services/icons'
 import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
@@ -116,7 +117,8 @@ const { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers 
 useSearchText(() => props.id, text, ready)
 const connection = computed(() => connectionBadge(status.value))
 
-const topLine = ref(0)
+/** Where the editor is while it drives in split mode; the preview shows the same place. */
+const editorAnchor = ref<ScrollAnchor | undefined>()
 
 /**
  * Split mode scrolls both panes together. Only the pane the user last touched drives, so the
@@ -125,12 +127,18 @@ const topLine = ref(0)
 type Pane = 'editor' | 'preview'
 const scrollDriver = ref<Pane>('editor')
 
-function onEditorTopLine(line: number): void {
-  if (scrollDriver.value === 'editor') topLine.value = line
+// a place from before the preview drove would pull it back once the editor drives again
+watch(scrollDriver, (driver) => {
+  if (driver === 'preview') editorAnchor.value = undefined
+})
+
+function onEditorAnchor(anchor: ScrollAnchor): void {
+  if (scrollDriver.value === 'editor') editorAnchor.value = anchor
 }
 
-function onPreviewTopLine(line: number): void {
-  if (mode.value === 'split' && scrollDriver.value === 'preview') editor.value?.scrollToLine(line)
+function onPreviewAnchor(anchor: ScrollAnchor): void {
+  if (mode.value === 'split' && scrollDriver.value === 'preview')
+    editor.value?.scrollToAnchor(anchor)
 }
 
 /** While only the preview shows, its lines are what followers of this user see. */
@@ -489,7 +497,7 @@ async function share(): Promise<void> {
           :shown="mode !== 'preview'"
           @change="(t: string) => (text = t)"
           @local-edit="follow.stop()"
-          @top-line="onEditorTopLine"
+          @anchor="onEditorAnchor"
         />
       </div>
       <v-divider v-if="mode === 'split'" vertical />
@@ -506,9 +514,9 @@ async function share(): Promise<void> {
           v-else
           :text="text"
           :section-id="parentId"
-          :top-line="mode === 'split' && scrollDriver === 'editor' ? topLine : undefined"
+          :anchor="mode === 'split' && scrollDriver === 'editor' ? editorAnchor : undefined"
           @visible-lines="onPreviewLines"
-          @top-line="onPreviewTopLine"
+          @anchor="onPreviewAnchor"
         />
       </div>
     </div>

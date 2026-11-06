@@ -14,6 +14,8 @@ import {
 } from '@codemirror/view'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import { scrollProgress } from '@/markdown/sourceLines'
+import type { ScrollAnchor } from '@/markdown/sourceLines'
 import type { DocumentSession } from '@/sync/session'
 
 import { authorship, setAuthorship } from './authorship'
@@ -40,8 +42,8 @@ const props = defineProps<{
   shown?: boolean
 }>()
 const emit = defineEmits<{
-  /** The first visible source line (0-based), for scrolling the preview along. */
-  topLine: [line: number]
+  /** The reading place after a scroll or an edit, for scrolling the preview along. */
+  anchor: [anchor: ScrollAnchor]
   /** The text changed (local or remote edit). */
   change: [text: string]
   /** This user changed the text. */
@@ -58,10 +60,39 @@ function readOnlyExtensions(value: boolean) {
   return [EditorState.readOnly.of(value), EditorView.editable.of(!value)]
 }
 
-function emitTopLine(): void {
+/** The source place at a height of the document (CodeMirror's heights), 0-based with fraction. */
+function lineAtHeight(editor: EditorView, height: number): number {
+  const block = editor.lineBlockAtHeight(height)
+  const within = block.height > 0 ? (height - block.top) / block.height : 0
+  return editor.state.doc.lineAt(block.from).number - 1 + Math.max(0, Math.min(1, within))
+}
+
+/** The reading place: at the height of the scroll progress, so both panes end together. */
+function progressAnchor(editor: EditorView): ScrollAnchor {
+  const scroller = editor.scrollDOM
+  const at = scrollProgress(scroller)
+  const y = scroller.getBoundingClientRect().top + at * scroller.clientHeight
+  return { line: lineAtHeight(editor, y - editor.documentTop), at }
+}
+
+/** While typing, the caret is the reading place, at its height. Null when it is not in view. */
+function caretAnchor(editor: EditorView): ScrollAnchor | null {
+  const caret = editor.coordsAtPos(editor.state.selection.main.head)
+  const scroller = editor.scrollDOM
+  if (!caret || scroller.clientHeight === 0) return null
+  const at = (caret.top - scroller.getBoundingClientRect().top) / scroller.clientHeight
+  if (at < 0 || at > 1) return null
+  return { line: lineAtHeight(editor, caret.top - editor.documentTop), at }
+}
+
+/** Scrolls caused by typing (CodeMirror keeps the caret in view) still follow the caret. */
+const TYPING_MS = 300
+let typedAt = -Infinity
+
+function emitAnchor(): void {
   if (!view) return
-  const block = view.lineBlockAtHeight(view.scrollDOM.scrollTop)
-  emit('topLine', view.state.doc.lineAt(block.from).number - 1)
+  const typing = performance.now() - typedAt < TYPING_MS
+  emit('anchor', (typing && caretAnchor(view)) || progressAnchor(view))
 }
 
 onMounted(() => {
@@ -92,13 +123,17 @@ onMounted(() => {
       props.upload ? fileUpload(props.upload) : [],
       EditorView.updateListener.of((update) => {
         if (update.docChanged) emit('change', update.state.doc.toString())
-        if (update.transactions.some(isLocalEdit)) emit('localEdit')
+        if (update.transactions.some(isLocalEdit)) {
+          emit('localEdit')
+          typedAt = performance.now()
+          update.view.requestMeasure({ read: emitAnchor })
+        }
         if (update.docChanged || update.geometryChanged) viewportPublisher?.publish()
       }),
     ],
   })
   view = new EditorView({ state, parent: host.value! })
-  view.scrollDOM.addEventListener('scroll', emitTopLine, { passive: true })
+  view.scrollDOM.addEventListener('scroll', emitAnchor, { passive: true })
   viewportPublisher = createViewportPublisher(view, props.session, () => props.shown !== false)
   viewportPublisher.publish()
   pushPeers()
@@ -142,18 +177,21 @@ onBeforeUnmount(() => {
   view = null
 })
 
-/** Scrolls so that a source line (0-based) is at the top, as the preview scrolled. */
-function scrollToLine(line: number): void {
+/** Shows a source place at its height, as the preview scrolled. */
+function scrollToAnchor(anchor: ScrollAnchor): void {
   if (!view) return
   const doc = view.state.doc
-  const from = doc.line(Math.max(1, Math.min(doc.lines, line + 1))).from
+  const index = Math.max(0, Math.min(doc.lines - 1, Math.floor(anchor.line)))
+  const within = Math.max(0, Math.min(1, anchor.line - index))
+  const from = doc.line(index + 1).from
+  const offset = anchor.at * view.scrollDOM.clientHeight - within * view.lineBlockAt(from).height
   // CodeMirror measures the lines on the way: an estimate of their height would land beside it
-  view.dispatch({ effects: EditorView.scrollIntoView(from, { y: 'start' }) })
+  view.dispatch({ effects: EditorView.scrollIntoView(from, { y: 'start', yMargin: offset }) })
 }
 
 defineExpose({
   focus: () => view?.focus(),
-  scrollToLine,
+  scrollToAnchor,
   /** For tests and the toolbar. */
   getView: () => view,
 })
