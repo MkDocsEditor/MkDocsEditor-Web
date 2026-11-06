@@ -1,24 +1,19 @@
 <script setup lang="ts">
 import {
-  mdiDelete,
-  mdiDotsVertical,
   mdiOpenInNew,
   mdiFileDocumentPlusOutline,
-  mdiFolderMoveOutline,
   mdiFolderPlusOutline,
-  mdiPencil,
   mdiPlus,
   mdiUpload,
 } from '@mdi/js'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { ApiError } from '@/api'
 import type { TreeItem } from '@/api'
 import PageHeader from '@/components/common/PageHeader.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
+import ItemActionsMenu from '@/components/tree/ItemActionsMenu.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import SyncStatus from '@/components/tree/SyncStatus.vue'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
@@ -27,9 +22,7 @@ import { colorFor, formatSize, iconFor } from '@/services/icons'
 import { plural, stripMarkdownExtension } from '@/services/names'
 import { openResource } from '@/services/resources'
 import { useLiveStore } from '@/stores/live'
-import { useBreakWarning } from '@/components/references/backlinks'
 import { useMovedRedirect } from '@/composables/useMovedRedirect'
-import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { sortByName } from '@/services/treeIndex'
@@ -44,7 +37,6 @@ const router = useRouter()
 const section = computed(() =>
   props.id === undefined ? tree.root : (tree.section(props.id) ?? null),
 )
-const moveStore = useMoveStore()
 const lookingUp = useMovedRedirect(
   () => props.id ?? '',
   'section',
@@ -63,8 +55,6 @@ const entries = computed<TreeItem[]>(() =>
       ]
     : [],
 )
-
-const typeLabel = { section: 'Folder', document: 'Page', resource: 'File' } as const
 
 function subtitle(item: TreeItem): string {
   if (item.type === 'section') {
@@ -88,13 +78,9 @@ async function open(item: TreeItem): Promise<void> {
   }
 }
 
-// create / rename / delete
+// create
 const createKind = ref<'section' | 'document' | null>(null)
 const createOpen = openWhileSet(createKind)
-const renameTarget = ref<TreeItem | null>(null)
-const renameOpen = openWhileSet(renameTarget)
-const deleteTarget = ref<TreeItem | null>(null)
-const deleteOpen = openWhileSet(deleteTarget)
 
 async function create(name: string): Promise<void> {
   const parent = section.value
@@ -106,33 +92,6 @@ async function create(name: string): Promise<void> {
   } else {
     const doc = await tree.createDocument(parent.id, stripMarkdownExtension(name))
     await router.push({ name: 'document', params: { id: doc.id } })
-  }
-}
-
-async function rename(name: string): Promise<void> {
-  const item = renameTarget.value
-  if (!item) return
-  if (item.type === 'section') await tree.renameSection(item.id, name)
-  else if (item.type === 'document')
-    await tree.renameDocument(item.id, stripMarkdownExtension(name))
-  else await tree.renameResource(item.id, name)
-  notify.success('Renamed')
-}
-
-// Deleting a page somebody has open fails with 409; the user can then force it.
-const forceTarget = ref<TreeItem | null>(null)
-const forceOpen = openWhileSet(forceTarget)
-
-async function remove(item = deleteTarget.value, force = false): Promise<void> {
-  if (!item) return
-  try {
-    if (item.type === 'section') await tree.deleteSection(item.id, force)
-    else if (item.type === 'document') await tree.deleteDocument(item.id, force)
-    else await tree.deleteResource(item.id)
-    notify.success(`Deleted “${item.name}”`)
-  } catch (error) {
-    if (!force && error instanceof ApiError && error.status === 409) forceTarget.value = item
-    else notify.error(error, 'Delete failed', () => void remove(item, force))
   }
 }
 
@@ -186,18 +145,6 @@ function onDrop(event: DragEvent): void {
   dragging.value = false
   void upload(Array.from(event.dataTransfer?.files ?? []))
 }
-
-const deleteWarning = useBreakWarning(() => deleteTarget.value)
-
-const deleteText = computed(() => {
-  const item = deleteTarget.value
-  if (!item) return ''
-  const base =
-    item.type === 'section'
-      ? `The folder “${item.name}” is deleted with everything in it.`
-      : `“${item.name}” will be deleted.`
-  return deleteWarning.value ? `${base} ${deleteWarning.value}` : base
-})
 </script>
 
 <template>
@@ -212,6 +159,9 @@ const deleteText = computed(() => {
     <template v-if="section">
       <ItemBreadcrumbs v-if="!isRoot" :ancestors="ancestors" />
       <PageHeader :title="title" testid="section-title">
+        <template v-if="!isRoot" #actions>
+          <ItemActionsMenu :item="section" size="default" />
+        </template>
         <SyncStatus class="mt-1" />
       </PageHeader>
       <v-progress-linear
@@ -251,42 +201,14 @@ const deleteText = computed(() => {
               :users="live.usersOf(item.id)"
               class="mr-1"
             />
-            <v-menu>
-              <template #activator="{ props: menuProps }">
-                <v-btn
-                  v-bind="menuProps"
-                  :icon="mdiDotsVertical"
-                  size="small"
-                  :aria-label="`Actions for ${item.name}`"
-                  @click.stop.prevent
-                />
-              </template>
-              <v-list>
-                <v-list-item
-                  v-if="item.type === 'resource'"
-                  :prepend-icon="mdiOpenInNew"
-                  title="Open in a new tab"
-                  @click="open(item)"
-                />
-                <v-list-item
-                  :prepend-icon="mdiPencil"
-                  title="Rename"
-                  @click="renameTarget = item"
-                />
-                <v-list-item
-                  :prepend-icon="mdiFolderMoveOutline"
-                  title="Move to…"
-                  data-testid="entry-move"
-                  @click="moveStore.open(item)"
-                />
-                <v-list-item
-                  :prepend-icon="mdiDelete"
-                  title="Delete"
-                  base-color="error"
-                  @click="deleteTarget = item"
-                />
-              </v-list>
-            </v-menu>
+            <ItemActionsMenu :item="item">
+              <v-list-item
+                v-if="item.type === 'resource'"
+                :prepend-icon="mdiOpenInNew"
+                title="Open in a new tab"
+                @click="open(item)"
+              />
+            </ItemActionsMenu>
           </template>
         </v-list-item>
       </v-list>
@@ -355,29 +277,6 @@ const deleteText = computed(() => {
       label="Name"
       confirm-text="Create"
       :save="create"
-    />
-    <NameDialog
-      v-model="renameOpen"
-      :title="renameTarget ? `Rename ${typeLabel[renameTarget.type].toLowerCase()}` : ''"
-      label="New name"
-      :initial="renameTarget?.name"
-      :save="rename"
-    />
-    <ConfirmDialog
-      v-model="deleteOpen"
-      title="Delete?"
-      :text="deleteText"
-      confirm-text="Delete"
-      danger
-      @confirm="remove()"
-    />
-    <ConfirmDialog
-      v-model="forceOpen"
-      title="Being edited right now"
-      text="Someone has this open right now. If you delete it anyway, they get a notice and can still copy their text."
-      confirm-text="Delete anyway"
-      danger
-      @confirm="remove(forceTarget, true)"
     />
   </v-container>
 </template>

@@ -41,8 +41,8 @@ test('moving a page from its folder list updates the links to it', async ({ page
   const { beta, seite } = await wiki(page, base)
 
   await page.goto(`/section/${beta.id}`)
-  await page.getByRole('button', { name: 'Actions for Ziel' }).click()
-  await page.getByTestId('entry-move').click()
+  await page.locator('main').getByRole('button', { name: 'Actions for Ziel' }).click()
+  await page.getByTestId('item-move').click()
   const dialog = page.getByTestId('move-dialog')
   await expect(dialog.getByTestId('move-target')).toHaveText(`${base}/Beta`)
   await dialog.getByTestId('browser-up').click()
@@ -64,7 +64,7 @@ test('an open page can be moved and renamed and stays editable', async ({ page }
 
   await openEditor(page, ziel.id)
   await page.getByRole('button', { name: 'More' }).click()
-  await page.getByTestId('document-move').click()
+  await page.getByTestId('item-move').click()
   const dialog = page.getByTestId('move-dialog')
   await dialog.getByTestId('move-name').locator('input').fill('Neues Ziel')
   await expect(dialog.getByTestId('move-new-path')).toHaveText(`${base}/Beta/Neues Ziel.md`)

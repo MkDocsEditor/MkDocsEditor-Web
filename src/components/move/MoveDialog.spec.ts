@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiClient, setApiClient } from '@/api'
 import type { MoveRequest, MoveResult } from '@/api'
 import { useMoveStore } from '@/stores/move'
+import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
@@ -110,6 +111,34 @@ describe('MoveDialog', () => {
     await settle()
     expect(requests).toEqual([])
     expect(el('move-loading')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('renames without a folder picker, and updates the links like a move', async () => {
+    vi.useFakeTimers()
+    const { move, requests, router, wrapper } = await setup()
+    move.rename(useTreeStore().get('s-kuchen')!)
+    await flushPromises()
+    expect(el('move-dialog').textContent).toContain('Rename folder “Kuchen”')
+    expect(el('move-target')).toBeNull()
+    expect(el('move-preview').textContent).toContain('Enter a new name.')
+
+    const input = el('move-name').querySelector('input')!
+    input.value = 'Torten'
+    input.dispatchEvent(new Event('input'))
+    await settle()
+    expect(requests).toEqual([{ type: 'section', id: 's-kuchen', name: 'Torten', dryRun: true }])
+    expect(el('move-apply').textContent).toContain('Rename')
+    el('move-apply').click()
+    await settle()
+    expect(requests.at(-1)).toEqual({
+      type: 'section',
+      id: 's-kuchen',
+      name: 'Torten',
+      dryRun: false,
+    })
+    expect(useNotifyStore().queue.at(-1)?.text).toBe('Renamed to Torten; links updated in 1 page')
+    expect(router.currentRoute.value.params.id).toBe('s-kuchen-neu')
     wrapper.unmount()
   })
 

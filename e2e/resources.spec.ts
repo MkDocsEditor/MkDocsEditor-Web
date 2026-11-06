@@ -53,8 +53,10 @@ test('shows files in the tree and on their own page', async ({ page, isMobile },
 
   // rename on the file's page
   await page.getByTestId('resource-rename').click()
-  await page.getByTestId('name-input').locator('input').fill('Einkauf.txt')
-  await page.getByTestId('name-confirm').click()
+  const dialog = page.getByTestId('move-dialog')
+  await dialog.getByTestId('move-name').locator('input').fill('Einkauf.txt')
+  await expect(dialog.getByTestId('move-new-path')).toContainText('Einkauf.txt')
+  await dialog.getByTestId('move-apply').click()
   await expect(page.getByTestId('resource-title')).toHaveText('Einkauf.txt')
 })
 

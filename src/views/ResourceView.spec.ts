@@ -1,5 +1,6 @@
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 
 import { ApiClient, setApiClient } from '@/api'
 import { useNotifyStore } from '@/stores/notify'
@@ -8,7 +9,15 @@ import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
 import { mountWithPlugins } from '@/test/mount'
 
+import DeleteDialogs from '@/components/tree/DeleteDialogs.vue'
+
 import ResourceView from './ResourceView.vue'
+
+/** The page with the delete dialog of the app shell. */
+const WithDialogs = defineComponent({
+  props: { id: { type: String, required: true } },
+  setup: (props) => () => [h(ResourceView, { id: props.id }), h(DeleteDialogs)],
+})
 
 async function setup(id: string) {
   const tree = sampleTree()
@@ -27,7 +36,10 @@ async function setup(id: string) {
   })
   setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
   URL.createObjectURL = vi.fn(() => 'blob:apfel')
-  const result = await mountWithPlugins(ResourceView, { props: { id } })
+  const result = await mountWithPlugins(WithDialogs, {
+    props: { id },
+    initialPath: `/resource/${id}`,
+  })
   await useTreeStore().load()
   await flushPromises()
   return { ...result, ...mock }
@@ -66,8 +78,8 @@ describe('ResourceView', () => {
     await wrapper.find('[data-testid="resource-delete"]').trigger('click')
     await flushPromises()
     ;(document.querySelector('[data-testid="confirm-button"]') as HTMLElement).click()
+    await vi.waitFor(() => expect(requests.some((r) => r.method === 'DELETE')).toBe(true))
     await flushPromises()
-    expect(requests.some((r) => r.method === 'DELETE')).toBe(true)
     expect(useNotifyStore().queue.at(-1)?.text).toBe('Deleted “notes.txt”')
     expect(router.currentRoute.value.name).toBe('home')
     wrapper.unmount()

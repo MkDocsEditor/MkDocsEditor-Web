@@ -3,7 +3,6 @@ import {
   mdiCheck,
   mdiDotsVertical,
   mdiEyeOutline,
-  mdiFolderMoveOutline,
   mdiFileDocumentEditOutline,
   mdiHistory,
   mdiOpenInNew,
@@ -24,6 +23,7 @@ import ResourcePickerDialog from '@/components/pickers/ResourcePickerDialog.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import BacklinksList from '@/components/references/BacklinksList.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
+import ItemActionItems from '@/components/tree/ItemActionItems.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import CursorColorDialog from '@/editor/CursorColorDialog.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
@@ -40,7 +40,6 @@ import { instanceColor, instanceId } from '@/sync/instance'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
 import { useAuthStore } from '@/stores/auth'
-import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
@@ -55,7 +54,6 @@ const props = defineProps<{ id: string }>()
 
 const tree = useTreeStore()
 const notify = useNotifyStore()
-const moveStore = useMoveStore()
 const router = useRouter()
 const { mobile } = useDisplay()
 
@@ -402,13 +400,6 @@ async function share(): Promise<void> {
             />
             <v-divider />
             <v-list-item
-              v-if="page"
-              :prepend-icon="mdiFolderMoveOutline"
-              title="Move or rename…"
-              data-testid="document-move"
-              @click="moveStore.open(page)"
-            />
-            <v-list-item
               :prepend-icon="mdiHistory"
               title="Versions"
               data-testid="open-history"
@@ -422,6 +413,10 @@ async function share(): Promise<void> {
               target="_blank"
               rel="noopener"
             />
+            <template v-if="page">
+              <v-divider />
+              <ItemActionItems :item="page" />
+            </template>
           </v-list>
         </v-menu>
       </div>

@@ -8,13 +8,9 @@ import {
   mdiPencil,
 } from '@mdi/js'
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 
 import PageHeader from '@/components/common/PageHeader.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import BacklinksList from '@/components/references/BacklinksList.vue'
-import { useBreakWarning } from '@/components/references/backlinks'
-import NameDialog from '@/components/common/NameDialog.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import { useApi } from '@/api'
 import { copyText, downloadUrl } from '@/services/clipboard'
@@ -23,6 +19,7 @@ import { openResource } from '@/services/resources'
 import { resourceObjectUrl } from '@/services/resourceUrls'
 import { useMovedRedirect } from '@/composables/useMovedRedirect'
 import { formatDate } from '@/services/time'
+import { useItemActionsStore } from '@/stores/itemActions'
 import { useMoveStore } from '@/stores/move'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
@@ -32,7 +29,7 @@ const props = defineProps<{ id: string }>()
 const tree = useTreeStore()
 const notify = useNotifyStore()
 const moveStore = useMoveStore()
-const router = useRouter()
+const actions = useItemActionsStore()
 
 const resource = computed(() => {
   const item = tree.get(props.id)
@@ -101,37 +98,6 @@ async function download(): Promise<void> {
 async function copyPath(): Promise<void> {
   if (await copyText(path.value)) notify.success('Path copied')
 }
-
-const renameOpen = ref(false)
-const deleteOpen = ref(false)
-const deleteWarning = useBreakWarning(() => (deleteOpen.value ? resource.value : null))
-const deleteText = computed(() => {
-  const base = `“${resource.value?.name}” will be deleted.`
-  return deleteWarning.value ? `${base} ${deleteWarning.value}` : base
-})
-
-async function rename(name: string): Promise<void> {
-  const renamed = await tree.renameResource(props.id, name)
-  await router.replace({ name: 'resource', params: { id: renamed.id } })
-  notify.success('Renamed')
-}
-
-async function remove(): Promise<void> {
-  const parent = tree.parentOf(props.id)
-  // read before the delete: afterwards the tree no longer has the file
-  const name = resource.value?.name ?? 'file'
-  try {
-    await tree.deleteResource(props.id)
-    notify.success(`Deleted “${name}”`)
-    await router.replace(
-      parent && parent.id !== tree.root?.id
-        ? { name: 'section', params: { id: parent.id } }
-        : { name: 'home' },
-    )
-  } catch (error) {
-    notify.error(error, 'Delete failed', () => void remove())
-  }
-}
 </script>
 
 <template>
@@ -155,7 +121,11 @@ async function remove(): Promise<void> {
         </v-btn>
         <v-btn :prepend-icon="mdiDownload" variant="outlined" @click="download">Download</v-btn>
         <v-btn :prepend-icon="mdiContentCopy" @click="copyPath">Copy path</v-btn>
-        <v-btn :prepend-icon="mdiPencil" data-testid="resource-rename" @click="renameOpen = true">
+        <v-btn
+          :prepend-icon="mdiPencil"
+          data-testid="resource-rename"
+          @click="moveStore.rename(resource)"
+        >
           Rename
         </v-btn>
         <v-btn
@@ -169,7 +139,7 @@ async function remove(): Promise<void> {
           :prepend-icon="mdiDelete"
           color="error"
           data-testid="resource-delete"
-          @click="deleteOpen = true"
+          @click="actions.remove(resource)"
         >
           Delete
         </v-btn>
@@ -217,22 +187,6 @@ async function remove(): Promise<void> {
         <v-btn color="primary" variant="flat" :to="{ name: 'home' }">To the start page</v-btn>
       </template>
     </v-empty-state>
-
-    <NameDialog
-      v-model="renameOpen"
-      title="Rename file"
-      label="New name"
-      :initial="resource?.name"
-      :save="rename"
-    />
-    <ConfirmDialog
-      v-model="deleteOpen"
-      title="Delete?"
-      :text="deleteText"
-      confirm-text="Delete"
-      danger
-      @confirm="remove"
-    />
   </v-container>
 </template>
 

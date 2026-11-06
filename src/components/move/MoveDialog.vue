@@ -131,11 +131,8 @@ async function apply(): Promise<void> {
     const result = await useApi().move(body)
     await tree.load().catch(() => undefined)
     const pages = result.documents.length
-    notify.success(
-      pages > 0
-        ? `Moved to ${result.newPath}; links updated in ${plural(pages, 'page')}`
-        : `Moved to ${result.newPath}`,
-    )
+    const done = move.renameOnly ? `Renamed to ${body.name}` : `Moved to ${result.newPath}`
+    notify.success(pages > 0 ? `${done}; links updated in ${plural(pages, 'page')}` : done)
     followMovedRoute(router, result.moved)
     move.close()
   } catch (error) {
@@ -148,7 +145,7 @@ async function apply(): Promise<void> {
 
 const title = computed(() => {
   const kind = ITEM_LABELS[item.value?.type ?? 'document']
-  return `Move ${kind} “${item.value?.name ?? ''}”`
+  return `${move.renameOnly ? 'Rename' : 'Move'} ${kind} “${item.value?.name ?? ''}”`
 })
 </script>
 
@@ -163,22 +160,28 @@ const title = computed(() => {
           :suffix="item.type === 'document' ? '.md' : undefined"
           :error-messages="nameValid === true ? [] : [nameValid]"
           class="mb-1"
+          :autofocus="move.renameOnly"
           data-testid="move-name"
+          @keydown.enter.prevent="preview && !loading && apply()"
         />
-        <p class="text-body-medium mb-1">
-          Into <strong data-testid="move-target">{{ targetPath }}</strong>
-        </p>
-        <TreeBrowser
-          v-model:section="sectionId"
-          :types="[]"
-          :disabled-ids="blocked"
-          search-placeholder="Search folders…"
-        />
+        <template v-if="!move.renameOnly">
+          <p class="text-body-medium mb-1">
+            Into <strong data-testid="move-target">{{ targetPath }}</strong>
+          </p>
+          <TreeBrowser
+            v-model:section="sectionId"
+            :types="[]"
+            :disabled-ids="blocked"
+            search-placeholder="Search folders…"
+          />
+        </template>
         <v-divider class="my-4" />
         <div class="move-dialog__preview" aria-live="polite" data-testid="move-preview">
           <v-progress-linear v-if="loading" indeterminate class="mb-2" data-testid="move-loading" />
           <v-alert v-if="problem" type="warning" :text="problem" data-testid="move-problem" />
-          <p v-else-if="unchanged" class="text-medium-emphasis">Choose another folder or name.</p>
+          <p v-else-if="unchanged" class="text-medium-emphasis">
+            {{ move.renameOnly ? 'Enter a new name.' : 'Choose another folder or name.' }}
+          </p>
           <template v-else-if="preview">
             <p class="mb-2">
               New place: <code data-testid="move-new-path">{{ preview.newPath }}</code>
@@ -263,7 +266,7 @@ const title = computed(() => {
           data-testid="move-apply"
           @click="apply"
         >
-          Move
+          {{ move.renameOnly ? 'Rename' : 'Move' }}
         </v-btn>
       </v-card-actions>
     </v-card>
