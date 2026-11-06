@@ -20,7 +20,7 @@ import ResourceThumb from '@/components/resources/ResourceThumb.vue'
 import { openWhileSet } from '@/services/dialogTarget'
 import { colorFor, formatSize, iconFor } from '@/services/icons'
 import { plural, stripMarkdownExtension } from '@/services/names'
-import { openResource } from '@/services/resources'
+import { openFile } from '@/composables/useOpenFile'
 import { useLiveStore } from '@/stores/live'
 import { useMovedRedirect } from '@/composables/useMovedRedirect'
 import { useNotifyStore } from '@/stores/notify'
@@ -72,7 +72,7 @@ function linkTo(item: TreeItem) {
 
 async function open(item: TreeItem): Promise<void> {
   try {
-    await openResource(item.id)
+    await openFile(item.id, item.name)
   } catch (error) {
     notify.error(error, 'Could not open the file', () => void open(item))
   }

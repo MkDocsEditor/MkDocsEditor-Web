@@ -18,6 +18,7 @@ import { ApiError } from '@/api'
 import { startPage } from '@/composables/useStartPage'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
+import TransferIndicator from '@/components/common/TransferIndicator.vue'
 import MoveDialog from '@/components/move/MoveDialog.vue'
 import DeleteDialogs from '@/components/tree/DeleteDialogs.vue'
 import { canDropInto, dragged, dropTarget } from '@/components/tree/dragState'
@@ -332,6 +333,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <MoveDialog v-if="showWiki" />
     <DeleteDialogs v-if="showWiki" />
     <ReauthDialog v-if="showShell" />
+    <TransferIndicator />
     <NotificationHost />
   </v-app>
 </template>
