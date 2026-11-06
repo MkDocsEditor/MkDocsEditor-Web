@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import type { OnlineUser } from '@/sync/events'
-import { initials } from '@/services/names'
+import UserAvatar from './UserAvatar.vue'
 
 const props = withDefaults(defineProps<{ users: OnlineUser[]; max?: number; size?: number }>(), {
   max: 3,
@@ -22,15 +22,16 @@ const label = computed(() => `Open now by ${props.users.map((u) => u.displayName
     role="img"
     data-testid="online-avatars"
   >
-    <v-avatar
+    <UserAvatar
       v-for="user in shown"
       :key="user.username"
+      :name="user.displayName"
       :color="user.color ?? 'grey'"
+      :account-id="user.accountId"
+      :avatar="user.avatar"
       :size="size"
-      class="text-white online-avatars__avatar"
-    >
-      {{ initials(user.displayName) }}
-    </v-avatar>
+      class="online-avatars__avatar"
+    />
     <v-avatar v-if="more > 0" :size="size" color="grey-lighten-1" class="online-avatars__avatar">
       +{{ more }}
     </v-avatar>

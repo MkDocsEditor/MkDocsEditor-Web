@@ -10,6 +10,8 @@ export interface OnlineInstance {
   /** The name of the person, for the avatar. */
   initials: string
   color: string
+  accountId?: string
+  avatar?: string | null
 }
 
 /**
@@ -70,6 +72,8 @@ export function useDocumentSession(id: () => string, onRenamed: (newId: string) 
           name: instanceName(peer),
           initials: peer.displayName || peer.username,
           color: peer.color,
+          accountId: peer.accountId,
+          avatar: peer.avatar,
         })
     }
     return [...seen.values()].sort(

@@ -3,6 +3,8 @@ import type { Range } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType } from '@codemirror/view'
 import type { DecorationSet } from '@codemirror/view'
 
+import { avatarUrl, loadedAvatarUrl } from '@/services/avatars'
+import type { AvatarOwner } from '@/services/avatars'
 import { instanceName } from '@/sync/session'
 import type { Peer } from '@/sync/session'
 
@@ -12,7 +14,7 @@ export const setPeers = StateEffect.define<readonly ShownPeer[]>()
 /** Someone whose cursor shows. A ghost has left and is faint. */
 export type ShownPeer = Pick<
   Peer,
-  'username' | 'displayName' | 'color' | 'selections' | 'deviceName'
+  'username' | 'displayName' | 'color' | 'selections' | 'deviceName' | 'accountId' | 'avatar'
 > & {
   ghost?: boolean
 }
@@ -24,12 +26,19 @@ class CursorWidget extends WidgetType {
     readonly name: string,
     readonly color: string,
     readonly ghost: boolean,
+    readonly owner: AvatarOwner,
   ) {
     super()
   }
 
   override eq(other: CursorWidget): boolean {
-    return other.name === this.name && other.color === this.color && other.ghost === this.ghost
+    return (
+      other.name === this.name &&
+      other.color === this.color &&
+      other.ghost === this.ghost &&
+      other.owner.accountId === this.owner.accountId &&
+      other.owner.avatar === this.owner.avatar
+    )
   }
 
   toDOM(): HTMLElement {
@@ -42,12 +51,27 @@ class CursorWidget extends WidgetType {
     label.style.backgroundColor = this.color
     label.textContent = this.name
     caret.appendChild(label)
+    // the profile picture in front of the name, once it is there; without one only the name
+    const loaded = loadedAvatarUrl(this.owner)
+    if (loaded) label.prepend(avatarImage(loaded))
+    else
+      void avatarUrl(this.owner)
+        ?.then((url) => label.prepend(avatarImage(url)))
+        .catch(() => undefined)
     return caret
   }
 
   override ignoreEvent(): boolean {
     return true
   }
+}
+
+function avatarImage(url: string): HTMLImageElement {
+  const image = document.createElement('img')
+  image.className = 'cm-remote-caret-avatar'
+  image.src = url
+  image.alt = ''
+  return image
 }
 
 /** Selection colour: the user colour with transparency. Accepts #rgb and #rrggbb. */
@@ -89,7 +113,10 @@ export function peerDecorations(peers: readonly ShownPeer[], docLength: number):
       }
       ranges.push(
         Decoration.widget({
-          widget: new CursorWidget(name, peer.color, !!peer.ghost),
+          widget: new CursorWidget(name, peer.color, !!peer.ghost, {
+            accountId: peer.accountId,
+            avatar: peer.avatar,
+          }),
           side: 1,
         }).range(head),
       )
@@ -142,6 +169,17 @@ const theme = EditorView.baseTheme({
     userSelect: 'none',
     zIndex: '10',
     fontFamily: 'system-ui, sans-serif',
+  },
+  // a circle the height of the text, in front of the name
+  '.cm-remote-caret-avatar': {
+    display: 'inline-block',
+    width: '1.1em',
+    height: '1.1em',
+    marginLeft: '-2px',
+    marginRight: '3px',
+    borderRadius: '50%',
+    objectFit: 'cover',
+    verticalAlign: '-0.2em',
   },
 })
 

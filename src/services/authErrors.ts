@@ -51,6 +51,12 @@ export function describeAuthError(error: unknown): string | null {
       return error.retryAfter
         ? `Too many attempts. Please wait ${waitText(error.retryAfter)}.`
         : 'Too many attempts. Please wait a moment.'
+    case 'payload-too-large':
+      return 'The picture is too large. It may be 5 MB at most.'
+    case 'unsupported-media-type':
+      return 'Please choose a JPEG, PNG or WebP picture.'
+    case 'invalid-image':
+      return 'This picture could not be read. Please choose another one.'
     case 'access-requests-disabled':
       return 'This server does not accept access requests right now.'
     case 'too-many-access-requests':

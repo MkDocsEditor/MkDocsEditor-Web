@@ -21,6 +21,7 @@ import type { ResourceModel } from '@/api'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
 import LinkPickerDialog from '@/components/pickers/LinkPickerDialog.vue'
 import ResourcePickerDialog from '@/components/pickers/ResourcePickerDialog.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import BacklinksList from '@/components/references/BacklinksList.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
@@ -34,7 +35,6 @@ import { isImage, resourceKind } from '@/services/icons'
 import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
 import { linkDestination } from '@/services/linkPath'
-import { initials } from '@/services/names'
 import { useStored } from '@/composables/useStored'
 import { instanceColor, instanceId } from '@/sync/instance'
 import { markdownFor } from '@/services/upload'
@@ -304,21 +304,22 @@ async function share(): Promise<void> {
             location="bottom"
           >
             <template #activator="{ props: tip }">
-              <v-avatar
+              <UserAvatar
                 v-bind="tip"
                 tag="button"
+                :name="user.initials"
                 :color="user.color"
+                :account-id="user.accountId"
+                :avatar="user.avatar"
                 size="30"
-                class="text-body-small text-white"
+                class="text-body-small"
                 :class="{
                   'document-view__avatar--followed': following?.instanceId === user.instanceId,
                 }"
                 :aria-label="followLabel(user)"
                 data-testid="online-user"
                 @click="toggleFollowing(user.instanceId)"
-              >
-                {{ initials(user.initials) }}
-              </v-avatar>
+              />
             </template>
           </v-tooltip>
         </v-avatar-group>

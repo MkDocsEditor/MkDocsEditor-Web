@@ -26,6 +26,8 @@ export interface PresenceInfo {
   username: string
   displayName?: string
   color?: string
+  /** Hash of the account's profile picture, see `avatarUrl`; absent or null without one. */
+  avatar?: string | null
   actorId?: string
   /** Stamped by the server: the last presence message of this connection, or when it connected. */
   lastActiveAt?: string
@@ -51,6 +53,7 @@ export interface GhostInfo {
   displayName?: string
   color?: string
   instanceColor?: string
+  avatar?: string | null
   deviceName?: string
   selections?: { anchor: string; head: string }[]
   viewport?: ViewportInfo
@@ -65,6 +68,7 @@ export interface PresenceLeave {
   accountId?: string
   deviceName?: string
   instanceColor?: string
+  avatar?: string | null
   selections?: { anchor: string; head: string }[]
   viewport?: ViewportInfo
   ghostMs?: number
@@ -76,7 +80,7 @@ export type ServerMessage =
       epoch?: string
       documentState?: string
       readOnly?: boolean
-      you?: SessionUser & { username: string; instanceId?: string }
+      you?: SessionUser & { username: string; instanceId?: string; accountId?: string }
       actors?: ActorInfo[]
     }
   | { type: 'sync-request'; syncMessage?: string }

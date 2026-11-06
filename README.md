@@ -21,7 +21,7 @@ together, in real time, from a phone or a desktop browser. It talks to the
   follows a sender who is still there, and otherwise opens the editor where the sender was last.
   Someone without an account can sign in or ask for access, and an admin decides under
   Admin → Requests.
-- Account page: profile and colour, password, authenticator app, recovery codes, passkeys,
+- Account page: profile, colour and picture, password, authenticator app, recovery codes, passkeys,
   and the signed-in devices (sign out one or all others).
 - Connect the Android app: Account → Devices creates a single-use link (5 minutes), shown as
   a QR code to scan with the phone's camera. On a phone, the first sign-in offers to open the
@@ -35,7 +35,8 @@ together, in real time, from a phone or a desktop browser. It talks to the
   and it is uploaded next to the page and embedded.
 - Edit together in real time: the Markdown editor (CodeMirror 6) syncs with
   [Automerge](https://automerge.org). Everyone sees the others' cursors and selections with
-  names and colours, plus a list of who is online.
+  names and colours, plus a list of who is online. A profile picture (Account → Profile) shows in
+  front of the name on the cursor and in the lists of users; without one, the initials do.
 - Follow someone by clicking their avatar: the editor stays on what they are looking at, without
   moving your cursor. Scrolling pauses it for 5 seconds, and for up to 40 seconds if you scroll again
   right after it resumed. Typing ends it. A user who leaves stays as a faint cursor for as long as

@@ -7,6 +7,7 @@ import { useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ConnectAppCard from '@/components/account/ConnectAppCard.vue'
+import AvatarCard from '@/components/account/AvatarCard.vue'
 import PasskeysCard from '@/components/account/PasskeysCard.vue'
 import PasswordCard from '@/components/account/PasswordCard.vue'
 import ProfileCard from '@/components/account/ProfileCard.vue'
@@ -148,6 +149,8 @@ onMounted(load)
     <template v-else-if="account">
       <div v-if="current === 'profile'" class="d-flex flex-column ga-4">
         <ProfileCard :account="account" @changed="load" />
+        <!-- servers with pictures always send the field, null without one -->
+        <AvatarCard v-if="account.avatar !== undefined" :account="account" @changed="load" />
       </div>
       <div v-else class="d-flex flex-column ga-4">
         <PasswordCard :account="account" @changed="load" />

@@ -38,6 +38,7 @@ interface GhostState {
   username: string
   displayName?: string
   color?: string
+  avatar?: string | null
   deviceName?: string
   selections: WireSelections
   viewport?: ViewportInfo
@@ -140,6 +141,7 @@ export function createPresence(options: PresenceOptions) {
         username: state.info.username,
         displayName: state.info.displayName ?? state.info.username,
         color: state.info.instanceColor ?? state.info.color ?? UNKNOWN_USER_COLOR,
+        avatar: state.info.avatar,
         ...state.resolved,
       })
     }
@@ -151,6 +153,7 @@ export function createPresence(options: PresenceOptions) {
       username: ghost.username,
       displayName: ghost.displayName ?? ghost.username,
       color: ghost.color ?? UNKNOWN_USER_COLOR,
+      avatar: ghost.avatar,
       ...resolved(ghost.selections, ghost.viewport, { selections: [] }),
     }))
   }
@@ -257,6 +260,7 @@ export function createPresence(options: PresenceOptions) {
             username: ghost.username ?? '',
             displayName: ghost.displayName,
             color: ghost.instanceColor ?? ghost.color,
+            avatar: ghost.avatar,
             selections: ghost.selections,
             viewport: ghost.viewport,
           },
@@ -278,6 +282,7 @@ export function createPresence(options: PresenceOptions) {
             username: info?.username ?? '',
             displayName: info?.displayName,
             color: leave.instanceColor ?? info?.instanceColor ?? info?.color,
+            avatar: leave.avatar !== undefined ? leave.avatar : info?.avatar,
             selections: leave.selections,
             viewport: leave.viewport,
           },

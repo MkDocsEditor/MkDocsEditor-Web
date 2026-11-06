@@ -443,6 +443,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         username: you.username,
         displayName: you.displayName || you.username,
         color: you.color,
+        accountId: you.accountId,
+        avatar: you.avatar,
         instanceId: you.instanceId,
       }
       authors.rememberUser(you)

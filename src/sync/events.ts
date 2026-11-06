@@ -8,6 +8,10 @@ export interface OnlineUser {
   username: string
   displayName: string
   color?: string
+  /** The account, for its profile picture; absent on older servers. */
+  accountId?: string
+  /** Hash of the profile picture, see `avatarUrl`. */
+  avatar?: string | null
 }
 
 interface EventsHandlers {
@@ -185,6 +189,8 @@ export function connectEvents(options: EventsOptions): EventsConnection {
             username: u.username,
             displayName: u.displayName || u.username,
             color: u.color,
+            accountId: u.accountId,
+            avatar: u.avatar,
           })),
         )
       }

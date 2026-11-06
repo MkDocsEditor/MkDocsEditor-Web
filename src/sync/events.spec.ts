@@ -120,6 +120,17 @@ describe('connectEvents', () => {
     expect(online().get('d-1')).toEqual([{ username: 'anna', displayName: 'Anna', color: '#123' }])
     expect(online().get('d-2')?.[0]?.displayName).toBe('ben')
 
+    socket.receive({
+      type: 'online',
+      documents: [
+        {
+          documentId: 'd-1',
+          users: [{ username: 'anna', displayName: 'Anna', accountId: 'a-1', avatar: 'ff00' }],
+        },
+      ],
+    })
+    expect(online().get('d-1')?.[0]).toMatchObject({ accountId: 'a-1', avatar: 'ff00' })
+
     socket.receive({ type: 'tree-changed' })
     expect(onTreeChanged).toHaveBeenCalledTimes(2)
     connection.close()
