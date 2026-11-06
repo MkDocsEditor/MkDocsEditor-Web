@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { createDocumentSession } from '@/sync'
 import type { DocumentSession } from '@/sync'
 import { instanceName } from '@/sync/session'
+import { useTreeStore } from '@/stores/tree'
 
 export interface OnlineInstance {
   instanceId: string
@@ -59,6 +60,15 @@ export function useDocumentSession(id: () => string, onRenamed: (newId: string) 
   onBeforeUnmount(() => session.value?.close())
 
   const status = computed(() => session.value?.status.value)
+  // a page in sync with the server is an answer from it, for "Synced …" on the folder pages
+  const tree = useTreeStore()
+  watch(
+    () => status.value?.connection === 'online' && !status.value.unsynced,
+    (synced) => {
+      if (synced) tree.markAnswered()
+    },
+    { immediate: true },
+  )
   const peers = computed(() => session.value?.peers.value ?? [])
   const ghosts = computed(() => session.value?.ghosts.value ?? [])
   const presenceKnown = computed(() => session.value?.presenceKnown.value ?? false)

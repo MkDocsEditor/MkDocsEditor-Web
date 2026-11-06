@@ -99,7 +99,7 @@ onMounted(() => {
   })
   view = new EditorView({ state, parent: host.value! })
   view.scrollDOM.addEventListener('scroll', emitTopLine, { passive: true })
-  viewportPublisher = createViewportPublisher(view, props.session)
+  viewportPublisher = createViewportPublisher(view, props.session, () => props.shown !== false)
   viewportPublisher.publish()
   pushPeers()
   pushAuthorship()
@@ -142,8 +142,18 @@ onBeforeUnmount(() => {
   view = null
 })
 
+/** Scrolls so that a source line (0-based) is at the top, as the preview scrolled. */
+function scrollToLine(line: number): void {
+  if (!view) return
+  const doc = view.state.doc
+  const from = doc.line(Math.max(1, Math.min(doc.lines, line + 1))).from
+  // CodeMirror measures the lines on the way: an estimate of their height would land beside it
+  view.dispatch({ effects: EditorView.scrollIntoView(from, { y: 'start' }) })
+}
+
 defineExpose({
   focus: () => view?.focus(),
+  scrollToLine,
   /** For tests and the toolbar. */
   getView: () => view,
 })

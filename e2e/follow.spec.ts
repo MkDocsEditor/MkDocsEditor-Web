@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { createDocument, openEditor, userPage } from './helpers'
+import { createDocument, login, openEditor, userPage } from './helpers'
 import { BACKEND_URL, USERS } from './ports'
 
 const LINES = Array.from({ length: 300 }, (_, i) => `Zeile ${i + 1}`).join('\n')
@@ -215,5 +215,63 @@ test.describe('following another user', () => {
     await expect(ghost).toHaveCSS('opacity', '1')
     await expect(follower.getByTestId('following')).toBeVisible()
     await expect(follower.getByTestId('online-user')).toHaveCount(0)
+  })
+
+  test('follows someone who only reads the preview', async ({ browser }, testInfo) => {
+    await requireJoinPresence()
+    const id = await createDocument(`Follow preview ${testInfo.project.name} ${testInfo.retry}`)
+    const leader = await userPage(browser, USERS.alice)
+    await openEditor(leader, id)
+    await leader.locator('.cm-content').click()
+    await leader.keyboard.insertText(LINES.split('\n').join('\n\n'))
+    await expect(leader.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
+    await leader.keyboard.press('ControlOrMeta+Home')
+
+    const follower = await userPage(browser, USERS.bob)
+    await openEditor(follower, id)
+    await follower.getByTestId('online-user').click()
+    const followerEditor = follower.getByTestId('markdown-editor')
+    await expect(followerEditor.getByText('Zeile 1', { exact: true })).toBeInViewport()
+
+    // the leader reads the end in the preview: the follower's editor goes there
+    await leader.getByRole('button', { name: 'Preview', exact: true }).click()
+    const preview = leader.getByTestId('markdown-preview')
+    await preview.hover()
+    await leader.mouse.wheel(0, 100_000)
+    await expect(preview.getByText('Zeile 300', { exact: true })).toBeInViewport()
+    await expect(followerEditor.getByText('Zeile 300', { exact: true })).toBeInViewport()
+    await expect(follower.getByTestId('following')).toBeVisible()
+  })
+
+  test('scrolls editor and preview together in split mode', async ({ page }, testInfo) => {
+    const id = await createDocument(`Split ${testInfo.project.name} ${testInfo.retry}`)
+    await login(page)
+    await openEditor(page, id)
+    await page.getByRole('button', { name: 'Edit and preview', exact: true }).click()
+    await page.locator('.cm-content').click()
+    await page.keyboard.insertText(LINES.split('\n').join('\n\n'))
+    await page.keyboard.press('ControlOrMeta+Home')
+    const preview = page.getByTestId('markdown-preview')
+    const editor = page.locator('.cm-scroller')
+
+    // the preview drives: the editor goes along, with the same line at the top
+    await preview.hover()
+    await page.mouse.wheel(0, 3000)
+    const topOfPreview = await preview.evaluate((root) => {
+      const top = root.getBoundingClientRect().top
+      const first = [...root.querySelectorAll('p')].find(
+        (p) => p.getBoundingClientRect().top >= top,
+      )
+      return first?.textContent ?? ''
+    })
+    expect(topOfPreview).toMatch(/^Zeile \d+$/)
+    expect(topOfPreview).not.toBe('Zeile 1')
+    await expect(editor.getByText(topOfPreview, { exact: true })).toBeInViewport()
+
+    // and back: the editor drives
+    await editor.hover()
+    await page.mouse.wheel(0, -100_000)
+    await expect(editor.getByText('Zeile 1', { exact: true })).toBeInViewport()
+    await expect(preview.getByText('Zeile 1', { exact: true })).toBeInViewport()
   })
 })

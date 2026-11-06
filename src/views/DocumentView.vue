@@ -31,6 +31,7 @@ import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import type { AuthorHighlightMode } from '@/editor/authorship'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
+import { lineRange } from '@/markdown/sourceLines'
 import { isImage, resourceKind } from '@/services/icons'
 import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
@@ -116,6 +117,27 @@ useSearchText(() => props.id, text, ready)
 const connection = computed(() => connectionBadge(status.value))
 
 const topLine = ref(0)
+
+/**
+ * Split mode scrolls both panes together. Only the pane the user last touched drives, so the
+ * scroll it causes on the other side does not come back.
+ */
+type Pane = 'editor' | 'preview'
+const scrollDriver = ref<Pane>('editor')
+
+function onEditorTopLine(line: number): void {
+  if (scrollDriver.value === 'editor') topLine.value = line
+}
+
+function onPreviewTopLine(line: number): void {
+  if (mode.value === 'split' && scrollDriver.value === 'preview') editor.value?.scrollToLine(line)
+}
+
+/** While only the preview shows, its lines are what followers of this user see. */
+function onPreviewLines(lines: { first: number; last: number } | null): void {
+  if (mode.value !== 'preview' || !session.value) return
+  session.value.setLocalViewport(lines && lineRange(text.value, lines.first, lines.last))
+}
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const editorView = () => editor.value?.getView() ?? null
 const { selectedText, replaceSelection, insertSnippets, reveal, revealLine } = useEditorInsertion(
@@ -219,6 +241,8 @@ const { following, paused: followPaused } = follow
 
 function startFollowing(instanceId: string): void {
   editorWanted.value = true
+  // the editor scrolls along with the one followed, and the preview with it
+  scrollDriver.value = 'editor'
   follow.start(instanceId)
 }
 
@@ -439,7 +463,14 @@ async function share(): Promise<void> {
     />
 
     <div v-if="session" class="document-view__panes" :class="`document-view__panes--${mode}`">
-      <div v-show="mode !== 'preview'" class="document-view__pane document-view__pane--editor">
+      <div
+        v-show="mode !== 'preview'"
+        class="document-view__pane document-view__pane--editor"
+        @wheel.passive="scrollDriver = 'editor'"
+        @touchstart.passive="scrollDriver = 'editor'"
+        @pointerdown="scrollDriver = 'editor'"
+        @keydown="scrollDriver = 'editor'"
+      >
         <template v-if="ready && !status?.readOnly">
           <FormatToolbar :view="editorView" :override="toolbarOverride" />
           <v-divider />
@@ -458,17 +489,26 @@ async function share(): Promise<void> {
           :shown="mode !== 'preview'"
           @change="(t: string) => (text = t)"
           @local-edit="follow.stop()"
-          @top-line="(l: number) => (topLine = l)"
+          @top-line="onEditorTopLine"
         />
       </div>
       <v-divider v-if="mode === 'split'" vertical />
-      <div v-show="mode !== 'edit'" class="document-view__pane">
+      <div
+        v-show="mode !== 'edit'"
+        class="document-view__pane"
+        @wheel.passive="scrollDriver = 'preview'"
+        @touchstart.passive="scrollDriver = 'preview'"
+        @pointerdown="scrollDriver = 'preview'"
+        @keydown="scrollDriver = 'preview'"
+      >
         <v-progress-linear v-if="!ready" indeterminate aria-label="Loading the page" />
         <MarkdownPreview
           v-else
           :text="text"
           :section-id="parentId"
-          :top-line="mode === 'split' ? topLine : undefined"
+          :top-line="mode === 'split' && scrollDriver === 'editor' ? topLine : undefined"
+          @visible-lines="onPreviewLines"
+          @top-line="onPreviewTopLine"
         />
       </div>
     </div>
