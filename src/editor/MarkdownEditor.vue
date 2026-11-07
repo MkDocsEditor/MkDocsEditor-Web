@@ -192,6 +192,8 @@ function scrollToAnchor(anchor: ScrollAnchor): void {
 defineExpose({
   focus: () => view?.focus(),
   scrollToAnchor,
+  /** Where the editor is now, for aligning the preview once. */
+  currentAnchor: (): ScrollAnchor | null => (view ? progressAnchor(view) : null),
   /** For tests and the toolbar. */
   getView: () => view,
 })

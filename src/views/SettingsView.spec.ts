@@ -2,7 +2,13 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
-import { showFilesInTree, startPage, themeChoice } from '@/composables/preferences'
+import {
+  lineNumbers,
+  showFilesInTree,
+  startPage,
+  syncScroll,
+  themeChoice,
+} from '@/composables/preferences'
 import { useAuthStore } from '@/stores/auth'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { account, authStatus, user } from '@/test/fixtures'
@@ -59,6 +65,8 @@ describe('SettingsView', () => {
     startPage.value = 'dashboard'
     themeChoice.value = 'system'
     showFilesInTree.value = true
+    syncScroll.value = true
+    lineNumbers.value = true
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -112,6 +120,17 @@ describe('SettingsView', () => {
     expect(showFilesInTree.value).toBe(false)
     expect(localStorage.getItem('mkdocseditor.startPage')).toBe('"files"')
     expect(localStorage.getItem('mkdocseditor.theme')).toBe('"dark"')
+    wrapper.unmount()
+  })
+
+  it('keeps the editor settings of this browser', async () => {
+    const { wrapper } = await mount('editor')
+    el('setting-sync-scroll')!.querySelector('input')!.click()
+    el('setting-line-numbers')!.querySelector('input')!.click()
+    await flushPromises()
+    expect(syncScroll.value).toBe(false)
+    expect(lineNumbers.value).toBe(false)
+    expect(localStorage.getItem('mkdocseditor.syncScroll')).toBe('false')
     wrapper.unmount()
   })
 

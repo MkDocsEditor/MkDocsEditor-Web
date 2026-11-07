@@ -25,8 +25,8 @@ together, in real time, from a phone or a desktop browser. It talks to the
   - Account: Profile (colour and picture), Sign-in and security (password, passkeys,
     authenticator app, recovery codes), Sessions (the signed-in devices: sign out one or all
     others).
-  - This browser: Editor (line numbers, who wrote what) and Appearance (theme, start page, files
-    in the tree).
+  - This browser: Editor (line numbers, sync scrolling in split view, who wrote what) and
+    Appearance (theme, start page, files in the tree).
   - Administration, for admins: Users, Invitations, Access requests, Audit log, Server.
   - About: the versions of the app and the server.
 

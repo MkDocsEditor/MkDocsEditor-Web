@@ -37,7 +37,7 @@ import { isImage, resourceKind } from '@/services/icons'
 import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
 import { linkDestination } from '@/services/linkPath'
-import { authorHighlight, lineNumbers } from '@/composables/preferences'
+import { authorHighlight, lineNumbers, syncScroll } from '@/composables/preferences'
 import { useStored } from '@/composables/useStored'
 import { instanceColor, instanceId } from '@/sync/instance'
 import { markdownFor } from '@/services/upload'
@@ -127,17 +127,27 @@ const editorAnchor = ref<ScrollAnchor | undefined>()
 type Pane = 'editor' | 'preview'
 const scrollDriver = ref<Pane>('editor')
 
+// Off, neither pane drives the other; on again, the preview goes to where the editor is.
+watch(syncScroll, (on) => {
+  if (!on) {
+    editorAnchor.value = undefined
+    return
+  }
+  scrollDriver.value = 'editor'
+  editorAnchor.value = editor.value?.currentAnchor() ?? undefined
+})
+
 // a place from before the preview drove would pull it back once the editor drives again
 watch(scrollDriver, (driver) => {
   if (driver === 'preview') editorAnchor.value = undefined
 })
 
 function onEditorAnchor(anchor: ScrollAnchor): void {
-  if (scrollDriver.value === 'editor') editorAnchor.value = anchor
+  if (syncScroll.value && scrollDriver.value === 'editor') editorAnchor.value = anchor
 }
 
 function onPreviewAnchor(anchor: ScrollAnchor): void {
-  if (mode.value === 'split' && scrollDriver.value === 'preview')
+  if (syncScroll.value && mode.value === 'split' && scrollDriver.value === 'preview')
     editor.value?.scrollToAnchor(anchor)
 }
 
@@ -429,6 +439,16 @@ async function share(): Promise<void> {
               @click="authorHighlight = option.value"
             />
             <v-list-item
+              v-if="mode === 'split'"
+              title="Sync scrolling"
+              :append-icon="syncScroll ? mdiCheck : undefined"
+              :active="syncScroll"
+              role="menuitemcheckbox"
+              :aria-checked="syncScroll"
+              data-testid="toggle-sync-scroll"
+              @click="syncScroll = !syncScroll"
+            />
+            <v-list-item
               :prepend-icon="mdiPaletteOutline"
               title="My cursor color…"
               data-testid="cursor-color"
@@ -518,7 +538,9 @@ async function share(): Promise<void> {
           v-else
           :text="text"
           :section-id="parentId"
-          :anchor="mode === 'split' && scrollDriver === 'editor' ? editorAnchor : undefined"
+          :anchor="
+            mode === 'split' && syncScroll && scrollDriver === 'editor' ? editorAnchor : undefined
+          "
           @visible-lines="onPreviewLines"
           @anchor="onPreviewAnchor"
         />

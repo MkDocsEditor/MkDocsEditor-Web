@@ -27,3 +27,6 @@ export const authorHighlight = useStored<AuthorHighlightMode>(
 
 /** Line numbers next to the text, on wide screens (phones never have room for them). */
 export const lineNumbers = useStored('mkdocseditor.lineNumbers', true)
+
+/** In split view, scrolling one pane scrolls the other along. Off, both move on their own. */
+export const syncScroll = useStored('mkdocseditor.syncScroll', true)
