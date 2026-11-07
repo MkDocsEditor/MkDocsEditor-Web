@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import {
-  mdiCheck,
   mdiDotsVertical,
   mdiEyeOutline,
   mdiFileDocumentEditOutline,
   mdiHistory,
   mdiOpenInNew,
-  mdiPaletteOutline,
   mdiImageSearchOutline,
   mdiPaperclip,
   mdiShareVariant,
+  mdiTune,
   mdiViewSplitVertical,
 } from '@mdi/js'
 import { computed, ref, watch } from 'vue'
@@ -25,10 +24,9 @@ import BacklinksList from '@/components/references/BacklinksList.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemActionItems from '@/components/tree/ItemActionItems.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
-import CursorColorDialog from '@/editor/CursorColorDialog.vue'
+import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
-import type { AuthorHighlightMode } from '@/editor/authorship'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { lineRange } from '@/markdown/sourceLines'
@@ -80,11 +78,6 @@ const mode = computed<Mode>({
     storedMode.value = m
   },
 })
-const authorHighlightModes: { value: AuthorHighlightMode; title: string }[] = [
-  { value: 'marker', title: 'Strip and marker' },
-  { value: 'strip', title: 'Strip next to the line' },
-  { value: 'off', title: 'Off' },
-]
 
 /** Leaves the preview-only mode, for actions that need the editor on screen. */
 function showEditor(): void {
@@ -280,7 +273,6 @@ function toggleFollowing(instanceId: string): void {
   else startFollowing(instanceId)
 }
 
-const cursorColorOpen = ref(false)
 watch(instanceColor, (color) => session.value?.setLocalColor(color))
 
 // nobody to follow on another page, and the rendered page cannot show where someone is
@@ -423,38 +415,27 @@ async function share(): Promise<void> {
           @click="filesOpen = !filesOpen"
         />
 
+        <v-menu :close-on-content-click="false" location="bottom end">
+          <template #activator="{ props: menu }">
+            <v-btn
+              v-bind="menu"
+              :icon="mdiTune"
+              aria-label="View"
+              title="View"
+              data-testid="open-view-panel"
+            />
+          </template>
+          <ViewPanel
+            :split="mode === 'split'"
+            :line-numbers-shown="!mobile && mode !== 'preview'"
+            :account-color="session?.me.value?.color"
+          />
+        </v-menu>
         <v-menu>
           <template #activator="{ props: menu }">
             <v-btn v-bind="menu" :icon="mdiDotsVertical" aria-label="More" />
           </template>
           <v-list>
-            <v-list-subheader>Who wrote what?</v-list-subheader>
-            <v-list-item
-              v-for="option in authorHighlightModes"
-              :key="option.value"
-              :title="option.title"
-              :active="authorHighlight === option.value"
-              :append-icon="authorHighlight === option.value ? mdiCheck : undefined"
-              :data-testid="`author-highlight-${option.value}`"
-              @click="authorHighlight = option.value"
-            />
-            <v-list-item
-              v-if="mode === 'split'"
-              title="Sync scrolling"
-              :append-icon="syncScroll ? mdiCheck : undefined"
-              :active="syncScroll"
-              role="menuitemcheckbox"
-              :aria-checked="syncScroll"
-              data-testid="toggle-sync-scroll"
-              @click="syncScroll = !syncScroll"
-            />
-            <v-list-item
-              :prepend-icon="mdiPaletteOutline"
-              title="My cursor color…"
-              data-testid="cursor-color"
-              @click="cursorColorOpen = true"
-            />
-            <v-divider />
             <v-list-item
               :prepend-icon="mdiHistory"
               title="Versions"
@@ -594,7 +575,6 @@ async function share(): Promise<void> {
       :selection="pickerSelection"
       @insert="insertFromPicker"
     />
-    <CursorColorDialog v-model="cursorColorOpen" :account-color="session?.me.value?.color" />
     <HistoryDialog v-model="historyOpen" :document-id="id" :read-only="status?.readOnly ?? true" />
   </div>
 </template>

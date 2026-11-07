@@ -155,11 +155,10 @@ test.describe('following another user', () => {
     await expect(caret).toBeVisible()
     const before = await caret.evaluate((el) => getComputedStyle(el).borderLeftColor)
 
-    await chooser.getByRole('button', { name: 'More' }).click()
-    await chooser.getByTestId('cursor-color').click()
-    await chooser.locator('.v-color-picker-swatches__color').nth(40).click()
-    await chooser.getByTestId('cursor-color-close').click()
-    // the dialog took the focus, and without it there is no cursor to see
+    await chooser.getByTestId('open-view-panel').click()
+    await chooser.getByTestId('cursor-color-9c36b5').click()
+    await chooser.keyboard.press('Escape')
+    // the panel took the focus, and without it there is no cursor to see
     await chooser.locator('.cm-content').click()
     await expect
       .poll(() => caret.evaluate((el) => getComputedStyle(el).borderLeftColor))
@@ -258,8 +257,9 @@ test.describe('following another user', () => {
     await expect(preview.getByText('Zeile 1', { exact: true })).toBeInViewport()
 
     // off: the editor goes to the end, the preview stays at the start
-    await page.getByRole('button', { name: 'More' }).click()
-    await page.getByTestId('toggle-sync-scroll').click()
+    await page.getByTestId('open-view-panel').click()
+    await page.getByTestId('toggle-sync-scroll').locator('input').click()
+    await page.keyboard.press('Escape')
     await editor.hover()
     await page.mouse.wheel(0, 100_000)
     await expect(editor.getByText('Zeile 300', { exact: true })).toBeInViewport()
@@ -267,8 +267,8 @@ test.describe('following another user', () => {
     await expect(preview.getByText('Zeile 1', { exact: true })).toBeInViewport()
 
     // on again: the preview goes to where the editor is, once
-    await page.getByRole('button', { name: 'More' }).click()
-    await page.getByTestId('toggle-sync-scroll').click()
+    await page.getByTestId('open-view-panel').click()
+    await page.getByTestId('toggle-sync-scroll').locator('input').click()
     await expect(preview.getByText('Zeile 300', { exact: true })).toBeInViewport()
   })
 
