@@ -313,6 +313,14 @@ export class ApiClient {
     return this.json<Pins>(pinned ? 'PUT' : 'DELETE', urlPath`/pins/${scope}/${documentId}`)
   }
 
+  /**
+   * Puts the pins of `scope` in the order of `documentIds`; returns all pins. Needs the
+   * `pin-order` feature, and the editor or admin role for family pins.
+   */
+  async setPinOrder(scope: PinScope, documentIds: string[]): Promise<Pins> {
+    return this.json<Pins>('PUT', urlPath`/pins/${scope}/order`, { json: { documentIds } })
+  }
+
   /** The changes of all pages, newest first; null when the server has no feed. */
   async getFeed(before?: string, limit = 50): Promise<FeedPage | null> {
     const query = new URLSearchParams({ limit: String(limit) })

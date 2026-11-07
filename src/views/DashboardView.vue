@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {
   mdiAccountGroupOutline,
+  mdiDragVertical,
   mdiFileDocumentOutline,
   mdiFolderOutline,
   mdiPencil,
   mdiPinOff,
 } from '@mdi/js'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import { useApi } from '@/api'
 import type { FeedEntry, Pin, PinScope } from '@/api'
@@ -105,6 +106,66 @@ function canUnpin(scope: PinScope): boolean {
   return scope === 'personal' || pins.canPinForEveryone
 }
 
+// Changing the order of the pins: drag a pin to its new place, or move it with Alt+↑ and Alt+↓.
+const draggedPin = ref<{ scope: PinScope; documentId: string } | null>(null)
+/** Where the dragged pin would go: before the pin at `place` (or after the last one). */
+const pinDrop = ref<{ scope: PinScope; place: number } | null>(null)
+
+function onPinDragStart(event: DragEvent, scope: PinScope, pin: Pin): void {
+  // otherwise it is the drag of a link, as everywhere else
+  if (!pins.canReorder(scope)) return
+  draggedPin.value = { scope, documentId: pin.documentId }
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+
+function onPinDragEnd(): void {
+  draggedPin.value = null
+  pinDrop.value = null
+}
+
+function onPinDragOver(event: DragEvent, scope: PinScope, place: number): void {
+  if (draggedPin.value?.scope !== scope) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const lowerHalf = event.clientY > box.top + box.height / 2
+  pinDrop.value = { scope, place: lowerHalf ? place + 1 : place }
+}
+
+function onPinDrop(event: DragEvent, scope: PinScope): void {
+  const dragged = draggedPin.value
+  const drop = pinDrop.value
+  onPinDragEnd()
+  if (dragged?.scope !== scope || drop?.scope !== scope) return
+  event.preventDefault()
+  const from = pins.pins?.[scope].findIndex((p) => p.documentId === dragged.documentId) ?? -1
+  if (from < 0) return
+  // the places after the pin move up by one once it is taken out
+  void pins.move(scope, dragged.documentId, drop.place > from ? drop.place - 1 : drop.place)
+}
+
+/** The line that shows where the dragged pin would go. */
+function dropClass(scope: PinScope, place: number): string | undefined {
+  const drop = pinDrop.value
+  if (drop?.scope !== scope) return undefined
+  if (drop.place === place) return 'dashboard-view__pin--drop-before'
+  const last = (pins.pins?.[scope].length ?? 0) - 1
+  return place === last && drop.place === last + 1 ? 'dashboard-view__pin--drop-after' : undefined
+}
+
+async function movePin(scope: PinScope, pin: Pin, to: number): Promise<void> {
+  if (!pins.canReorder(scope)) return
+  const moving = pins.move(scope, pin.documentId, to)
+  // the list shows the new order right away; the moved pin keeps the focus
+  await nextTick()
+  document
+    .querySelector<HTMLElement>(
+      `[data-testid="pins-${scope}"] [data-pin-id="${CSS.escape(pin.documentId)}"]`,
+    )
+    ?.focus()
+  await moving
+}
+
 /** Where an entry leads: the page, or the folder found by its path, while it still exists. */
 function entryLink(entry: FeedEntry) {
   if (entry.kind === 'deleted') return undefined
@@ -158,7 +219,7 @@ function entryLink(entry: FeedEntry) {
           :data-testid="`pins-${group.scope}`"
         >
           <v-list-item
-            v-for="pin in pins.pins[group.scope]"
+            v-for="(pin, place) in pins.pins[group.scope]"
             :key="pin.documentId"
             :to="{ name: 'document', params: { id: pin.documentId } }"
             :title="pinName(pin)"
@@ -167,12 +228,30 @@ function entryLink(entry: FeedEntry) {
                 ? `${pinFolder(pin)} · pinned by ${pin.pinnedBy.displayName}`
                 : pinFolder(pin)
             "
+            :class="dropClass(group.scope, place)"
+            :aria-keyshortcuts="
+              pins.canReorder(group.scope) ? 'Alt+ArrowUp Alt+ArrowDown' : undefined
+            "
+            :data-pin-id="pin.documentId"
             data-testid="pin"
+            @dragstart="onPinDragStart($event, group.scope, pin)"
+            @dragend="onPinDragEnd"
+            @dragover="onPinDragOver($event, group.scope, place)"
+            @drop="onPinDrop($event, group.scope)"
+            @keydown.alt.up.prevent.stop="movePin(group.scope, pin, place - 1)"
+            @keydown.alt.down.prevent.stop="movePin(group.scope, pin, place + 1)"
           >
             <template #prepend>
               <v-icon :icon="group.scope === 'family' ? mdiAccountGroupOutline : pinIcon(pin)" />
             </template>
             <template v-if="canUnpin(group.scope)" #append>
+              <v-icon
+                v-if="pins.canReorder(group.scope) && pins.pins[group.scope].length > 1"
+                :icon="mdiDragVertical"
+                class="dashboard-view__pin-handle me-1"
+                title="Drag to change the order, or press Alt+↑ and Alt+↓"
+                aria-hidden="true"
+              />
               <v-btn
                 :icon="mdiPinOff"
                 size="small"
@@ -275,5 +354,22 @@ function entryLink(entry: FeedEntry) {
 }
 .dashboard-view__index :deep(.markdown-preview > :last-child) {
   margin-bottom: 0;
+}
+
+/* shows on the pin under the pointer or with the focus, a hint that pins can be dragged */
+.dashboard-view__pin-handle {
+  opacity: 0;
+  cursor: grab;
+  transition: opacity 0.15s;
+}
+.v-list-item:hover .dashboard-view__pin-handle,
+.v-list-item:focus-visible .dashboard-view__pin-handle {
+  opacity: var(--v-medium-emphasis-opacity);
+}
+.dashboard-view__pin--drop-before {
+  box-shadow: inset 0 2px 0 rgb(var(--v-theme-primary));
+}
+.dashboard-view__pin--drop-after {
+  box-shadow: inset 0 -2px 0 rgb(var(--v-theme-primary));
 }
 </style>

@@ -6,13 +6,17 @@ import type { Pins } from '@/api'
 
 const getPins = vi.fn<() => Promise<Pins | null>>()
 const setPin = vi.fn()
+const setPinOrder = vi.fn()
+const serverInfo = vi.fn()
 vi.mock('@/api', async (original) => ({
   ...(await original<object>()),
-  useApi: () => ({ getPins, setPin }),
+  useApi: () => ({ getPins, setPin, setPinOrder }),
+  useAuthApi: () => ({ serverInfo }),
 }))
 
 import { useAuthStore } from './auth'
 import { useLiveStore } from './live'
+import { useNotifyStore } from './notify'
 import { usePinsStore } from './pins'
 
 const pin = (documentId: string) => ({
@@ -28,6 +32,9 @@ describe('pins', () => {
     setActivePinia(createPinia())
     getPins.mockReset()
     setPin.mockReset()
+    setPinOrder.mockReset()
+    serverInfo.mockReset()
+    serverInfo.mockResolvedValue({ features: [] })
   })
 
   it('loads once, again on a change, and pins', async () => {
@@ -64,5 +71,62 @@ describe('pins', () => {
     const pins = usePinsStore()
     pins.ensureLoaded()
     await vi.waitFor(() => expect(pins.available).toBe(false))
+  })
+
+  it('changes the order only on a server that keeps one, and for whom may', async () => {
+    getPins.mockResolvedValue({ family: [pin('a')], personal: [pin('b')] })
+    const pins = usePinsStore()
+    pins.ensureLoaded()
+    await vi.waitFor(() => expect(pins.available).toBe(true))
+    expect(pins.canReorder('personal')).toBe(false)
+
+    pins.reset()
+    serverInfo.mockResolvedValue({ features: ['pins', 'pin-order'] })
+    useAuthStore().setUser({
+      id: 'u',
+      username: 'r',
+      displayName: 'R',
+      role: 'reader',
+      color: '#000',
+    })
+    pins.ensureLoaded()
+    await vi.waitFor(() => expect(pins.orderable).toBe(true))
+    expect(pins.canReorder('personal')).toBe(true)
+    expect(pins.canReorder('family')).toBe(false)
+  })
+
+  it('moves a pin, shows the new order right away, and takes the answer of the server', async () => {
+    getPins.mockResolvedValue({ family: [], personal: [pin('a'), pin('b'), pin('c')] })
+    const pins = usePinsStore()
+    pins.ensureLoaded()
+    await vi.waitFor(() => expect(pins.available).toBe(true))
+
+    let answer!: (value: Pins) => void
+    setPinOrder.mockReturnValue(new Promise<Pins>((resolve) => (answer = resolve)))
+    const moving = pins.move('personal', 'c', 0)
+    expect(setPinOrder).toHaveBeenCalledWith('personal', ['c', 'a', 'b'])
+    expect(pins.pins?.personal.map((p) => p.documentId)).toEqual(['c', 'a', 'b'])
+    answer({ family: [], personal: [pin('c'), pin('b'), pin('a')] })
+    await moving
+    expect(pins.pins?.personal.map((p) => p.documentId)).toEqual(['c', 'b', 'a'])
+
+    // past either end it stays where it is
+    await pins.move('personal', 'c', -1)
+    await pins.move('personal', 'a', 7)
+    expect(setPinOrder).toHaveBeenCalledTimes(1)
+  })
+
+  it('loads the pins again when the server refuses the order', async () => {
+    getPins.mockResolvedValue({ family: [], personal: [pin('a'), pin('b')] })
+    const pins = usePinsStore()
+    pins.ensureLoaded()
+    await vi.waitFor(() => expect(pins.available).toBe(true))
+    const error = vi.spyOn(useNotifyStore(), 'error').mockImplementation(() => {})
+
+    setPinOrder.mockRejectedValue(new Error('403'))
+    await pins.move('personal', 'b', 0)
+    expect(error).toHaveBeenCalled()
+    await vi.waitFor(() => expect(pins.pins?.personal.map((p) => p.documentId)).toEqual(['a', 'b']))
+    expect(getPins).toHaveBeenCalledTimes(2)
   })
 })
