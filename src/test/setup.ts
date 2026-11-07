@@ -1,8 +1,17 @@
-import { afterEach } from 'vitest'
+import { afterEach, vi } from 'vitest'
 
 import { setApiClient } from '@/api'
 
 afterEach(() => setApiClient(null))
+
+// vi.waitFor gives up after 1 s by default, which a busy machine (CI, parallel runs) exceeds
+// while rendering. It returns as soon as the condition holds, so a longer limit costs nothing.
+const waitFor = vi.waitFor.bind(vi)
+vi.waitFor = ((callback, options) =>
+  waitFor(
+    callback,
+    typeof options === 'number' ? options : { timeout: 5_000, ...options },
+  )) as typeof vi.waitFor
 
 // jsdom lacks a few browser APIs that Vuetify overlays and CodeMirror use.
 

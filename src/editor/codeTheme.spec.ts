@@ -1,5 +1,5 @@
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { ensureSyntaxTree } from '@codemirror/language'
+import { forceParsing } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -17,8 +17,10 @@ function editor(doc: string, extra = false): EditorView {
       extra ? lineNumberGutter() : [],
     ],
   })
-  ensureSyntaxTree(state, state.doc.length, 5000)
   view = new EditorView({ state, parent: document.body })
+  // The first parse gets a few milliseconds only; on a busy machine it stops before the end.
+  // forceParsing hands the whole tree to the view (ensureSyntaxTree on the state does not).
+  forceParsing(view, state.doc.length, 5000)
   return view
 }
 

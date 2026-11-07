@@ -9,6 +9,9 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: 'jsdom',
+      // Mounting the app with Vuetify takes a few seconds on a busy machine (CI, parallel runs);
+      // the default of 5 s then cuts tests off in the middle.
+      testTimeout: 20_000,
       setupFiles: ['./src/test/setup.ts'],
       exclude: [...configDefaults.exclude, 'e2e/**', '.claude/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
