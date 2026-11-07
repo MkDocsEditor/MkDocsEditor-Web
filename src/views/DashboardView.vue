@@ -126,23 +126,26 @@ function entryLink(entry: FeedEntry) {
       <SyncStatus class="mt-1" />
     </PageHeader>
 
-    <v-card v-if="index" variant="outlined" class="mb-4" data-testid="dashboard-index">
-      <template #append>
-        <v-btn
-          :icon="mdiPencil"
-          size="small"
-          :to="{ name: 'document', params: { id: index.id } }"
-          aria-label="Open the start page of the wiki"
-          data-testid="dashboard-index-open"
-        />
-      </template>
-      <v-card-text>
-        <MarkdownPreview v-if="indexText !== null" :text="indexText" :section-id="tree.root?.id" />
-        <v-alert v-else-if="failed" type="warning" density="compact">
-          The start page of the wiki could not be loaded.
-        </v-alert>
-        <v-progress-linear v-else indeterminate />
-      </v-card-text>
+    <v-card
+      v-if="index"
+      variant="outlined"
+      class="dashboard-view__index mb-4"
+      data-testid="dashboard-index"
+    >
+      <v-btn
+        :icon="mdiPencil"
+        size="small"
+        variant="text"
+        class="dashboard-view__index-open"
+        :to="{ name: 'document', params: { id: index.id } }"
+        aria-label="Open the start page of the wiki"
+        data-testid="dashboard-index-open"
+      />
+      <MarkdownPreview v-if="indexText !== null" :text="indexText" :section-id="tree.root?.id" />
+      <v-alert v-else-if="failed" type="warning" density="compact">
+        The start page of the wiki could not be loaded.
+      </v-alert>
+      <v-progress-linear v-else indeterminate class="mt-4" />
     </v-card>
 
     <template v-if="pins.available">
@@ -245,3 +248,32 @@ function entryLink(entry: FeedEntry) {
     </section>
   </v-container>
 </template>
+
+<style scoped>
+.dashboard-view__index {
+  padding: var(--app-space-4);
+}
+
+/* floats, so the text runs beside it rather than below a row of its own */
+.dashboard-view__index-open {
+  float: right;
+  margin: calc(-1 * var(--app-space-2)) calc(-1 * var(--app-space-2)) 0 var(--app-space-2);
+}
+
+/* the page as part of this one: no scrolling or padding of its own, and no title */
+.dashboard-view__index :deep(.markdown-preview) {
+  height: auto;
+  overflow: visible;
+  padding: 0;
+}
+.dashboard-view__index :deep(.markdown-preview > h1:first-child) {
+  display: none;
+}
+.dashboard-view__index :deep(.markdown-preview > :first-child),
+.dashboard-view__index :deep(.markdown-preview > h1:first-child + *) {
+  margin-top: 0;
+}
+.dashboard-view__index :deep(.markdown-preview > :last-child) {
+  margin-bottom: 0;
+}
+</style>
