@@ -103,6 +103,27 @@ export function buildRouter(history: RouterHistory): Router {
         props: true,
       },
       {
+        path: '/q/:code',
+        name: 'qr-open',
+        component: () => import('@/views/QrOpenView.vue'),
+        props: true,
+      },
+      {
+        path: '/qr-codes',
+        name: 'qr-codes',
+        component: () => import('@/views/QrCodesView.vue'),
+      },
+      {
+        path: '/qr-codes/print',
+        name: 'qr-print',
+        component: () => import('@/views/QrPrintView.vue'),
+        props: (route) => ({
+          keys: ([] as unknown[])
+            .concat(route.query.key ?? [])
+            .filter((k) => typeof k === 'string'),
+        }),
+      },
+      {
         path: '/welcome',
         name: 'welcome',
         component: () => import('@/views/WelcomeView.vue'),

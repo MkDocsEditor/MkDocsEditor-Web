@@ -3,6 +3,7 @@ import {
   mdiAccountCircle,
   mdiCogOutline,
   mdiLinkVariantOff,
+  mdiQrcode,
   mdiLogout,
   mdiPaperclip,
   mdiPaperclipOff,
@@ -32,11 +33,21 @@ import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
 import { usePagesStore } from '@/stores/pages'
 import { usePinsStore } from '@/stores/pins'
+import { useQrStore } from '@/stores/qr'
 import { useMoveStore } from '@/stores/move'
 import { describeError, useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 
 const auth = useAuthStore()
+const qr = useQrStore()
+// the menu has "QR codes" on a server with them
+watch(
+  () => auth.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void qr.checkAvailable()
+  },
+  { immediate: true },
+)
 const tree = useTreeStore()
 const route = useRoute()
 const router = useRouter()
@@ -161,6 +172,7 @@ watch(
     tree.reset()
     pages.reset()
     usePinsStore().reset()
+    useQrStore().reset()
     if (!route.meta.public && !loggingOut) {
       void router.push({ name: 'login', query: { redirect: route.fullPath } })
     }
@@ -268,6 +280,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 <v-badge inline color="error" :content="pendingRequests" />
               </template>
             </v-list-item>
+            <v-list-item
+              v-if="qr.available"
+              :prepend-icon="mdiQrcode"
+              title="QR codes"
+              :to="{ name: 'qr-codes' }"
+              data-testid="menu-qr-codes"
+            />
             <v-list-item
               :prepend-icon="mdiLinkVariantOff"
               title="Broken links and unused files"

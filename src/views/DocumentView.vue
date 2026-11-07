@@ -7,6 +7,7 @@ import {
   mdiOpenInNew,
   mdiImageSearchOutline,
   mdiPaperclip,
+  mdiQrcode,
   mdiShareVariant,
   mdiTune,
   mdiViewSplitVertical,
@@ -15,7 +16,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
-import type { ResourceModel } from '@/api'
+import type { QrKey, ResourceModel } from '@/api'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
 import LinkPickerDialog from '@/components/pickers/LinkPickerDialog.vue'
 import ResourcePickerDialog from '@/components/pickers/ResourcePickerDialog.vue'
@@ -24,6 +25,7 @@ import BacklinksList from '@/components/references/BacklinksList.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemActionItems from '@/components/tree/ItemActionItems.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
+import PageQrDialog from '@/components/qr/PageQrDialog.vue'
 import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import { flashLines } from '@/editor/flashLines'
@@ -31,6 +33,7 @@ import MarkdownEditor from '@/editor/MarkdownEditor.vue'
 import { placeRanges, textHash } from '@/markdown/changeRanges'
 import type { ChangeRange, ChangeTarget } from '@/markdown/changeRanges'
 import { sectionOf } from '@/markdown/headings'
+import { withQrKeys } from '@/markdown/qrKeys'
 import { pageTitle } from '@/markdown/pageTitle'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
@@ -49,6 +52,7 @@ import { wikiPageUrl } from '@/services/wiki'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 import { usePageMetaStore } from '@/stores/pageMeta'
+import { useQrStore } from '@/stores/qr'
 import { useTreeStore } from '@/stores/tree'
 
 import { connectionBadge } from './document/connectionBadge'
@@ -105,6 +109,42 @@ function closeFilesOnPhone(): void {
   if (mobile.value) filesOpen.value = false
 }
 const historyOpen = ref(false)
+
+// QR codes of the page: in its front matter, changed through the editor like typing
+const qr = useQrStore()
+void qr.checkAvailable()
+const qrOpen = ref(false)
+/** A key to put on the page, from a sticker without a page (`?qr=key`). */
+const qrSuggested = ref<string | undefined>()
+
+function openQr(suggested?: string): void {
+  qrSuggested.value = suggested
+  qrOpen.value = true
+}
+
+/** Writes `keys` into the front matter as one edit of the changed part. */
+function setQrKeys(keys: QrKey[]): void {
+  const view = editorView()
+  if (!view) return
+  const before = view.state.doc.toString()
+  const after = withQrKeys(before, keys)
+  let start = 0
+  while (start < before.length && before[start] === after[start]) start++
+  let end = 0
+  while (
+    end < before.length - start &&
+    end < after.length - start &&
+    before[before.length - 1 - end] === after[after.length - 1 - end]
+  )
+    end++
+  view.dispatch({
+    changes: {
+      from: start,
+      to: before.length - end,
+      insert: after.slice(start, after.length - end),
+    },
+  })
+}
 
 const { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers } =
   useDocumentSession(
@@ -335,6 +375,17 @@ watch(
   { flush: 'post' },
 )
 
+// `?qr=key` (from a sticker without a page): the QR codes of the page, with the key to add
+watch(
+  () => [ready.value && status.value?.connection !== 'connecting', route.query.qr] as const,
+  ([isReady, key]) => {
+    if (!isReady || typeof key !== 'string') return
+    void router.replace({ query: { ...route.query, qr: undefined } })
+    openQr(key)
+  },
+  { flush: 'post' },
+)
+
 const auth = useAuthStore()
 const follow = useFollow({
   view: editorView,
@@ -534,6 +585,13 @@ async function share(): Promise<void> {
               @click="historyOpen = true"
             />
             <v-list-item
+              v-if="qr.available"
+              :prepend-icon="mdiQrcode"
+              title="QR codes"
+              data-testid="open-qr"
+              @click="openQr()"
+            />
+            <v-list-item
               v-if="wikiUrl"
               :prepend-icon="mdiOpenInNew"
               title="View in the wiki"
@@ -666,6 +724,15 @@ async function share(): Promise<void> {
       :document-id="id"
       :selection="pickerSelection"
       @insert="insertFromPicker"
+    />
+    <PageQrDialog
+      v-model="qrOpen"
+      :document-id="id"
+      :name="page?.name ?? ''"
+      :text="text"
+      :read-only="!ready || (status?.readOnly ?? true)"
+      :suggested="qrSuggested"
+      @change="setQrKeys"
     />
     <HistoryDialog v-model="historyOpen" :document-id="id" :read-only="status?.readOnly ?? true" />
   </div>

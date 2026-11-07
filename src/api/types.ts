@@ -25,6 +25,47 @@ export interface ServerPageMeta {
   status: string | null
   tags: string[]
   searchExclude: boolean
+  /** `qr-codes`: the valid QR code keys of the page (`docs/qr.md`). */
+  qr?: QrKey[]
+}
+
+/** A QR code key in the front matter of a page, with its optional label. */
+export interface QrKey {
+  key: string
+  label: string | null
+}
+
+/** A page with its title, as the QR code answers list it. */
+export interface QrItem {
+  item: ItemRef
+  title: string
+}
+
+/** `GET /qr/{key}/`: the one page with the key. */
+export interface QrCode extends QrItem, QrKey {
+  /** RFC 3339, null if never scanned. */
+  lastScannedAt: string | null
+}
+
+/** A key on more than one page (409 `qr-conflict`). */
+export interface QrConflict {
+  key: string
+  items: QrItem[]
+  lastScannedAt: string | null
+}
+
+/** A key that a page had, but none has now (410 `qr-gone`). */
+export interface QrGone extends QrKey {
+  lastPath: string
+  lastScannedAt: string | null
+}
+
+/** `GET /qr/`. */
+export interface QrCodes {
+  codes: QrCode[]
+  conflicts: QrConflict[]
+  invalid: (QrItem & { value: string })[]
+  gone: QrGone[]
 }
 
 /** Kind of a resource, for icons and pickers (`docs/references.md` section 9). */

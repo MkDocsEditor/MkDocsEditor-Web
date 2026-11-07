@@ -12,6 +12,8 @@ import type {
   MoveResult,
   PinScope,
   Pins,
+  QrCode,
+  QrCodes,
   ResourceModel,
   Revision,
   SectionModel,
@@ -94,6 +96,8 @@ export interface RequestInitOptions {
   onUploadProgress?: Progress
   /** Do not report a 401 to `onSessionEnded` (login and link endpoints, the start check). */
   quiet401?: boolean
+  /** The HTTP cache mode of `fetch`; see `getQrCode`. */
+  cache?: RequestCache
 }
 
 /**
@@ -150,6 +154,7 @@ export class ApiClient {
               headers,
               body,
               credentials: 'include',
+              ...(init.cache ? { cache: init.cache } : {}),
             })
     } catch (error) {
       throw new ApiError(
@@ -326,6 +331,22 @@ export class ApiClient {
     const query = new URLSearchParams({ limit: String(limit) })
     if (before) query.set('before', before)
     return nullWhen([404, 405], this.json<FeedPage>('GET', `/feed?${query}`))
+  }
+
+  /**
+   * The page with a QR code key (`docs/qr.md`). `scan` records the scan; without it, it is a
+   * look only. Throws `ApiError` 409 `qr-conflict`, 410 `qr-gone` or 404 with their details.
+   */
+  async getQrCode(key: string, scan = false): Promise<QrCode> {
+    const path = urlPath`/qr/${key}`
+    // browsers may keep a 404 or 410 without asking again: after the key went onto a page, the
+    // sticker would still say it has none
+    return this.json<QrCode>('GET', scan ? `${path}?scan=1` : path, { cache: 'no-store' })
+  }
+
+  /** All QR code keys of the wiki, with conflicts, invalid values and keys of gone pages. */
+  async getQrCodes(): Promise<QrCodes> {
+    return this.json<QrCodes>('GET', '/qr', { cache: 'no-store' })
   }
 
   /** A profile picture. The hash changes with every new picture, so the result never goes stale. */
