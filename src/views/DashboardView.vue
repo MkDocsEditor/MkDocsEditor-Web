@@ -17,6 +17,7 @@ import UserAvatar from '@/components/common/UserAvatar.vue'
 import SyncStatus from '@/components/tree/SyncStatus.vue'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { formatDate, formatWhen } from '@/services/time'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import { usePagesStore } from '@/stores/pages'
 import { usePinsStore } from '@/stores/pins'
 import { useTreeStore } from '@/stores/tree'
@@ -29,6 +30,7 @@ import { useFeed } from './dashboard/useFeed'
  * comes first, then the pinned pages, then the feed of changes: who changed what, when and where.
  */
 const tree = useTreeStore()
+const pageMeta = usePageMetaStore()
 const pages = usePagesStore()
 const pins = usePinsStore()
 const feed = useFeed()
@@ -84,7 +86,19 @@ function pinFolder(pin: Pin): string {
 }
 
 function pinName(pin: Pin): string {
-  return tree.get(pin.documentId)?.name ?? pin.name
+  const page = tree.get(pin.documentId)
+  return page ? pageMeta.title(page) : pin.name
+}
+
+function pinIcon(pin: Pin): string {
+  const page = tree.get(pin.documentId)
+  return page ? pageMeta.icon(page) : mdiFileDocumentOutline
+}
+
+/** The page of an entry by its title while it exists, else by the name in its path. */
+function entryName(entry: FeedEntry): string {
+  const page = entry.documentId ? tree.get(entry.documentId) : undefined
+  return page ? pageMeta.title(page) : nameOf(entry.path)
 }
 
 function canUnpin(scope: PinScope): boolean {
@@ -153,9 +167,7 @@ function entryLink(entry: FeedEntry) {
             data-testid="pin"
           >
             <template #prepend>
-              <v-icon
-                :icon="group.scope === 'family' ? mdiAccountGroupOutline : mdiFileDocumentOutline"
-              />
+              <v-icon :icon="group.scope === 'family' ? mdiAccountGroupOutline : pinIcon(pin)" />
             </template>
             <template v-if="canUnpin(group.scope)" #append>
               <v-btn
@@ -208,7 +220,7 @@ function entryLink(entry: FeedEntry) {
           </template>
           <v-list-item-title class="text-wrap">
             {{ peopleText(entry.authors) }} {{ verbOf(entry) }}
-            <strong>{{ nameOf(entry.path) }}</strong>
+            <strong>{{ entryName(entry) }}</strong>
           </v-list-item-title>
           <v-list-item-subtitle class="text-wrap">{{ detailsOf(entry) }}</v-list-item-subtitle>
           <template #append>

@@ -168,5 +168,10 @@ export function resolveRelative(
 }
 
 export function sortByName<T extends { name: string }>(items: readonly T[]): T[] {
-  return [...items].sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }))
+  return sortByText(items, (item) => item.name)
+}
+
+/** Sorted like names: case-insensitive, with numbers in their order (2 before 10). */
+export function sortByText<T>(items: readonly T[], text: (item: T) => string): T[] {
+  return [...items].sort((a, b) => text(a).localeCompare(text(b), 'en', { numeric: true }))
 }

@@ -27,6 +27,7 @@ import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
+import { parseFrontMatter } from '@/markdown/frontMatter'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { lineRange } from '@/markdown/sourceLines'
@@ -36,12 +37,14 @@ import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
 import { linkDestination } from '@/services/linkPath'
 import { authorHighlight, lineNumbers, syncScroll } from '@/composables/preferences'
+import { useDebounced } from '@/composables/useDebounced'
 import { useStored } from '@/composables/useStored'
 import { instanceColor, instanceId } from '@/sync/instance'
 import { markdownFor } from '@/services/upload'
 import { wikiPageUrl } from '@/services/wiki'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import { useTreeStore } from '@/stores/tree'
 
 import { connectionBadge } from './document/connectionBadge'
@@ -108,6 +111,15 @@ const { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers 
     },
   )
 useSearchText(() => props.id, text, ready)
+
+// The title from the front matter, as it is typed; the stored copy until the text is there.
+const pageMeta = usePageMetaStore()
+const typed = useDebounced(() => (ready.value ? { id: props.id, text: text.value } : null), 300)
+const title = computed(() => {
+  if (!page.value) return ''
+  if (typed.value?.id !== props.id) return pageMeta.title(page.value)
+  return parseFrontMatter(typed.value.text).meta.title ?? page.value.name
+})
 const connection = computed(() => connectionBadge(status.value))
 
 /** Where the editor is while it drives in split mode; the preview shows the same place. */
@@ -314,7 +326,7 @@ watch(
 async function share(): Promise<void> {
   const url = joinLink(props.id, auth.user?.id, session.value?.me.value?.instanceId ?? instanceId())
   if (mobile.value && typeof navigator.share === 'function') {
-    await navigator.share({ title: page.value?.name, url }).catch(() => undefined)
+    await navigator.share({ title: title.value, url }).catch(() => undefined)
   } else if (await copyText(url)) {
     notify.success('Link copied. It leads to your position on this page.')
   } else {
@@ -326,10 +338,10 @@ async function share(): Promise<void> {
 <template>
   <div class="document-view">
     <div class="document-view__bar px-4 pt-1">
-      <ItemBreadcrumbs v-if="!mobile" :ancestors="ancestors" :current="page?.name" />
+      <ItemBreadcrumbs v-if="!mobile" :ancestors="ancestors" :current="title" />
       <div class="d-flex align-center ga-2 pb-1">
         <h1 class="text-title-large text-truncate flex-grow-1" data-testid="document-title">
-          {{ page?.name }}
+          {{ title }}
         </h1>
 
         <v-avatar-group v-if="onlineUsers.length > 0" data-testid="online-users">

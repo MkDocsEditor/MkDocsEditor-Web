@@ -95,7 +95,7 @@ describe('findExcerpts', () => {
 
 describe('sortByRelevance', () => {
   const result = (name: string, matchCount = 0) =>
-    ({ item: { name }, matchCount }) as unknown as SearchResult
+    ({ item: { name }, title: name, matchCount }) as unknown as SearchResult
 
   it('prefers the whole name, then its start, a part of it, then the text', () => {
     const sorted = sortByRelevance(
@@ -149,6 +149,22 @@ describe('searchWiki', () => {
     expect(isSearchable('a kuchen')).toBe(true)
     expect(search(text, 'k')).toEqual([])
     expect(search(text, 'docs')).toEqual([])
+  })
+
+  it('finds pages by the title of their front matter, and shows it', () => {
+    const title = (id: string) => (id === 'd-suppe' ? 'Herbstsuppe' : undefined)
+    const [result] = searchWiki(index, text, 'herbst', { title }).results
+    expect(result!.item.id).toBe('d-suppe')
+    expect(result!.title).toBe('Herbstsuppe')
+    expect(search(text, 'kuchen').find((r) => r.item.id === 'd-index')!.title).toBe('index')
+  })
+
+  it('leaves out the text of pages excluded from search, not their names', () => {
+    const textExcluded = (id: string) => id === 'd-index'
+    const ids = (term: string) =>
+      searchWiki(index, text, term, { textExcluded }).results.map((r) => r.item.id)
+    expect(ids('rezept')).not.toContain('d-index')
+    expect(ids('index')).toEqual(['d-index'])
   })
 
   it('keeps the best 50 results and says how many there are', () => {
