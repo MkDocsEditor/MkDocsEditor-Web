@@ -243,6 +243,35 @@ test.describe('following another user', () => {
     await expect(follower.getByTestId('following')).toBeVisible()
   })
 
+  test('split scrolling can be unlinked, and links up again', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'phone', 'phones have no split view')
+    const id = await createDocument(`Unsync ${testInfo.project.name} ${testInfo.retry}`)
+    await login(page)
+    await openEditor(page, id)
+    await page.getByRole('button', { name: 'Edit and preview', exact: true }).click()
+    await page.locator('.cm-content').click()
+    await page.keyboard.insertText(LINES.split('\n').join('\n\n'))
+    await page.keyboard.press('ControlOrMeta+Home')
+    const preview = page.getByTestId('markdown-preview')
+    const editor = page.locator('.cm-scroller')
+    await expect(preview.getByText('Zeile 300', { exact: true })).toBeAttached()
+    await expect(preview.getByText('Zeile 1', { exact: true })).toBeInViewport()
+
+    // off: the editor goes to the end, the preview stays at the start
+    await page.getByRole('button', { name: 'More' }).click()
+    await page.getByTestId('toggle-sync-scroll').click()
+    await editor.hover()
+    await page.mouse.wheel(0, 100_000)
+    await expect(editor.getByText('Zeile 300', { exact: true })).toBeInViewport()
+    await page.waitForTimeout(300)
+    await expect(preview.getByText('Zeile 1', { exact: true })).toBeInViewport()
+
+    // on again: the preview goes to where the editor is, once
+    await page.getByRole('button', { name: 'More' }).click()
+    await page.getByTestId('toggle-sync-scroll').click()
+    await expect(preview.getByText('Zeile 300', { exact: true })).toBeInViewport()
+  })
+
   test('scrolls editor and preview together in split mode', async ({ page }, testInfo) => {
     const id = await createDocument(testName('Split', testInfo))
     await login(page)

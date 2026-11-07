@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { authorHighlight, lineNumbers } from '@/composables/preferences'
+import { authorHighlight, lineNumbers, syncScroll } from '@/composables/preferences'
 import type { AuthorHighlightMode } from '@/editor/authorship'
 
 const authorModes: { value: AuthorHighlightMode; title: string }[] = [
@@ -18,6 +18,13 @@ const authorModes: { value: AuthorHighlightMode; title: string }[] = [
         label="Show line numbers"
         messages="On wide screens; phones have no room for them."
         data-testid="setting-line-numbers"
+      />
+      <v-switch
+        v-model="syncScroll"
+        color="primary"
+        label="Sync scrolling in split view"
+        messages="Scrolling the text or the preview scrolls the other one along."
+        data-testid="setting-sync-scroll"
       />
       <v-select
         v-model="authorHighlight"
