@@ -5,19 +5,30 @@
  * generates it from environment variables at start, so one image works for every deployment.
  */
 export interface AppConfig {
-  /** Base URL of the MkDocsEditor backend, for example `https://mkdocs-api.example.com`. */
+  /**
+   * Absolute base URL of the MkDocsEditor backend, for example `https://wiki.example.com/api`.
+   * Without a value, the backend is at `/api` of the app's own origin.
+   */
   backendUrl: string
-  /** Base URL of the rendered MkDocs site, for example `https://wiki.example.com`. Optional. */
+  /** Base URL of the rendered MkDocs site, for example `https://wiki.example.com/view`. Optional. */
   wikiUrl: string
 }
 
+/** Where the backend is when nothing else is configured: `/api` on the app's own origin. */
+export const SAME_ORIGIN_BACKEND = '/api'
+
 const DEFAULT_CONFIG: AppConfig = {
-  backendUrl: import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:7413',
+  backendUrl: import.meta.env.VITE_BACKEND_URL || SAME_ORIGIN_BACKEND,
   wikiUrl: import.meta.env.VITE_WIKI_URL ?? '',
 }
 
 function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '')
+}
+
+/** A backend URL, also a path like `/api`, as an absolute URL against the app's origin. */
+function absoluteBackendUrl(url: string): string {
+  return stripTrailingSlash(new URL(url, window.location.origin).href)
 }
 
 /** Merges a parsed `config.json` with the defaults and normalizes the URLs. */
@@ -28,7 +39,7 @@ export function parseConfig(raw: unknown, defaults: AppConfig = DEFAULT_CONFIG):
     return typeof value === 'string' && value.trim() !== '' ? value.trim() : defaults[key]
   }
   return {
-    backendUrl: stripTrailingSlash(pick('backendUrl')),
+    backendUrl: absoluteBackendUrl(pick('backendUrl')),
     wikiUrl: stripTrailingSlash(pick('wikiUrl')),
   }
 }

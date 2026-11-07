@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { USERS, WEB_PORT, WORKER } from './ports'
+import { backendBase, USERS, WEB_PORT, WORKER } from './ports'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const TMP = path.join(here, '.tmp')
@@ -168,7 +168,7 @@ export interface RunningBackend {
  * backend, and tests would silently share its state.
  */
 export async function assertPortFree(port: number): Promise<void> {
-  const taken = await fetch(`http://127.0.0.1:${port}/alive/`).then(
+  const taken = await fetch(`${backendBase(port)}/alive/`).then(
     () => true,
     () => false,
   )
@@ -201,7 +201,7 @@ export async function startBackend(
       throw new Error(`backend exited with ${child.exitCode}:\n${log.join('')}`)
     }
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/alive/`)
+      const response = await fetch(`${backendBase(port)}/alive/`)
       if (response.ok) return { process: child, log, stop }
     } catch {
       // not up yet

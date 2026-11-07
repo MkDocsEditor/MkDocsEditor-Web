@@ -19,7 +19,7 @@ import {
 import { addVirtualAuthenticator, totp } from './authenticators'
 import { backendBinary, createWiki, startBackend, TMP, waitForLog, writeConfig } from './backend'
 import { backendRequest, login, skipPasskeyStep, testName } from './helpers'
-import { BACKEND_URL, BROWSER_BACKEND_URL, extraBackendPort, WEB_PORT } from './ports'
+import { BACKEND_URL, backendBase, BROWSER_BACKEND_URL, extraBackendPort, WEB_PORT } from './ports'
 
 test.describe('accounts', () => {
   test('the setup link creates the first admin', async ({ browser }, testInfo) => {
@@ -39,7 +39,7 @@ test.describe('accounts', () => {
 
       const context = await browser.newContext(testInfo.project.use)
       await context.route('**/config.json', (route) =>
-        route.fulfill({ json: { backendUrl: `http://localhost:${port}`, wikiUrl: '' } }),
+        route.fulfill({ json: { backendUrl: backendBase(port, 'localhost'), wikiUrl: '' } }),
       )
       const page = await context.newPage()
       // without a token, the app explains where to find the setup link
@@ -72,7 +72,7 @@ test.describe('accounts', () => {
       await page.getByTestId('done-continue').click()
       await expect(page.getByTestId('dashboard-title')).toBeVisible()
 
-      const status = (await (await fetch(`http://127.0.0.1:${port}/auth/status/`)).json()) as {
+      const status = (await (await fetch(`${backendBase(port)}/auth/status/`)).json()) as {
         setupRequired: boolean
       }
       expect(status.setupRequired).toBe(false)
@@ -536,7 +536,7 @@ test('too many attempts are slowed down with a clear message', async ({ browser 
   try {
     const context = await browser.newContext(testInfo.project.use)
     await context.route('**/config.json', (route) =>
-      route.fulfill({ json: { backendUrl: `http://localhost:${port}`, wikiUrl: '' } }),
+      route.fulfill({ json: { backendUrl: backendBase(port, 'localhost'), wikiUrl: '' } }),
     )
     const page = await context.newPage()
     await page.goto('/login')

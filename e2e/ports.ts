@@ -18,12 +18,20 @@ export const extraBackendPort = () => Number(process.env.E2E_BACKEND_PORT ?? 174
 export const WORKER = Number(process.env.TEST_PARALLEL_INDEX ?? 0)
 export const BACKEND_PORT = backendPort(WORKER)
 export const WEB_PORT = webPort(WORKER)
+/** The path under which the backend serves every route. */
+export const API_PREFIX = '/api'
+
+/** The base URL of a backend on a port: its routes are under `/api`. */
+export const backendBase = (port: number, host = '127.0.0.1') =>
+  `http://${host}:${port}${API_PREFIX}`
+
 /**
- * The browser reaches the backend as `localhost`, like the app (same site as the app, so the
- * session cookie is sent). Node talks to it on 127.0.0.1.
+ * The app reaches the backend of its worker as `/api` of its own origin; the app server passes it
+ * on (see `web-server.ts`), as the reverse proxy does in production. Node talks to the backend
+ * directly, on 127.0.0.1.
  */
-export const BROWSER_BACKEND_URL = `http://localhost:${BACKEND_PORT}`
-export const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`
+export const BROWSER_BACKEND_URL = `http://localhost:${WEB_PORT}${API_PREFIX}`
+export const BACKEND_URL = backendBase(BACKEND_PORT)
 
 /** Test users of the throwaway e2e backend (passwords are generated into its config). */
 export const USERS = {

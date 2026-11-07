@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test'
 import { backendBinary, createWiki, startBackend, TMP, writeConfig } from './backend'
 import type { RunningBackend } from './backend'
 import { bearerToken, editorText, forgetBearer, login, typeAt } from './helpers'
-import { extraBackendPort, USERS } from './ports'
+import { backendBase, extraBackendPort, USERS } from './ports'
 
 /**
  * The server loses its saved Automerge state (new epoch) while a client has unsynced offline
@@ -27,7 +27,7 @@ test('offline edits survive a server that lost its state (new epoch)', async ({
   const bin = backendBinary()
   const config = writeConfig(bin, workDir, wiki, port)
   let backend: RunningBackend = await startBackend(bin, config, workDir, port)
-  const baseUrl = `http://127.0.0.1:${port}`
+  const baseUrl = backendBase(port)
   forgetBearer(USERS.alice, baseUrl)
   const auth = `Bearer ${await bearerToken(USERS.alice, baseUrl)}`
   const content = async () =>
@@ -47,7 +47,7 @@ test('offline edits survive a server that lost its state (new epoch)', async ({
     // a client of this backend: the runtime config points the app at it
     const context = await browser.newContext(testInfo.project.use)
     await context.route('**/config.json', (route) =>
-      route.fulfill({ json: { backendUrl: `http://localhost:${port}`, wikiUrl: '' } }),
+      route.fulfill({ json: { backendUrl: backendBase(port, 'localhost'), wikiUrl: '' } }),
     )
     const page = await context.newPage()
     await login(page, USERS.alice)
