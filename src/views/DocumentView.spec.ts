@@ -9,9 +9,12 @@ import { sampleTree } from '@/test/fixtures'
 import { mountWithPlugins } from '@/test/mount'
 
 const fakes: ReturnType<typeof createFakeSession>[] = []
+/** The next session starts from an empty stored copy and still waits for the server. */
+let staleCopy = false
 vi.mock('@/sync', () => ({
   createDocumentSession: () => {
-    const fake = createFakeSession('# Apfelkuchen\n\nLecker.')
+    const fake = createFakeSession(staleCopy ? '' : '# Apfelkuchen\n\nLecker.')
+    if (staleCopy) fake.status.value = { ...fake.status.value, connection: 'connecting' }
     fakes.push(fake)
     return fake.session
   },
@@ -19,11 +22,11 @@ vi.mock('@/sync', () => ({
 
 const { default: DocumentView } = await import('./DocumentView.vue')
 
-async function setup() {
+async function setup(initialPath?: string) {
   localStorage.setItem('mkdocseditor.documentMode', JSON.stringify('split'))
   const mock = createFetchMock({ 'GET /section/': () => json(sampleTree()) })
   setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
-  const result = await mountWithPlugins(DocumentView, { props: { id: 'd-apfel' } })
+  const result = await mountWithPlugins(DocumentView, { props: { id: 'd-apfel' }, initialPath })
   await useTreeStore().load()
   await flushPromises()
   return result
@@ -33,6 +36,29 @@ describe('DocumentView', () => {
   afterEach(() => {
     localStorage.clear()
     fakes.length = 0
+    staleCopy = false
+  })
+
+  it('selects a linked line in the text of the server, not in an older stored copy', async () => {
+    staleCopy = true
+    const { wrapper, router } = await setup('/document/d-apfel?line=3')
+    const view = () => wrapper.findComponent({ name: 'MarkdownEditor' }).vm.getView()!
+    const selected = () => {
+      const { from, to } = view().state.selection.main
+      return view().state.sliceDoc(from, to)
+    }
+    await vi.waitFor(() => expect(view()).toBeTruthy())
+    // the server takes a while
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(router.currentRoute.value.query.line).toBe('3')
+    expect(selected()).toBe('')
+
+    const fake = fakes[0]!
+    fake.remote([{ from: 0, to: 0, insert: 'Eins\n\nDrei ist hier\n' }])
+    fake.status.value = { ...fake.status.value, connection: 'online' }
+    await vi.waitFor(() => expect(selected()).toBe('Drei ist hier'))
+    await vi.waitFor(() => expect(router.currentRoute.value.query.line).toBeUndefined())
+    wrapper.unmount()
   })
 
   it('shows strip and marker by default and remembers the chosen highlight mode', async () => {

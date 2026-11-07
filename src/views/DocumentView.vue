@@ -222,10 +222,14 @@ function revealReference(reference: TextReference): void {
   closeFilesOnPhone()
 }
 
-/** `?line=12` (from "linked from" lists): select that line once the text is there. */
+/**
+ * `?line=12` (from "linked from" lists): select that line once the text is there. The line is
+ * one of the server's text, and the stored copy the page is ready with can be older: wait for
+ * the server's text, unless the page is offline.
+ */
 const route = useRoute()
 watch(
-  () => [ready.value, route.query.line] as const,
+  () => [ready.value && status.value?.connection !== 'connecting', route.query.line] as const,
   ([isReady, line]) => {
     const number = Number(line)
     if (!isReady || !Number.isInteger(number) || number < 1) return

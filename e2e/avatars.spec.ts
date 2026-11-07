@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { createDocument, openEditor, userPage } from './helpers'
+import { createDocument, openEditor, testName, userPage } from './helpers'
 import { BACKEND_URL, USERS } from './ports'
 
 /** A red pixel. The server crops and scales it to its 256 × 256 JPEG. */
@@ -35,7 +35,7 @@ test('a profile picture shows wherever its user does', async ({ browser }, testI
   await bob.keyboard.press('Escape')
 
   // in the editor of someone else: the online list and the cursor flag
-  const id = await createDocument(`Avatar ${testInfo.project.name} ${testInfo.retry}`)
+  const id = await createDocument(testName('Avatar', testInfo))
   await openEditor(bob, id)
   await bob.locator('.cm-content').click()
   const alice = await userPage(browser, USERS.alice)

@@ -32,7 +32,8 @@ test('pages and files show what links to them', async ({ page }, testInfo) => {
   const bild = await uploadResource(top.id, 'Bild.png', PNG, 'image/png')
   const unbenutzt = await uploadResource(top.id, 'Unbenutzt.png', PNG, 'image/png')
 
-  const missing = `Fehlt-${testInfo.project.name}.md`
+  // unique per run: a retry or a repeat finds the broken links of the runs before it
+  const missing = `Fehlt-${base.replaceAll(' ', '-')}.md`
 
   await login(page)
   await openEditor(page, quelle.id)

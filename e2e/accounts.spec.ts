@@ -17,7 +17,7 @@ import {
 } from './accounts'
 import { addVirtualAuthenticator, totp } from './authenticators'
 import { backendBinary, createWiki, startBackend, TMP, waitForLog, writeConfig } from './backend'
-import { backendRequest, login, skipPasskeyStep } from './helpers'
+import { backendRequest, login, skipPasskeyStep, testName } from './helpers'
 import { BACKEND_URL, BROWSER_BACKEND_URL, extraBackendPort, WEB_PORT } from './ports'
 
 test.describe('accounts', () => {
@@ -89,7 +89,7 @@ test.describe('accounts', () => {
     const admin = await devicePage(browser, testInfo, ADMIN)
     await accountMenu(admin, 'menu-admin')
     await admin.getByRole('tab', { name: 'Invites' }).click()
-    const note = `Invite ${testInfo.project.name} ${testInfo.retry}`
+    const note = testName('Invite', testInfo)
     await admin.getByTestId('invite-role').click()
     await admin.getByRole('option', { name: 'Reader' }).click()
     await admin.getByTestId('invite-note').locator('input').fill(note)
