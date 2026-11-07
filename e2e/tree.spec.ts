@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
 import { createDocument, login, openEditor, openFiles, testName, typeAt } from './helpers'
+import { E2E_USER } from './ports'
 
 /** How many pages the local copy of the wiki holds. */
 function storedPageCount(page: Page): Promise<number> {
@@ -52,6 +53,36 @@ test('rejects a wrong password', async ({ page }) => {
   await page.getByLabel('Password', { exact: true }).fill('falsch')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByTestId('login-error')).toContainText('Wrong username or password')
+})
+
+test('the login of the wiki returns to its page, and only on this host', async ({ page }) => {
+  // the published wiki at /view/, which asks the app for the login
+  await page.route('**/view/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<h1 id="wiki">Wiki: Haus</h1>' }),
+  )
+  await page.goto('/login?next=%2Fview%2FHaus%2F')
+  await page.getByLabel('Username').fill(E2E_USER.username)
+  await page.getByLabel('Password', { exact: true }).fill(E2E_USER.password)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  // the welcome steps, if any, come first and then go on to the page
+  const wiki = page.locator('#wiki')
+  await expect(async () => {
+    for (const id of ['passkey-step-later', 'android-hint-dismiss']) {
+      const button = page.getByTestId(id)
+      if (await button.isVisible()) await button.click({ timeout: 1000 })
+    }
+    await expect(wiki).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(page).toHaveURL(/\/view\/Haus\/$/)
+
+  // signed in already: straight on
+  await page.goto('/login?next=%2Fview%2FKueche%2F')
+  await expect(page).toHaveURL(/\/view\/Kueche\/$/)
+
+  // another host is not followed: home instead
+  await page.goto('/login?next=%2F%2Fexample.com%2F')
+  await expect(page.getByTestId('dashboard-title')).toBeVisible()
+  expect(new URL(page.url()).host).toBe(new URL(test.info().project.use.baseURL!).host)
 })
 
 test('logs in, loads the tree and opens a page', async ({ page }) => {

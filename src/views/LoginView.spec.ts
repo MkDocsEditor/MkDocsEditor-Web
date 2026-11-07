@@ -1,5 +1,5 @@
 import { flushPromises } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
 import { snoozePasskeyReminder } from '@/services/passkeyReminder'
@@ -160,6 +160,83 @@ describe('LoginView', () => {
     await fillAndSubmit(wrapper)
     expect(router.currentRoute.value.fullPath).toBe('/')
     wrapper.unmount()
+  })
+
+  describe('with ?next= from the login check of the wiki', () => {
+    let assign: ReturnType<typeof vi.fn>
+    beforeEach(() => {
+      assign = vi.fn()
+      vi.stubGlobal('location', { ...window.location, assign, origin: window.location.origin })
+    })
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('loads the wiki page after the login', async () => {
+      backend({
+        'GET /auth/whoami/': () => json({ code: 'unauthenticated', message: '' }, 401),
+        'POST /auth/login/': () => json(sessionResponse()),
+      })
+      const { wrapper } = await mount('/login?next=%2Fview%2FHaus%2F')
+      await fillAndSubmit(wrapper)
+      expect(assign).toHaveBeenCalledWith('/view/Haus/')
+      wrapper.unmount()
+    })
+
+    it('opens a page of the app in place', async () => {
+      backend({
+        'GET /auth/whoami/': () => json({ code: 'unauthenticated', message: '' }, 401),
+        'POST /auth/login/': () => json(sessionResponse()),
+      })
+      const { wrapper, router } = await mount('/login?next=%2Fdocument%2Fd1')
+      await fillAndSubmit(wrapper)
+      expect(router.currentRoute.value.fullPath).toBe('/document/d1')
+      expect(assign).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    it.each(['//evil.example/', '/\\evil.example/', 'https://evil.example/'])(
+      'ignores %s and goes home',
+      async (next) => {
+        backend({
+          'GET /auth/whoami/': () => json({ code: 'unauthenticated', message: '' }, 401),
+          'POST /auth/login/': () => json(sessionResponse()),
+        })
+        const { wrapper, router } = await mount(`/login?next=${encodeURIComponent(next)}`)
+        await fillAndSubmit(wrapper)
+        expect(router.currentRoute.value.fullPath).toBe('/')
+        expect(assign).not.toHaveBeenCalled()
+        wrapper.unmount()
+      },
+    )
+
+    it('goes on right away when already signed in', async () => {
+      backend({ 'GET /auth/whoami/': () => json(sessionResponse().user) })
+      const { wrapper } = await mount('/login?next=%2Fview%2FHaus%2F')
+      expect(assign).toHaveBeenCalledWith('/view/Haus/')
+      wrapper.unmount()
+    })
+
+    it('sends an account without the required second factor to its setup, not back', async () => {
+      backend({
+        'GET /auth/whoami/': () =>
+          json({ ...sessionResponse().user, secondFactorSetupRequired: true }),
+      })
+      const { wrapper, router } = await mount('/login?next=%2Fview%2FHaus%2F')
+      expect(assign).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.fullPath).toBe('/settings/security')
+      wrapper.unmount()
+    })
+
+    it('keeps the page after the passkey step', async () => {
+      backend({
+        'GET /auth/whoami/': () => json({ code: 'unauthenticated', message: '' }, 401),
+        'POST /auth/login/': () => json(sessionResponse({ passkeyCount: 0 })),
+      })
+      const { wrapper, router } = await mount('/login?next=%2Fview%2FHaus%2F')
+      await fillAndSubmit(wrapper)
+      expect(router.currentRoute.value.name).toBe('welcome')
+      expect(router.currentRoute.value.query.redirect).toBe('/view/Haus/')
+      wrapper.unmount()
+    })
   })
 
   it('shows a generic message for wrong credentials', async () => {
