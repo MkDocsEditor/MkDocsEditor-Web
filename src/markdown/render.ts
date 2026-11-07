@@ -47,6 +47,8 @@ import mark from 'markdown-it-mark'
 import taskLists from 'markdown-it-task-lists'
 
 import { admonitionPlugin } from './admonition'
+import { blankFrontMatter, parseFrontMatter } from './frontMatter'
+import type { PageMeta } from './frontMatter'
 import { spacedLinksPlugin } from './spacedLinks'
 
 const languages = {
@@ -161,17 +163,66 @@ let renderer: MarkdownIt | null = null
  * source line numbers keep matching the editor.
  */
 export function stripFrontMatter(source: string): string {
-  const match = /^---\r?\n[\s\S]*?\r?\n(---|\.\.\.)\r?\n/.exec(source)
-  if (!match) return source
-  return '\n'.repeat(match[0].split('\n').length - 1) + source.slice(match[0].length)
+  return blankFrontMatter(source, parseFrontMatter(source).lines)
+}
+
+export interface RenderedPage {
+  /** Sanitized HTML: the page header from the front matter, then the content. */
+  html: string
+  meta: PageMeta
+  /** Set when the front matter could not be read; the preview shows it as a warning. */
+  metaError?: string
+}
+
+const STATUS_LABELS: Record<string, string> = { new: 'New', deprecated: 'Deprecated' }
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+/** What Material shows of the front matter above the content: title, status and tags. */
+function pageHeader(meta: PageMeta, hasHeading: boolean, error: string | undefined): string {
+  const parts: string[] = []
+  if (error) parts.push(`<p class="md-meta-error" role="note">${escapeHtml(error)}</p>`)
+  const showTags = meta.tags.length > 0 && !meta.hide.includes('tags')
+  if (showTags) {
+    const tags = meta.tags.map((tag) => `<span class="md-tag">${escapeHtml(tag)}</span>`)
+    parts.push(`<nav class="md-tags" aria-label="Tags">${tags.join('')}</nav>`)
+  }
+  const status = meta.status
+    ? `<span class="md-status md-status--${escapeHtml(meta.status.toLowerCase())}">${escapeHtml(statusLabel(meta.status))}</span>`
+    : ''
+  // Material takes the title as the heading of a page without one
+  if (meta.title && !hasHeading) {
+    parts.push(
+      `<h1 data-source-line="0">${escapeHtml(meta.title)}${status ? ` ${status}` : ''}</h1>`,
+    )
+  } else if (status) {
+    parts.push(`<p class="md-status-line">${status}</p>`)
+  }
+  return parts.join('')
+}
+
+/** Renders a page: its front matter as meta data and header, and the content. */
+export function renderPage(source: string): RenderedPage {
+  renderer ??= createRenderer()
+  const front = parseFrontMatter(source)
+  const tokens = renderer.parse(blankFrontMatter(source, front.lines), {})
+  const hasHeading = tokens.some((t) => t.type === 'heading_open' && t.tag === 'h1')
+  const html =
+    pageHeader(front.meta, hasHeading, front.error) +
+    renderer.renderer.render(tokens, renderer.options, {})
+  return {
+    html: DOMPurify.sanitize(html, {
+      ADD_ATTR: ['data-source-line', 'open', 'target'],
+      ADD_TAGS: ['details', 'summary'],
+    }),
+    meta: front.meta,
+    ...(front.error ? { metaError: front.error } : {}),
+  }
 }
 
 /** Renders MkDocs flavoured markdown to sanitized HTML. */
 export function renderMarkdown(source: string): string {
-  renderer ??= createRenderer()
-  const html = renderer.render(stripFrontMatter(source))
-  return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['data-source-line', 'open', 'target'],
-    ADD_TAGS: ['details', 'summary'],
-  })
+  return renderPage(source).html
 }
