@@ -245,7 +245,7 @@ test.describe('following another user', () => {
 
   test('split scrolling can be unlinked, and links up again', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'phone', 'phones have no split view')
-    const id = await createDocument(`Unsync ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Unsync', testInfo))
     await login(page)
     await openEditor(page, id)
     await page.getByRole('button', { name: 'Edit and preview', exact: true }).click()
