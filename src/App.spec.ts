@@ -1,6 +1,6 @@
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient, useApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -50,8 +50,10 @@ describe('App', () => {
       const { wrapper } = await mountWithPlugins(App, { initialPath: '/', pinia })
       await flushPromises()
       await wrapper.find('[data-testid="account-menu"]').trigger('click')
-      await flushPromises()
-      expect(document.querySelector('[data-testid="menu-account"]')).not.toBeNull()
+      // the menu opens with a transition, which a busy machine can make take a while
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-testid="menu-account"]')).not.toBeNull(),
+      )
       expect(document.querySelector('[data-testid="menu-admin"]') !== null).toBe(role === 'admin')
       wrapper.unmount()
     }
@@ -66,8 +68,8 @@ describe('App', () => {
     await flushPromises()
     // any request that finds the session gone
     useApi().onSessionEnded?.()
-    await flushPromises()
-    expect(router.currentRoute.value.name).toBe('login')
+    // the login view loads lazily
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('login'))
     expect(router.currentRoute.value.query.redirect).toBe('/document/d-apfel')
     expect(useAuthStore().sessionEnded).toBe(true)
     wrapper.unmount()
