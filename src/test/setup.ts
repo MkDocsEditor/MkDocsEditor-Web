@@ -10,7 +10,7 @@ const waitFor = vi.waitFor.bind(vi)
 vi.waitFor = ((callback, options) =>
   waitFor(
     callback,
-    typeof options === 'number' ? options : { timeout: 5_000, ...options },
+    typeof options === 'number' ? options : { timeout: 10_000, ...options },
   )) as typeof vi.waitFor
 
 // jsdom lacks a few browser APIs that Vuetify overlays and CodeMirror use.

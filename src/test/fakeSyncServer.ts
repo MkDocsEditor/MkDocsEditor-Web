@@ -27,6 +27,8 @@ export class FakeSocket implements SocketLike {
   readonly sent: Record<string, unknown>[] = []
   /** Stays in CONNECTING, like a socket whose network packets get no answer. */
   keepConnecting = false
+  /** Nothing from the server arrives, not even what was already on its way; see `mute`. */
+  muted = false
 
   constructor(private readonly server: FakeSyncServer) {
     setTimeout(() => {
@@ -59,10 +61,18 @@ export class FakeSocket implements SocketLike {
   }
 
   deliver(message: Record<string, unknown>): void {
-    if (this.readyState !== 1) return
+    if (this.readyState !== 1 || this.muted) return
     setTimeout(() => {
-      if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(message) })
+      if (this.readyState === 1 && !this.muted) this.onmessage?.({ data: JSON.stringify(message) })
     }, 0)
+  }
+
+  /**
+   * The server goes silent on this socket without closing it. Messages already on their way are
+   * lost too: on a busy machine, they could otherwise arrive later and show the socket alive.
+   */
+  mute(muted = true): void {
+    this.muted = muted
   }
 }
 
@@ -88,6 +98,8 @@ export class FakeSyncServer {
   ticketsIssued = 0
   /** Old ids of the document (renames), answered with `document-renamed` after hello. */
   readonly oldIds = new Set<string>()
+  /** Sockets the server is closing: what they still send is ignored, as by the real server. */
+  private readonly closing = new WeakSet<FakeSocket>()
 
   constructor(
     private readonly A: Api,
@@ -98,8 +110,10 @@ export class FakeSyncServer {
   }
 
   private fresh(text: string): AmDoc {
+    // a fixed time as well as a fixed actor: the same text always makes the same change
     return this.A.change(
       this.A.init<{ content: string }>({ actor: '00'.repeat(15) + '02' }),
+      { time: 0 },
       (d) => {
         d.content = text
       },
@@ -141,6 +155,7 @@ export class FakeSyncServer {
   }
 
   receive(socket: FakeSocket, message: Record<string, unknown>): void {
+    if (this.closing.has(socket)) return
     let connection = this.connections.find((c) => c.socket === socket)
     if (message.type === 'hello' && this.oldIds.has(String(message.documentId))) {
       socket.deliver({
@@ -148,7 +163,7 @@ export class FakeSyncServer {
         documentId: message.documentId,
         newDocumentId: this.documentId,
       })
-      setTimeout(() => socket.serverClose(4009), 0)
+      this.closeSoon(socket, 4009)
       return
     }
     if (message.type === 'hello' && this.foreignActors.has(String(message.actorId))) {
@@ -273,7 +288,13 @@ export class FakeSyncServer {
   refuse(socket: FakeSocket, code: string): void {
     socket.deliver({ type: 'error', code, message: code })
     this.drop(socket)
-    setTimeout(() => socket.serverClose(4003), 0)
+    this.closeSoon(socket, 4003)
+  }
+
+  /** Closes the socket after the messages already on their way; it is ignored until then. */
+  private closeSoon(socket: FakeSocket, code: number): void {
+    this.closing.add(socket)
+    setTimeout(() => socket.serverClose(code), 0)
   }
 
   /** Closes every connection from the server side. */
@@ -296,7 +317,7 @@ export class FakeSyncServer {
         newDocumentId: newId,
       })
       this.drop(connection.socket)
-      setTimeout(() => connection.socket.serverClose(4009), 0)
+      this.closeSoon(connection.socket, 4009)
     }
   }
 

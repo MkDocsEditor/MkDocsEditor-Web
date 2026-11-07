@@ -22,9 +22,10 @@ const timing = {
   presenceMs: 1,
   persistMs: 1,
   heartbeatMs: 50,
-  timeoutMs: 400,
-  doubtMs: 400,
-  connectTimeoutMs: 400,
+  // long enough for a busy machine: tests about these timeouts set short ones of their own
+  timeoutMs: 30_000,
+  doubtMs: 30_000,
+  connectTimeoutMs: 30_000,
   retryNowMs: 2_000,
   retryClaimMs: 60_000,
   authorshipRefetchMs: 10_000,
@@ -311,11 +312,11 @@ describe('Automerge session', () => {
 
   it('reconnects when the server stays silent (heartbeat timeout)', async () => {
     const server = new FakeSyncServer(A, 'still')
-    const anna = client(server, 'anna')
+    const anna = client(server, 'anna', memoryStore(), { timing: { timeoutMs: 400 } })
     await online(anna)
     // the server stops answering without closing the socket
     const socket = server.connections[0]!.socket
-    socket.deliver = () => undefined
+    socket.mute()
     await vi.waitFor(() => expect(server.ticketsIssued).toBeGreaterThan(1), { timeout: 3000 })
     await online(anna)
   })
@@ -327,15 +328,26 @@ describe('Automerge session', () => {
     const anna = client(server, 'anna', memoryStore(), { timing: { heartbeatMs: 300 } })
     await online(anna)
     setIntervalSpy.mockRestore()
-    const sent = server.connections[0]!.socket.sent
+    const socket = server.connections[0]!.socket
+    const sent = socket.sent
+    // nothing arrives meanwhile (on a busy machine, the sync could still be going on): without
+    // timers, nothing is sent either
+    socket.mute()
     await new Promise((r) => setTimeout(r, 310))
     expect(sent.filter((m) => m.type === 'heartbeat')).toEqual([])
-    server.heartbeat()
-    await vi.waitFor(() => expect(sent.filter((m) => m.type === 'heartbeat')).toHaveLength(1))
-    // only as often as heartbeats are due
-    server.heartbeat()
-    await new Promise((r) => setTimeout(r, 20))
-    expect(sent.filter((m) => m.type === 'heartbeat')).toHaveLength(1)
+    socket.mute(false)
+    // the clock stops: however slow the machine, the next heartbeat is not due yet
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now())
+    try {
+      server.heartbeat()
+      await vi.waitFor(() => expect(sent.filter((m) => m.type === 'heartbeat')).toHaveLength(1))
+      // only as often as heartbeats are due
+      server.heartbeat()
+      await new Promise((r) => setTimeout(r, 20))
+      expect(sent.filter((m) => m.type === 'heartbeat')).toHaveLength(1)
+    } finally {
+      clock.mockRestore()
+    }
   })
 })
 
@@ -442,8 +454,9 @@ describe('Automerge session: staying connected', () => {
       timing: { timeoutMs: 60_000, doubtMs: 30, retryNowMs: 0, backoffMs: [60_000] },
     })
     await online(anna)
-    await new Promise((r) => setTimeout(r, 50))
     const old = server.connections[0]!.socket
+    old.mute()
+    await new Promise((r) => setTimeout(r, 50))
     document.dispatchEvent(new Event('visibilitychange'))
     expect(old.readyState).toBe(3)
     expect(anna.session.status.value.connection).toBe('offline')
@@ -471,7 +484,7 @@ describe('Automerge session: staying connected', () => {
     })
     await online(anna)
     const dead = server.connections[0]!.socket
-    dead.deliver = () => undefined
+    dead.mute()
     anna.insert('end', '!')
     await vi.waitFor(() => expect(server.ticketsIssued).toBe(2))
     await vi.waitFor(() => expect(server.text).toBe('Text!'))
@@ -484,7 +497,7 @@ describe('Automerge session: staying connected', () => {
     // the socket accepts messages but they never arrive
     const dead = server.connections[0]!.socket
     dead.send = () => undefined
-    dead.deliver = () => undefined
+    dead.mute()
     anna.insert('end', ' eins')
     await new Promise((r) => setTimeout(r, 20))
     anna.insert('end', ' zwei')
