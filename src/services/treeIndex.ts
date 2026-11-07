@@ -90,14 +90,19 @@ export function normalize(text: string): string {
 }
 
 /** Finds items whose name contains every word of the query (case and accent insensitive). */
-export function searchTree(index: TreeIndex, query: string, limit = 50): SearchHit[] {
+export function searchTree(
+  index: TreeIndex,
+  query: string,
+  limit = 50,
+  title: (item: TreeItem) => string = (item) => item.name,
+): SearchHit[] {
   const words = normalize(query).split(/\s+/).filter(Boolean)
   if (words.length === 0) return []
   const rank = { document: 0, section: 1, resource: 2 }
   const hits: SearchHit[] = []
   for (const item of index.items.values()) {
     if (!index.parents.has(item.id)) continue // the root itself
-    const name = normalize(item.name)
+    const name = `${normalize(item.name)}\n${normalize(title(item))}`
     if (!words.every((w) => name.includes(w))) continue
     hits.push({
       item,
@@ -107,7 +112,8 @@ export function searchTree(index: TreeIndex, query: string, limit = 50): SearchH
     })
   }
   hits.sort(
-    (a, b) => rank[a.item.type] - rank[b.item.type] || a.item.name.localeCompare(b.item.name, 'en'),
+    (a, b) =>
+      rank[a.item.type] - rank[b.item.type] || title(a.item).localeCompare(title(b.item), 'en'),
   )
   return hits.slice(0, limit)
 }

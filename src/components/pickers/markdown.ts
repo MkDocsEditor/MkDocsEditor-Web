@@ -1,6 +1,7 @@
 import type { TreeItem } from '@/api'
 import { resourceKind } from '@/services/icons'
 import { linkDestination } from '@/services/linkPath'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import type { useTreeStore } from '@/stores/tree'
 
 /** Link text without characters that would end it. */
@@ -14,10 +15,12 @@ export function cleanUrl(url: string): string {
 }
 
 /**
- * The default text of a link to an item (like the backend's `GET /link/`): the name, without
- * the extension for an embedded image's alt text.
+ * The default text of a link to an item: the name of a page as MkDocs shows it (see
+ * `pageTitle`), else the name, without the extension for an embedded image's alt text. The
+ * Android app does the same (`PickerMarkdown.defaultLinkText`).
  */
 function defaultLinkText(item: TreeItem, embedded = false): string {
+  if (item.type === 'document') return usePageMetaStore().title(item)
   return embedded ? item.name.replace(/\.[^.]+$/, '') : item.name
 }
 

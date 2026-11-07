@@ -130,8 +130,9 @@ export const useTreeStore = defineStore('tree', () => {
     return linkTargetOf(index.value, item)
   }
 
-  function search(query: string): SearchHit[] {
-    return searchTree(index.value, query)
+  /** Items whose name (or `title`, for example the name of a page as MkDocs shows it) matches. */
+  function search(query: string, title?: (item: TreeItem) => string): SearchHit[] {
+    return searchTree(index.value, query, undefined, title)
   }
 
   async function mutate<T>(action: () => Promise<T>): Promise<T> {

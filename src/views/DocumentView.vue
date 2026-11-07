@@ -27,7 +27,7 @@ import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
-import { parseFrontMatter } from '@/markdown/frontMatter'
+import { pageTitle } from '@/markdown/pageTitle'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { lineRange } from '@/markdown/sourceLines'
@@ -112,13 +112,13 @@ const { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers 
   )
 useSearchText(() => props.id, text, ready)
 
-// The title from the front matter, as it is typed; the stored copy until the text is there.
+// The name of the page as MkDocs shows it, as it is typed; from the tree until the text is there.
 const pageMeta = usePageMetaStore()
 const typed = useDebounced(() => (ready.value ? { id: props.id, text: text.value } : null), 300)
 const title = computed(() => {
   if (!page.value) return ''
   if (typed.value?.id !== props.id) return pageMeta.title(page.value)
-  return parseFrontMatter(typed.value.text).meta.title ?? page.value.name
+  return pageTitle(typed.value.text, tree.path(props.id) || `${page.value.name}.md`)
 })
 const connection = computed(() => connectionBadge(status.value))
 

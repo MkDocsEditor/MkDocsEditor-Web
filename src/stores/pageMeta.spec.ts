@@ -6,6 +6,7 @@ import type { DocumentModel, SectionModel } from '@/api'
 
 import { usePageMetaStore } from './pageMeta'
 import { usePagesStore } from './pages'
+import { useTreeStore } from './tree'
 
 const page = (id: string, name: string): DocumentModel => ({
   type: 'document',
@@ -41,11 +42,46 @@ describe('page meta store', () => {
     expect(meta.meta('unknown').tags).toEqual([])
   })
 
-  it('shows the title of a page, else its name; folders keep their name', () => {
-    const meta = store({ a: '---\ntitle: Apfelkuchen\n---\n', b: '# B' })
+  it('shows the name of a page as MkDocs does; folders keep their name', () => {
+    const meta = store({ a: '---\ntitle: Apfelkuchen\n---\n', b: '# Birnen' })
     expect(meta.title(page('a', 'apfel'))).toBe('Apfelkuchen')
-    expect(meta.title(page('b', 'birne'))).toBe('birne')
+    expect(meta.title(page('b', 'birne'))).toBe('Birnen')
+    // without a stored text: the name from the file
+    expect(meta.title(page('c', 'quitten-gelee'))).toBe('Quitten gelee')
     expect(meta.title({ type: 'section', id: 'a', name: 'Ordner' })).toBe('Ordner')
+  })
+
+  it('takes the names and front matter the server sends with the tree', () => {
+    const meta = store({ a: '---\ntitle: Lokal\n---\n' })
+    const doc: DocumentModel = {
+      ...page('a', 'apfel'),
+      title: 'Vom Server',
+      meta: {
+        title: 'Vom Server',
+        description: 'Beschreibung',
+        icon: null,
+        status: 'new',
+        tags: ['Obst'],
+        searchExclude: true,
+      },
+    }
+    useTreeStore().root = {
+      type: 'section',
+      id: 'root',
+      name: 'Wiki',
+      subsections: [],
+      documents: [doc],
+      resources: [],
+    } as unknown as SectionModel
+    expect(meta.title(page('a', 'apfel'))).toBe('Vom Server')
+    expect(meta.meta('a')).toMatchObject({
+      title: 'Vom Server',
+      description: 'Beschreibung',
+      status: 'new',
+      tags: ['Obst'],
+      searchExclude: true,
+    })
+    expect(meta.meta('a').icon).toBeUndefined()
   })
 
   it('follows changed texts', () => {

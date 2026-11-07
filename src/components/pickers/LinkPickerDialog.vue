@@ -8,6 +8,7 @@ import AppDialog from '@/components/common/AppDialog.vue'
 import TreeBrowser from '@/components/tree/TreeBrowser.vue'
 import { headingsOf } from '@/markdown/headings'
 import type { Heading } from '@/markdown/headings'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import { useTreeStore } from '@/stores/tree'
 
 import { cleanUrl, escapeLinkText, markdownLink } from './markdown'
@@ -28,6 +29,7 @@ const open = defineModel<boolean>({ required: true })
 const emit = defineEmits<{ insert: [markdown: string] }>()
 
 const tree = useTreeStore()
+const pageMeta = usePageMetaStore()
 const tab = ref<'wiki' | 'web'>('wiki')
 const linkText = ref('')
 const url = ref('')
@@ -118,7 +120,7 @@ const ownPage = computed(() => page.value?.id === props.documentId)
                 data-testid="link-back"
                 @click="page = null"
               />
-              <strong class="text-truncate">{{ page.name }}</strong>
+              <strong class="text-truncate">{{ pageMeta.title(page) }}</strong>
             </div>
             <v-list class="py-0">
               <v-list-item

@@ -116,7 +116,8 @@ test('the feed says who changed which page', async ({ browser }, testInfo) => {
   const alice = await userPage(browser, USERS.alice)
   await openEditor(alice, id)
   await alice.locator('.cm-content').click()
-  await alice.keyboard.insertText('# Zutaten\n\nMehl und Zucker\n')
+  // a section, not a level-1 heading: that would become the name of the page in the feed
+  await alice.keyboard.insertText('## Zutaten\n\nMehl und Zucker\n')
   await expect(alice.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
 
   const bob = await userPage(browser, USERS.bob)

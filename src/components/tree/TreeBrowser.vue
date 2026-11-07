@@ -4,9 +4,10 @@ import { computed, ref } from 'vue'
 
 import type { ItemType, SectionModel, TreeItem } from '@/api'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
-import { colorFor, formatSize, iconFor } from '@/services/icons'
+import { colorFor, formatSize } from '@/services/icons'
+import { sortByName, sortByText } from '@/services/treeIndex'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import { useTreeStore } from '@/stores/tree'
-import { sortByName } from '@/services/treeIndex'
 
 /**
  * Browses the wiki folder by folder, or searches it, for the pickers and the move dialog.
@@ -38,6 +39,7 @@ const sectionId = defineModel<string>('section', { required: true })
 const emit = defineEmits<{ pick: [item: TreeItem] }>()
 
 const tree = useTreeStore()
+const pageMeta = usePageMetaStore()
 const query = ref('')
 
 const current = computed<SectionModel | undefined>(
@@ -56,13 +58,15 @@ const entries = computed<TreeItem[]>(() => {
   if (!section) return []
   return [
     ...sortByName(section.subsections),
-    ...sortByName(section.documents),
+    ...sortByText(section.documents, pageMeta.title),
     ...sortByName(section.resources),
   ].filter(allowed)
 })
 
 const hits = computed(() =>
-  query.value.trim() === '' ? [] : tree.search(query.value).filter((hit) => allowed(hit.item)),
+  query.value.trim() === ''
+    ? []
+    : tree.search(query.value, pageMeta.title).filter((hit) => allowed(hit.item)),
 )
 
 function isDisabled(item: TreeItem): boolean {
@@ -137,7 +141,7 @@ function crumbTitle(section: SectionModel): string {
         <v-list-item
           v-for="item in entries"
           :key="item.id"
-          :title="item.name"
+          :title="pageMeta.title(item)"
           :subtitle="subtitle(item)"
           :active="item.id === selectedId"
           :disabled="isDisabled(item)"
@@ -152,7 +156,7 @@ function crumbTitle(section: SectionModel): string {
               class="me-2"
             />
             <span v-else class="tree-browser__icon me-2">
-              <v-icon :icon="iconFor(item)" :color="colorFor(item)" />
+              <v-icon :icon="pageMeta.icon(item)" :color="colorFor(item)" />
             </span>
           </template>
           <template v-if="item.type === 'section'" #append>
@@ -173,7 +177,7 @@ function crumbTitle(section: SectionModel): string {
       <v-list-item
         v-for="hit in hits"
         :key="hit.item.id"
-        :title="hit.item.name"
+        :title="pageMeta.title(hit.item)"
         :subtitle="subtitle(hit.item, hit.path)"
         :disabled="isDisabled(hit.item)"
         :data-testid="`browser-hit-${hit.item.type}`"
@@ -187,7 +191,7 @@ function crumbTitle(section: SectionModel): string {
             class="me-2"
           />
           <span v-else class="tree-browser__icon me-2">
-            <v-icon :icon="iconFor(hit.item)" :color="colorFor(hit.item)" />
+            <v-icon :icon="pageMeta.icon(hit.item)" :color="colorFor(hit.item)" />
           </span>
         </template>
       </v-list-item>

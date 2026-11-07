@@ -25,7 +25,8 @@ async function titles(showFiles: boolean) {
 describe('NavTree', () => {
   it('lists files after the pages of each open folder', async () => {
     const { resources, documents } = await titles(true)
-    expect(documents).toEqual(['Apfelkuchen', 'Kürbissuppe', 'index'])
+    // the index of the top folder is "Home", as in MkDocs
+    expect(documents).toEqual(['Apfelkuchen', 'Kürbissuppe', 'Home'])
     expect(resources).toEqual(['apfel.png', 'Plan (alt).pdf', 'logo.png'])
   })
 

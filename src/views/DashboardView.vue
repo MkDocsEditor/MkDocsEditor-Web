@@ -88,7 +88,7 @@ function pinFolder(pin: Pin): string {
 
 function pinName(pin: Pin): string {
   const page = tree.get(pin.documentId)
-  return page ? pageMeta.title(page) : pin.name
+  return page ? pageMeta.title(page) : (pin.title ?? pin.name)
 }
 
 function pinIcon(pin: Pin): string {
@@ -99,7 +99,7 @@ function pinIcon(pin: Pin): string {
 /** The page of an entry by its title while it exists, else by the name in its path. */
 function entryName(entry: FeedEntry): string {
   const page = entry.documentId ? tree.get(entry.documentId) : undefined
-  return page ? pageMeta.title(page) : nameOf(entry.path)
+  return page ? pageMeta.title(page) : (entry.title ?? nameOf(entry.path))
 }
 
 function canUnpin(scope: PinScope): boolean {
