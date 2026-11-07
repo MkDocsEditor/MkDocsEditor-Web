@@ -12,6 +12,7 @@ interface Connection {
   clientId: string
   user: { username: string; displayName: string; color: string; role: string }
   helloReceived: boolean
+  actorId: string
 }
 
 let nextClient = 1
@@ -167,7 +168,16 @@ export class FakeSyncServer {
           role: this.readOnlyUsers.has(username) ? 'reader' : 'editor',
         },
         helloReceived: true,
+        actorId: String(message.actorId),
       }
+      const actor = {
+        actorId: connection.actorId,
+        username,
+        displayName: connection.user.displayName,
+        color: connection.user.color,
+      }
+      // like the real server: everyone learns whose the new actor is
+      for (const other of this.connections) other.socket.deliver({ type: 'actor', ...actor })
       this.connections.push(connection)
       socket.deliver({
         type: 'initial-content',
@@ -177,7 +187,12 @@ export class FakeSyncServer {
         content: this.doc.content,
         readOnly: this.readOnlyUsers.has(username),
         you: { clientId: connection.clientId, ...connection.user },
-        actors: [],
+        actors: this.connections.map((c) => ({
+          actorId: c.actorId,
+          username: c.user.username,
+          displayName: c.user.displayName,
+          color: c.user.color,
+        })),
       })
       socket.deliver({
         type: 'presence-snapshot',

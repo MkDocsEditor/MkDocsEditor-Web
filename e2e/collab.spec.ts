@@ -35,6 +35,20 @@ test.describe('live collaboration', () => {
     await expect.poll(() => documentContent(id)).toBe(expected)
   })
 
+  test('text of someone else is colored at once', async ({ browser }, testInfo) => {
+    const id = await createDocument(testName('Farbe', testInfo))
+    const alice = await userPage(browser, USERS.alice, testInfo.project.use)
+    const bob = await userPage(browser, USERS.bob, testInfo.project.use)
+    await openEditor(alice, id)
+    await openEditor(bob, id)
+    await typeAt(bob, 'end', 'Von Bob geschrieben.')
+    await expect.poll(() => editorText(alice)).toBe('Von Bob geschrieben.')
+    // the server answers only after the text settled for a few seconds: this is the instant one
+    await expect(alice.locator('.cm-author').filter({ hasText: 'Bob' }).first()).toBeVisible({
+      timeout: 1_500,
+    })
+  })
+
   test('readers can watch but not edit', async ({ browser }, testInfo) => {
     const id = await createDocument(testName('Lesen', testInfo))
     const alice = await userPage(browser, USERS.alice, testInfo.project.use)

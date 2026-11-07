@@ -514,7 +514,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       const changes =
         patchesToChanges(A.diff(doc, beforeHeads, afterHeads)) ??
         diffText(before.content, doc.content)
-      authors.follow(changes, null)
+      // colored at once when the new changes are all of one person; the server's answer follows
+      const actorIds = A.getChanges(before, doc).map((change) => A.decodeChange(change).actor)
+      authors.follow(changes, authors.authorOf(actorIds))
       emit(changes)
       authors.publish()
       authors.scheduleRefetch()
