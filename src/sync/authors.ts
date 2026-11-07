@@ -21,7 +21,11 @@ export interface AuthorsOptions {
   doc: () => AmDoc | null
   documentId: () => string
   getAuthorship: (id: string) => Promise<AuthorshipResponse | null>
+  /** Asks again this long after the text stopped changing. */
   refetchMs: number
+  /** While the text keeps changing, asks at least this often (counted from the first change). */
+  refetchMaxWaitMs?: number
+  now?: () => number
 }
 
 /**
@@ -31,7 +35,13 @@ export interface AuthorsOptions {
 export function createAuthors(options: AuthorsOptions) {
   const authorship = shallowRef<AuthorRun[]>([])
   const users = new Map<string, { displayName: string; color: string }>()
+  /** Actor id to username. The server binds each actor to one account and refuses foreign ones. */
+  const actors = new Map<string, string>()
   let runs: Run[] = []
+  /** Since when a change waits for the server's answer, for the longest wait while typing. */
+  let pendingSince: number | null = null
+  const now = options.now ?? (() => Date.now())
+  const maxWait = options.refetchMaxWaitMs ?? 10_000
   /** null until the first fetch tells whether the backend has the authorship endpoint. */
   let supported: boolean | null = null
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -53,6 +63,7 @@ export function createAuthors(options: AuthorsOptions) {
 
   async function fetch(): Promise<void> {
     if (!options.doc()) return
+    pendingSince = null
     let response: AuthorshipResponse | null
     try {
       response = await options.getAuthorship(options.documentId())
@@ -73,10 +84,12 @@ export function createAuthors(options: AuthorsOptions) {
   function scheduleRefetch(): void {
     if (supported === false) return
     if (timer) clearTimeout(timer)
+    pendingSince ??= now()
+    const delay = Math.min(options.refetchMs, Math.max(0, pendingSince + maxWait - now()))
     timer = setTimeout(() => {
       timer = null
       void fetch()
-    }, options.refetchMs)
+    }, delay)
   }
 
   return {
@@ -87,12 +100,28 @@ export function createAuthors(options: AuthorsOptions) {
     refresh(): void {
       if (supported !== false) void fetch()
     },
-    rememberUser(info: { username: string; displayName?: string; color?: string }): void {
+    rememberUser(info: {
+      username: string
+      displayName?: string
+      color?: string
+      actorId?: string
+    }): void {
       if (!info.username) return
+      if (info.actorId) actors.set(info.actorId, info.username)
       users.set(info.username, {
         displayName: info.displayName || info.username,
         color: info.color ?? users.get(info.username)?.color ?? UNKNOWN_USER_COLOR,
       })
+    },
+    /**
+     * The author of changes made by these actors, for colouring them before the server answers:
+     * only when all of them belong to one person (not an import like ":disk"), else null.
+     */
+    authorOf(actorIds: readonly string[]): string | null {
+      const names = new Set(actorIds.map((id) => actors.get(id) ?? null))
+      if (names.size !== 1) return null
+      const [name] = names
+      return name !== undefined && hasAuthor(name) ? name : null
     },
     /** Moves the runs along with `changes`; the inserted text belongs to `username`. */
     follow(changes: readonly TextChange[], username: string | null): void {

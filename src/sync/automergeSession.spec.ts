@@ -119,6 +119,30 @@ describe('Automerge session', () => {
     await vi.waitFor(() => expect(anna.session.status.value.unsynced).toBe(false))
   })
 
+  it('colors remote text by its author at once, before the server says who wrote what', async () => {
+    const server = new FakeSyncServer(A, 'Mitte\n')
+    const anna = client(server, 'anna')
+    await online(anna)
+    const ben = client(server, 'ben')
+    await online(ben)
+    ben.insert(0, 'Ben: ')
+    anna.insert('end', 'Anna.')
+    await vi.waitFor(() =>
+      expect(anna.session.authorship.value).toContainEqual({
+        from: 0,
+        to: 5,
+        username: 'Ben',
+        color: '#e8590c',
+      }),
+    )
+    // and the other way round, for an actor that was there before the session started
+    await vi.waitFor(() =>
+      expect(ben.session.authorship.value).toContainEqual(
+        expect.objectContaining({ username: 'Anna', color: '#1971c2' }),
+      ),
+    )
+  })
+
   it('emits precise changes for edits in different places', async () => {
     const server = new FakeSyncServer(A, 'eins zwei drei')
     const anna = client(server, 'anna')
