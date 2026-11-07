@@ -32,6 +32,7 @@ together, in real time, from a phone or a desktop browser. It talks to the
 
   Wide screens show the sections in a side column; narrow ones show the list first. The old
   `/account/…` and `/admin/…` addresses lead to the matching section.
+
 - Connect the Android app: Settings → Sessions creates a single-use link (5 minutes), shown as
   a QR code to scan with the phone's camera. On a phone, the first sign-in offers to open the
   app directly. Links the app does not take land on `/connect`, which explains how to install
