@@ -16,7 +16,7 @@ cat > "$target_dir/config.json" <<JSON
   "wikiUrl": "$(json_escape "${MKDOCSEDITOR_WIKI_URL:-}")"
 }
 JSON
-echo "mkdocseditor: wrote $target_dir/config.json (backendUrl=${MKDOCSEDITOR_BACKEND_URL:-<default>})"
+echo "mkdocseditor: wrote $target_dir/config.json (backendUrl=${MKDOCSEDITOR_BACKEND_URL:-/api of this host})"
 
 # Android App Links and shared credentials: the Digital Asset Links file for this host,
 # served as /.well-known/assetlinks.json (see nginx.conf). Without the variable the file is

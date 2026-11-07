@@ -90,31 +90,40 @@ with sync protocol v1 (see its `docs/sync-protocol.md`) and the account system o
 `docs/auth.md`. For the version history, set `git.enabled: true` and keep the wiki in a git
 repository.
 
-The browser talks to the backend directly, so the backend URL must be reachable from the
-users' browsers. A reverse proxy in front of the backend must pass websocket upgrades for
-`/document/{id}/ws/` and `/events/ws/`.
+The browser talks to the backend directly. The simplest setup puts the client, the backend
+and the published wiki on one host, with a reverse proxy routing by path:
+
+| Path     | Goes to                                   |
+| -------- | ----------------------------------------- |
+| `/api/`  | the backend (it serves every route there) |
+| `/view/` | the published wiki (optional)             |
+| `/`      | this client                               |
+
+With an empty `backendUrl` the client uses `/api` of its own origin, and its websockets go to
+`wss://<host>/api/…`. The proxy must pass websocket upgrades for `/api/`. The image answers 404
+for `/api/` and `/view/`, so a request that reaches it by mistake gets no `index.html`.
 
 ### Sessions, CORS and passkeys
 
 The web client signs in with a session cookie of the backend (HttpOnly, SameSite=Lax). It
-never sees the session token and stores no password or token in the browser. For the cookie
-to work:
+never sees the session token and stores no password or token in the browser. On one host
+the cookie simply works, and CORS plays no part.
 
-- The web client and the backend must be **same-site**, for example
-  `https://edit.wiki.example.com` and `https://backend.wiki.example.com` (or `localhost` with
-  two ports for development). An IP address and `localhost` are different sites.
-- The backend must list the web client's origin in `server.cors.allowedOrigins`.
+The backend may also run on a host of its own; then set `backendUrl` to its address. For the
+cookie to work, the web client and the backend must be **same-site** then, for example
+`https://edit.wiki.example.com` and `https://backend.wiki.example.com` (an IP address and
+`localhost` are different sites), and the backend must list the web client's origin in
+`server.cors.allowedOrigins`.
 
 Backend settings that matter for the web client:
 
 ```yaml
 server:
-  cors:
-    allowedOrigins: ['https://edit.wiki.example.com']
+  backendUrl: 'https://wiki.example.com/api'
   trustedProxies: ['10.42.0.0/16'] # the reverse proxy, for client IPs and HTTPS detection
   auth:
     # The web client: setup, invite and reset links point here.
-    clientUrl: 'https://edit.wiki.example.com'
+    clientUrl: 'https://wiki.example.com'
     webauthn:
       # Passkeys are bound to this domain for good: the client's host or a parent domain.
       rpId: 'wiki.example.com'
@@ -135,7 +144,7 @@ the reload.
    one-time setup link (valid 24 hours):
 
    ```
-   setup link: https://edit.wiki.example.com/setup#mdl_…
+   setup link: https://wiki.example.com/setup#mdl_…
    setup token: mdl_…
    ```
 
@@ -156,27 +165,28 @@ The app reads `config.json` next to `index.html` at start:
 
 ```json
 {
-  "backendUrl": "https://mkdocs-api.example.com",
-  "wikiUrl": "https://wiki.example.com"
+  "backendUrl": "",
+  "wikiUrl": "https://wiki.example.com/view"
 }
 ```
 
 | Key          | Docker variable            | Meaning                                                                    |
 | ------------ | -------------------------- | -------------------------------------------------------------------------- |
-| `backendUrl` | `MKDOCSEDITOR_BACKEND_URL` | Base URL of the backend                                                    |
+| `backendUrl` | `MKDOCSEDITOR_BACKEND_URL` | Base URL of the backend; empty means `/api` on the client's own host       |
 | `wikiUrl`    | `MKDOCSEDITOR_WIKI_URL`    | Base URL of the published wiki, for the "View in the wiki" link (optional) |
 
 The Docker image also takes `MKDOCSEDITOR_ASSETLINKS_JSON` for Android App Links (see below).
 
-For local development, copy `public/config.example.json` to `public/config.json` (ignored by
-git), or set `VITE_BACKEND_URL` and `VITE_WIKI_URL`.
+For local development nothing needs configuring: the dev server passes `/api` on to a backend
+on `http://localhost:7413` (set `DEV_BACKEND_URL` for another one), like the reverse proxy in
+production. To point the client somewhere else, copy `public/config.example.json` to
+`public/config.json` (ignored by git), or set `VITE_BACKEND_URL` and `VITE_WIKI_URL`.
 
 ## Docker
 
 ```bash
 docker run -d -p 8080:8080 \
-  -e MKDOCSEDITOR_BACKEND_URL=https://mkdocs-api.example.com \
-  -e MKDOCSEDITOR_WIKI_URL=https://wiki.example.com \
+  -e MKDOCSEDITOR_WIKI_URL=https://wiki.example.com/view \
   mkdocseditor/mkdocseditor-web:latest
 ```
 
@@ -214,7 +224,7 @@ Requirements: Node.js 22, and Go plus git for the end-to-end tests.
 
 ```bash
 npm install
-npm run dev          # dev server on http://localhost:5173
+npm run dev          # dev server on http://localhost:5173, /api goes to the backend on :7413
 npm run lint         # ESLint
 npm run format:check # Prettier
 npm run type-check   # vue-tsc
@@ -271,8 +281,10 @@ values (`src/styles/tokens.css`). The web client is denser, because it is meant 
 wiki (a git repository) and three users (admin, editor, reader), and runs the tests in a
 desktop and a phone browser. Run `npx playwright install chromium` once. The account tests
 start extra backends (setup mode, strict rate limits) and use Chrome's virtual authenticator
-for passkeys. The app reaches the test backend as `http://localhost:17414` (same site as the
-app on `http://localhost:4174`).
+for passkeys. The app on `http://localhost:4174` reaches its test backend as `/api` of its own
+origin; the app server passes that on to the backend on port `17414`, as the reverse proxy does
+in production. The extra backends are reached directly, as `http://localhost:<port>/api`, like a
+backend on a host of its own.
 
 Test files run in parallel. Every worker has its own backend, wiki and users, and its own port
 of the app: the first worker uses the ports above, the next one `17415` and `4175`, and so on.

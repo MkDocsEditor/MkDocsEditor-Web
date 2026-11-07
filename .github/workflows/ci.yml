@@ -86,6 +86,9 @@ jobs:
           for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz && break; sleep 1; done
           curl -fs http://localhost:8080/config.json | tee /dev/stderr | grep -q '"backendUrl": "https://api.example.com"'
           curl -fs http://localhost:8080/some/client/route | grep -q '<div id="app">'
+          # the backend and the wiki share the host; the app never answers for them
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/server-info/)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/view/)" = "404"
           # without MKDOCSEDITOR_ASSETLINKS_JSON there is no assetlinks.json
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/.well-known/assetlinks.json)" = "404"
           test "$(docker inspect --format '{{.Config.User}}' mkdocseditor-web:ci)" = "101"
