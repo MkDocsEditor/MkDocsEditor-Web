@@ -23,7 +23,7 @@ import { usePagesStore } from '@/stores/pages'
 import { usePinsStore } from '@/stores/pins'
 import { useTreeStore } from '@/stores/tree'
 
-import { detailsOf, nameOf, peopleText, verbOf } from './dashboard/feedText'
+import { detailsOf, headingsText, nameOf, peopleText, verbOf } from './dashboard/feedText'
 import { useFeed } from './dashboard/useFeed'
 
 /**
@@ -169,8 +169,16 @@ async function movePin(scope: PinScope, pin: Pin, to: number): Promise<void> {
 /** Where an entry leads: the page, or the folder found by its path, while it still exists. */
 function entryLink(entry: FeedEntry) {
   if (entry.kind === 'deleted') return undefined
-  if (entry.itemType === 'document')
-    return entry.documentId ? { name: 'document', params: { id: entry.documentId } } : undefined
+  if (entry.itemType === 'document') {
+    if (!entry.documentId) return undefined
+    // an edit opens the page at the first section it touched that is still there
+    const headings = entry.kind === 'edited' ? (entry.summary?.headings ?? []) : []
+    return {
+      name: 'document',
+      params: { id: entry.documentId },
+      query: headings.length > 0 ? { section: headings } : {},
+    }
+  }
   const section = tree.byPath(entry.path)
   return section?.type === 'section' ? { name: 'section', params: { id: section.id } } : undefined
 }
@@ -304,7 +312,21 @@ function entryLink(entry: FeedEntry) {
             {{ peopleText(entry.authors) }} {{ verbOf(entry) }}
             <strong>{{ entryName(entry) }}</strong>
           </v-list-item-title>
-          <v-list-item-subtitle class="text-wrap">{{ detailsOf(entry) }}</v-list-item-subtitle>
+          <v-list-item-subtitle class="text-wrap">
+            {{ detailsOf(entry) }}
+            <template v-if="entry.summary">
+              ·
+              <span class="dashboard-view__added" data-testid="feed-added"
+                >+{{ entry.summary.linesAdded }}</span
+              >
+              <span class="dashboard-view__removed" data-testid="feed-removed"
+                >−{{ entry.summary.linesRemoved }}</span
+              >
+            </template>
+            <span v-if="headingsText(entry)" class="d-block" data-testid="feed-headings">
+              {{ headingsText(entry) }}
+            </span>
+          </v-list-item-subtitle>
           <template #append>
             <span class="text-body-small text-medium-emphasis ms-2" :title="formatDate(entry.time)">
               {{ formatWhen(entry.time) }}
@@ -329,6 +351,15 @@ function entryLink(entry: FeedEntry) {
 </template>
 
 <style scoped>
+/* added and removed lines as the diff views show them (the code palette, as on Android) */
+.dashboard-view__added {
+  color: rgb(var(--v-theme-code-inserted));
+  font-weight: 500;
+}
+.dashboard-view__removed {
+  color: rgb(var(--v-theme-code-deleted));
+  font-weight: 500;
+}
 .dashboard-view__index {
   padding: var(--app-space-4);
 }

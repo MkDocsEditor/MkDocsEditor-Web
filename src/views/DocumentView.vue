@@ -11,7 +11,7 @@ import {
   mdiTune,
   mdiViewSplitVertical,
 } from '@mdi/js'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
@@ -26,7 +26,9 @@ import ItemActionItems from '@/components/tree/ItemActionItems.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
+import { flashLines } from '@/editor/flashLines'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
+import { sectionOf } from '@/markdown/headings'
 import { pageTitle } from '@/markdown/pageTitle'
 import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
@@ -163,6 +165,7 @@ function onPreviewLines(lines: { first: number; last: number } | null): void {
 }
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const editorView = () => editor.value?.getView() ?? null
+const preview = ref<InstanceType<typeof MarkdownPreview> | null>(null)
 const { selectedText, replaceSelection, insertSnippets, reveal, revealLine } = useEditorInsertion(
   editorView,
   () => text.value,
@@ -253,6 +256,39 @@ watch(
     revealLine(number)
   },
   // after the id watcher below, so a new page's line waits for that page's text
+  { flush: 'post' },
+)
+
+/**
+ * `?section=Zutaten&section=…` (from the feed): show the section of the first of these headings
+ * the page has, in the mode the page is in, and highlight it for a moment. Without a match, the
+ * page stays at the top. Like `?line`, it waits for the server's text.
+ */
+let sectionTimer: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => clearTimeout(sectionTimer))
+
+function showSection(names: string[], attempt = 0): void {
+  const view = editorView()
+  const editorShown = mode.value !== 'preview'
+  // the panes come a moment after the text is ready
+  if ((editorShown && (!view || view.state.doc.length < text.value.length)) || !preview.value) {
+    if (attempt < 40) sectionTimer = setTimeout(() => showSection(names, attempt + 1), 50)
+    return
+  }
+  const section = sectionOf(text.value, names)
+  if (!section) return
+  if (editorShown && view) flashLines(view, section.from, section.to)
+  if (mode.value !== 'edit') preview.value.flashLines(section.from - 1, section.to - 1)
+}
+
+watch(
+  () => [ready.value && status.value?.connection !== 'connecting', route.query.section] as const,
+  ([isReady, query]) => {
+    if (!isReady || query === undefined || query === null) return
+    void router.replace({ query: { ...route.query, section: undefined } })
+    clearTimeout(sectionTimer)
+    showSection((Array.isArray(query) ? query : [query]).filter((n): n is string => !!n))
+  },
   { flush: 'post' },
 )
 
@@ -529,6 +565,7 @@ async function share(): Promise<void> {
         <v-progress-linear v-if="!ready" indeterminate aria-label="Loading the page" />
         <MarkdownPreview
           v-else
+          ref="preview"
           :text="text"
           :section-id="parentId"
           :anchor="

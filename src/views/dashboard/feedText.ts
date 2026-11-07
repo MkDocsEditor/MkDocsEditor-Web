@@ -29,7 +29,7 @@ export function verbOf(entry: FeedEntry): string {
   return entry.kind
 }
 
-/** Where, and more about what: the folder, where it came from, and what an edit touched. */
+/** Where, and more about what: the folder and where it came from (the summary is apart). */
 export function detailsOf(entry: FeedEntry): string {
   const parts: string[] = []
   const folder = folderOf(entry.path)
@@ -38,10 +38,11 @@ export function detailsOf(entry: FeedEntry): string {
   else if (verb === 'moved') parts.push(`from ${folderOf(entry.oldPath ?? '') || 'the top folder'}`)
   if (verb !== 'moved') parts.push(folder ? `in ${folder}` : 'in the top folder')
   if (verb === 'moved') parts.push(`to ${folder || 'the top folder'}`)
-  const summary = entry.summary
-  if (summary) {
-    parts.push(`+${summary.linesAdded} −${summary.linesRemoved}`)
-    if (summary.headings.length > 0) parts.push(summary.headings.join(', '))
-  }
   return parts.join(' · ')
+}
+
+/** The sections an edit touched, for a line of their own: "In Zutaten, Backen", else "". */
+export function headingsText(entry: FeedEntry): string {
+  const headings = entry.summary?.headings ?? []
+  return headings.length > 0 ? `In ${headings.join(', ')}` : ''
 }

@@ -131,6 +131,54 @@ watch(html, () =>
   }),
 )
 watch(() => props.anchor, showAnchor)
+
+/** How long a highlight stays (it fades out over that time); the same as in the editor. */
+const FLASH_MS = 2_000
+/** Lines to highlight once they are rendered (0-based, inclusive). */
+let pendingFlash: { from: number; to: number } | null = null
+
+/** The top-level blocks of lines `from` to `to`, if the text with them is rendered yet. */
+function blocksOf(root: HTMLElement, from: number, to: number): HTMLElement[] {
+  if (debounced.value !== props.text) return []
+  return [...root.querySelectorAll<HTMLElement>(':scope > [data-source-line]')].filter((el) => {
+    const line = Number(el.dataset.sourceLine)
+    return line >= from && line <= to
+  })
+}
+
+function applyFlash(): void {
+  const root = container.value
+  if (!pendingFlash || !root) return
+  const blocks = blocksOf(root, pendingFlash.from, pendingFlash.to)
+  if (blocks.length === 0) return
+  pendingFlash = null
+  const margin = 16
+  root.scrollTo({
+    top:
+      root.scrollTop +
+      blocks[0]!.getBoundingClientRect().top -
+      root.getBoundingClientRect().top -
+      margin,
+  })
+  for (const block of blocks) {
+    block.classList.remove('markdown-preview__flash')
+    void block.offsetWidth // restarts the animation
+    block.classList.add('markdown-preview__flash')
+    setTimeout(() => block.classList.remove('markdown-preview__flash'), FLASH_MS)
+  }
+}
+watch(html, () => nextTick(applyFlash))
+
+defineExpose({
+  /**
+   * Scrolls source lines `from` to `to` (0-based) to the top and highlights them for a moment,
+   * once they are rendered.
+   */
+  flashLines(from: number, to: number): void {
+    pendingFlash = { from, to }
+    void nextTick(applyFlash)
+  },
+})
 </script>
 
 <template>
@@ -177,5 +225,16 @@ watch(() => props.anchor, showAnchor)
 }
 .v-theme--dark .markdown-preview {
   --md-mark-background: #6b5a00;
+}
+@keyframes markdown-preview-flash {
+  from {
+    background-color: rgba(var(--v-theme-primary), 0.22);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.markdown-preview__flash {
+  animation: markdown-preview-flash 2s ease-in forwards;
 }
 </style>
