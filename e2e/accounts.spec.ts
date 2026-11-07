@@ -13,6 +13,7 @@ import {
   logout,
   openAdminUsers,
   requireEndpoints,
+  settingsSection,
   uniqueUsername,
 } from './accounts'
 import { addVirtualAuthenticator, totp } from './authenticators'
@@ -88,7 +89,7 @@ test.describe('accounts', () => {
   test('an invite link creates an account with the chosen role', async ({ browser }, testInfo) => {
     const admin = await devicePage(browser, testInfo, ADMIN)
     await accountMenu(admin, 'menu-admin')
-    await admin.getByRole('tab', { name: 'Invites' }).click()
+    await settingsSection(admin, 'invites')
     const note = testName('Invite', testInfo)
     await admin.getByTestId('invite-role').click()
     await admin.getByRole('option', { name: 'Reader' }).click()
@@ -128,7 +129,7 @@ test.describe('accounts', () => {
     const user = await createAccount(uniqueUsername('totp', testInfo))
     const page = await devicePage(browser, testInfo, user)
     await accountMenu(page, 'menu-account')
-    await page.getByRole('tab', { name: 'Security' }).click()
+    await settingsSection(page, 'security')
     await page.getByTestId('totp-enroll').click()
     const secretField = page.getByTestId('totp-secret')
     await confirmIfAsked(page, secretField, user.password)
@@ -174,7 +175,7 @@ test.describe('accounts', () => {
     await page.getByRole('button', { name: 'Confirm', exact: true }).click()
     await skipPasskeyStep(page)
     await accountMenu(page, 'menu-account')
-    await page.getByRole('tab', { name: 'Security' }).click()
+    await settingsSection(page, 'security')
     await expect(page.getByTestId('recovery-left')).toContainText('9 of 10')
   })
 
@@ -187,7 +188,7 @@ test.describe('accounts', () => {
     await expect(page.getByLabel('Username')).toHaveAttribute('autocomplete', 'username webauthn')
     await login(page, user)
     await accountMenu(page, 'menu-account')
-    await page.getByRole('tab', { name: 'Security' }).click()
+    await settingsSection(page, 'security')
     await page.getByTestId('passkey-add').click()
     const list = page.getByTestId('passkey-list')
     await confirmIfAsked(page, list, user.password)
@@ -223,7 +224,7 @@ test.describe('accounts', () => {
     const authenticator = await addVirtualAuthenticator(page)
     await login(page, user)
     await accountMenu(page, 'menu-account')
-    await page.getByRole('tab', { name: 'Security' }).click()
+    await settingsSection(page, 'security')
     await page.getByTestId('passkey-add').click()
     await expect(page.getByTestId('passkey-list').locator('.v-list-item')).toHaveCount(1)
     expect(await authenticator.credentialCount()).toBe(1)
@@ -244,7 +245,7 @@ test.describe('accounts', () => {
     }, BROWSER_BACKEND_URL)
     expect(paired).toBe(200)
     await page.reload()
-    await page.getByRole('tab', { name: 'Devices' }).click()
+    await settingsSection(page, 'sessions')
 
     // the provider fails, as with two copies of Bitwarden's scripts in the page
     await page.evaluate(() => {
@@ -315,7 +316,7 @@ test.describe('accounts', () => {
     await expect(laptop).toHaveURL(/\/welcome\?passkey=1/)
     await skipPasskeyStep(laptop)
     await accountMenu(laptop, 'menu-account')
-    await expect(laptop.getByRole('heading', { name: 'Account' })).toBeVisible()
+    await expect(laptop.getByRole('heading', { name: 'Profile' })).toBeVisible()
     await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
 
     // a few days later
@@ -333,7 +334,7 @@ test.describe('accounts', () => {
       .click()
     await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
     await laptop.reload()
-    await expect(laptop.getByRole('heading', { name: 'Account' })).toBeVisible()
+    await expect(laptop.getByRole('heading', { name: 'Profile' })).toBeVisible()
     await expect(laptop.getByTestId('passkey-reminder')).toHaveCount(0)
   })
 
@@ -342,7 +343,7 @@ test.describe('accounts', () => {
     const user = await createAccount(uniqueUsername('android', testInfo))
     const page = await devicePage(browser, testInfo, user)
     await accountMenu(page, 'menu-account')
-    await page.getByRole('tab', { name: 'Devices' }).click()
+    await settingsSection(page, 'sessions')
     const card = page.getByTestId('connect-app')
     await expect(card.getByRole('link', { name: 'Obtainium' })).toHaveAttribute(
       'href',
@@ -482,7 +483,7 @@ test.describe('accounts', () => {
     const phone = await devicePage(browser, testInfo, user)
     const laptop = await devicePage(browser, testInfo, user)
     await accountMenu(laptop, 'menu-account')
-    await laptop.getByRole('tab', { name: 'Devices' }).click()
+    await settingsSection(laptop, 'sessions')
     await expect(laptop.getByTestId('session-current')).toBeVisible()
     await expect(laptop.getByTestId('session-other')).toHaveCount(2) // the phone and the REST session
     await laptop.getByTestId('revoke-others').click()
@@ -500,7 +501,7 @@ test.describe('accounts', () => {
     const user = await createAccount(uniqueUsername('newpw', testInfo))
     const page = await devicePage(browser, testInfo, user)
     await accountMenu(page, 'menu-account')
-    await page.getByRole('tab', { name: 'Security' }).click()
+    await settingsSection(page, 'security')
     const form = page.getByTestId('password-form')
     await expect(form.locator('input[name="username"]')).toHaveAttribute('autocomplete', 'username')
     await expect(form.locator('input[name="username"]')).toHaveValue(user.username)

@@ -37,6 +37,7 @@ import { isImage, resourceKind } from '@/services/icons'
 import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
 import { linkDestination } from '@/services/linkPath'
+import { authorHighlight, lineNumbers } from '@/composables/preferences'
 import { useStored } from '@/composables/useStored'
 import { instanceColor, instanceId } from '@/sync/instance'
 import { markdownFor } from '@/services/upload'
@@ -79,7 +80,6 @@ const mode = computed<Mode>({
     storedMode.value = m
   },
 })
-const authorHighlight = useStored<AuthorHighlightMode>('mkdocseditor.authorHighlight', 'marker')
 const authorHighlightModes: { value: AuthorHighlightMode; title: string }[] = [
   { value: 'marker', title: 'Strip and marker' },
   { value: 'strip', title: 'Strip next to the line' },
@@ -496,7 +496,7 @@ async function share(): Promise<void> {
           :session="session"
           :author-highlight="authorHighlight"
           :upload="upload"
-          :line-numbers="!mobile"
+          :line-numbers="!mobile && lineNumbers"
           :format-override="shortcutOverride"
           :shown="mode !== 'preview'"
           @change="(t: string) => (text = t)"

@@ -52,7 +52,7 @@ async function done(response: SessionResponse): Promise<void> {
   cancelPasskeyRequest()
   auth.signedIn(response.user)
   if (response.user.secondFactorSetupRequired) {
-    await router.replace({ name: 'account', params: { tab: 'security' } })
+    await router.replace({ name: 'settings', params: { section: 'security' } })
     return
   }
   const passkey = offerPasskey(response)

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { settingsSection } from './accounts'
 import { createDocument, login, openEditor, testName, userPage } from './helpers'
 import { BACKEND_URL, USERS } from './ports'
 
@@ -18,13 +19,15 @@ test('starts with the start page of the wiki, or with the files', async ({ page 
   await page.getByTestId('all-files').click()
   await expect(page.getByTestId('section-title')).toHaveText('Wiki')
 
-  // the setting of this device: `/` shows the files instead
+  // the setting of this browser, under Settings > Appearance: `/` shows the files instead
   await page.getByTestId('account-menu').click()
-  await page.getByTestId('menu-start-page').click()
+  await page.getByTestId('menu-settings').click()
+  await settingsSection(page, 'appearance')
+  await page.getByTestId('setting-start-page').getByLabel('Files of the top folder').check()
   await page.goto('/')
   await expect(page.getByTestId('section-title')).toHaveText('Wiki')
-  await page.getByTestId('account-menu').click()
-  await page.getByTestId('menu-start-page').click()
+  await page.goto('/settings/appearance')
+  await page.getByTestId('setting-start-page').getByLabel('What’s going on').check()
   await page.goto('/')
   await expect(page.getByTestId('dashboard-title')).toBeVisible()
 })

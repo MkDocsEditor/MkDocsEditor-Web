@@ -7,14 +7,13 @@ import LinkView from '@/views/LinkView.vue'
 import LoginView from '@/views/LoginView.vue'
 import HomeView from '@/views/HomeView.vue'
 import SectionView from '@/views/SectionView.vue'
+import { ADMIN_TAB_SECTIONS, SECTION_PATTERN, isAdminSection } from '@/services/settingsSections'
 
 declare module 'vue-router' {
   interface RouteMeta {
     /** Routes are protected by default; set to true for routes reachable without login. */
     public?: boolean
-    /** Only for admins. */
-    admin?: boolean
-    /** Account and admin pages: shown without waiting for the wiki tree. */
+    /** Settings and welcome pages: shown without waiting for the wiki tree. */
     standalone?: boolean
   }
 }
@@ -76,11 +75,26 @@ export function buildRouter(history: RouterHistory): Router {
         props: true,
       },
       {
-        path: '/account/:tab(profile|security|sessions)?',
-        name: 'account',
-        component: () => import('@/views/AccountView.vue'),
+        path: `/settings/:section(${SECTION_PATTERN})?`,
+        name: 'settings',
+        component: () => import('@/views/SettingsView.vue'),
         props: true,
         meta: { standalone: true },
+      },
+      // the addresses before the settings page
+      {
+        path: '/account/:tab(profile|security|sessions)?',
+        redirect: (to) => ({
+          name: 'settings',
+          params: { section: typeof to.params.tab === 'string' ? to.params.tab : 'profile' },
+        }),
+      },
+      {
+        path: '/admin/:tab(users|invites|requests|audit|settings)?',
+        redirect: (to) => ({
+          name: 'settings',
+          params: { section: ADMIN_TAB_SECTIONS[String(to.params.tab || 'users')] ?? 'users' },
+        }),
       },
       {
         path: '/links/:tab(broken|unused)?',
@@ -93,13 +107,6 @@ export function buildRouter(history: RouterHistory): Router {
         name: 'welcome',
         component: () => import('@/views/WelcomeView.vue'),
         meta: { standalone: true },
-      },
-      {
-        path: '/admin/:tab(users|invites|requests|audit|settings)?',
-        name: 'admin',
-        component: () => import('@/views/AdminView.vue'),
-        props: true,
-        meta: { standalone: true, admin: true },
       },
       { path: '/:pathMatch(.*)*', redirect: '/' },
     ],
@@ -114,9 +121,10 @@ export function buildRouter(history: RouterHistory): Router {
       return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
     }
     // With require2FA, an account without a second factor only reaches its security settings.
-    if (auth.secondFactorSetupRequired && !(to.name === 'account' && to.params.tab === 'security'))
-      return { name: 'account', params: { tab: 'security' } }
-    if (to.meta.admin && !auth.isAdmin) return { name: 'home' }
+    const section = to.name === 'settings' ? String(to.params.section ?? '') : ''
+    if (auth.secondFactorSetupRequired && section !== 'security')
+      return { name: 'settings', params: { section: 'security' } }
+    if (isAdminSection(section) && !auth.isAdmin) return { name: 'settings' }
     // A join link was opened before the sign-in, the passkey step or the invite.
     if (to.name === 'home') {
       const target = takeJoinTarget()

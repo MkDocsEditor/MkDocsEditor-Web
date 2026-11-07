@@ -18,7 +18,7 @@ test.beforeEach(async () => {
 
 test('a profile picture shows wherever its user does', async ({ browser }, testInfo) => {
   const bob = await userPage(browser, USERS.bob)
-  await bob.goto('/account/profile')
+  await bob.goto('/settings/profile')
   const card = bob.getByTestId('avatar-card')
   await expect(card.getByTestId('avatar-upload')).toHaveText('Upload picture')
   await card
@@ -44,7 +44,7 @@ test('a profile picture shows wherever its user does', async ({ browser }, testI
   await expect(alice.locator('.cm-remote-caret-label .cm-remote-caret-avatar')).toBeVisible()
 
   // removed, the initials are back
-  await bob.goto('/account/profile')
+  await bob.goto('/settings/profile')
   await card.getByTestId('avatar-remove').click()
   await expect(card.getByTestId('avatar-image')).toBeHidden()
   await expect(card.getByTestId('avatar-upload')).toHaveText('Upload picture')

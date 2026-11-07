@@ -1,21 +1,20 @@
 <script setup lang="ts">
 import {
   mdiAccountCircle,
-  mdiAccountCog,
+  mdiCogOutline,
   mdiLinkVariantOff,
   mdiLogout,
   mdiPaperclip,
   mdiPaperclipOff,
   mdiRefresh,
   mdiShieldAccount,
-  mdiViewDashboardOutline,
 } from '@mdi/js'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useDisplay } from 'vuetify'
+import { useDisplay, useTheme } from 'vuetify'
 
 import { ApiError } from '@/api'
-import { startPage } from '@/composables/useStartPage'
+import { showFilesInTree as showFiles, startPage, themeChoice } from '@/composables/preferences'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
@@ -29,7 +28,6 @@ import SearchDialog from '@/components/tree/SearchDialog.vue'
 import { signOut } from '@/stores/signOut'
 import { roleLabel } from '@/services/accountRules'
 import { followMovedRoute } from '@/composables/useMovedRedirect'
-import { useStored } from '@/composables/useStored'
 import { useAuthStore } from '@/stores/auth'
 import { useLiveStore } from '@/stores/live'
 import { usePagesStore } from '@/stores/pages'
@@ -51,8 +49,9 @@ const drawer = ref<boolean | null>(null)
 const searchOpen = ref(false)
 const opened = reactive(new Set<string>())
 
-/** Files (resources) in the drawer tree; can be hidden in large wikis. */
-const showFiles = useStored('mkdocseditor.treeShowFiles', true)
+// light, dark or like the system: a setting of this browser
+const theme = useTheme()
+watch(themeChoice, (choice) => theme.change(choice), { immediate: true })
 
 const activeId = computed(() =>
   typeof route.params.id === 'string' ? route.params.id : tree.root?.id,
@@ -114,11 +113,11 @@ onBeforeUnmount(() => live.stop())
 const pendingRequests = computed(() => (auth.isAdmin ? live.pendingAccessRequests : 0))
 watch(pendingRequests, (pending, before) => {
   if (pending <= before) return
-  if (route.name === 'admin' && route.params.tab === 'requests') return
+  if (route.name === 'settings' && route.params.section === 'requests') return
   useNotifyStore().withAction(
     pending === 1 ? 'Someone asks for access.' : `${pending} access requests are waiting.`,
     'Show',
-    () => void router.push({ name: 'admin', params: { tab: 'requests' } }),
+    () => void router.push({ name: 'settings', params: { section: 'requests' } }),
   )
 })
 
@@ -233,6 +232,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             <v-list-item
               :title="auth.displayName || auth.username"
               :subtitle="auth.role ? `signed in (${roleLabel(auth.role)})` : 'signed in'"
+              :to="{ name: 'settings', params: { section: 'profile' } }"
+              data-testid="menu-account"
             >
               <template v-if="auth.user" #prepend>
                 <UserAvatar
@@ -248,35 +249,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             </v-list-item>
             <v-divider />
             <v-list-item
-              :prepend-icon="mdiAccountCog"
-              title="Account"
-              :to="{ name: 'account' }"
-              data-testid="menu-account"
-            />
-            <v-list-item
-              :prepend-icon="mdiViewDashboardOutline"
-              title="Start page"
-              :subtitle="startPage === 'dashboard' ? 'What’s going on' : 'Files of the top folder'"
-              data-testid="menu-start-page"
-              @click="startPage = startPage === 'dashboard' ? 'files' : 'dashboard'"
-            />
-            <v-list-item
-              :prepend-icon="mdiLinkVariantOff"
-              title="Broken links and unused files"
-              :to="{ name: 'references' }"
-              data-testid="menu-references"
+              :prepend-icon="mdiCogOutline"
+              title="Settings"
+              :to="{ name: 'settings' }"
+              data-testid="menu-settings"
             />
             <v-list-item
               v-if="auth.isAdmin"
               :prepend-icon="mdiShieldAccount"
-              title="Admin"
-              :to="{ name: 'admin', params: { tab: pendingRequests > 0 ? 'requests' : undefined } }"
+              title="Administration"
+              :to="{
+                name: 'settings',
+                params: { section: pendingRequests > 0 ? 'requests' : 'users' },
+              }"
               data-testid="menu-admin"
             >
               <template v-if="pendingRequests > 0" #append>
                 <v-badge inline color="error" :content="pendingRequests" />
               </template>
             </v-list-item>
+            <v-list-item
+              :prepend-icon="mdiLinkVariantOff"
+              title="Broken links and unused files"
+              :to="{ name: 'references' }"
+              data-testid="menu-references"
+            />
+            <v-divider />
             <v-list-item
               :prepend-icon="mdiLogout"
               title="Sign out"

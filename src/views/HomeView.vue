@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { startPage } from '@/composables/useStartPage'
+import { startPage } from '@/composables/preferences'
 
 import DashboardView from './DashboardView.vue'
 import SectionView from './SectionView.vue'

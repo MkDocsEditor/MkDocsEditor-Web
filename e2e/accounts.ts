@@ -43,16 +43,28 @@ export async function devicePage(browser: Browser, testInfo: TestInfo, user?: Us
 /** Opens the account menu in the app bar and picks an entry. */
 export async function accountMenu(
   page: Page,
-  entry: 'menu-account' | 'menu-admin' | 'menu-logout',
+  entry: 'menu-account' | 'menu-settings' | 'menu-admin' | 'menu-logout',
 ) {
   await page.getByTestId('account-menu').click()
   await page.getByTestId(entry).click()
 }
 
+/**
+ * Goes to a section of the settings page that is open: from the side column, or on a narrow
+ * screen back to the list first.
+ */
+export async function settingsSection(page: Page, section: string): Promise<void> {
+  const back = page.getByTestId('settings-back')
+  await expect(page.getByTestId('settings-nav').or(back).first()).toBeVisible()
+  if (await back.isVisible()) await back.click()
+  await page.getByTestId(`settings-nav-${section}`).click()
+  await expect(page.getByTestId(`settings-section-${section}`)).toBeVisible()
+}
+
 /** The list of users. The menu leads to the access requests while some are waiting. */
 export async function openAdminUsers(page: Page): Promise<void> {
   await accountMenu(page, 'menu-admin')
-  await page.getByRole('tab', { name: 'Users' }).click()
+  await settingsSection(page, 'users')
 }
 
 export async function logout(page: Page): Promise<void> {

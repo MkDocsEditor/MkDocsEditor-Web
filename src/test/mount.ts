@@ -33,21 +33,14 @@ export function stubRoutes(): RouteRecordRaw[] {
     { path: '/invite', name: 'invite', component: Stub, meta: { public: true } },
     { path: '/reset', name: 'reset', component: Stub, meta: { public: true } },
     {
-      path: '/account/:tab?',
-      name: 'account',
+      path: '/settings/:section?',
+      name: 'settings',
       component: Stub,
       props: true,
       meta: { standalone: true },
     },
     { path: '/welcome', name: 'welcome', component: Stub, meta: { standalone: true } },
     { path: '/connect', name: 'connect', component: Stub, meta: { public: true } },
-    {
-      path: '/admin/:tab?',
-      name: 'admin',
-      component: Stub,
-      props: true,
-      meta: { standalone: true, admin: true },
-    },
   ]
 }
 
