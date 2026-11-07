@@ -9,6 +9,7 @@ import { useBreakWarning } from '@/components/references/backlinks'
 import { ITEM_LABELS } from '@/services/names'
 import { useItemActionsStore } from '@/stores/itemActions'
 import { useNotifyStore } from '@/stores/notify'
+import { useQrStore } from '@/stores/qr'
 import { useTransfersStore } from '@/stores/transfers'
 import { useTreeStore } from '@/stores/tree'
 
@@ -97,6 +98,17 @@ async function remove(item: TreeItem | null, force = false): Promise<void> {
 
 const target = shown
 const deleteWarning = useBreakWarning(() => actions.deleting)
+const qr = useQrStore()
+
+/** Stickers stop working: say which, and that the codes can go on another page. */
+const qrWarning = computed(() => {
+  const keys = target.value ? qr.keysIn(target.value) : []
+  if (keys.length === 0) return ''
+  const names = keys.map((k) => `“${k}”`).join(', ')
+  return keys.length === 1
+    ? `Stickers with the QR code ${names} then open no page, until you put the code on another one.`
+    : `Stickers with the QR codes ${names} then open no page, until you put the codes on other ones.`
+})
 const title = computed(() => (target.value ? `Delete ${ITEM_LABELS[target.value.type]}?` : ''))
 const text = computed(() => {
   const item = target.value
@@ -105,7 +117,7 @@ const text = computed(() => {
     item.type === 'section'
       ? `The folder “${item.name}” is deleted with everything in it, for everyone.`
       : `“${item.name}” will be deleted for everyone.`
-  return deleteWarning.value ? `${base} ${deleteWarning.value}` : base
+  return [base, deleteWarning.value, qrWarning.value].filter(Boolean).join(' ')
 })
 
 function confirm(): void {
