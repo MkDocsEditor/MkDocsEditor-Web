@@ -28,8 +28,12 @@ function copy(id: string, doc: Automerge.Doc<{ content: string }>, actorId: stri
 const content = async (store: OfflineStore, id: string) =>
   A.load<{ content: string }>((await store.get(id))!.bytes).content
 
+/**
+ * The common start of the copies. Its change has a fixed time: tests build it more than once,
+ * and two different changes of one actor with the same number cannot be merged.
+ */
 function base() {
-  return A.change(A.init<{ content: string }>({ actor: '01'.repeat(16) }), (d) => {
+  return A.change(A.init<{ content: string }>({ actor: '01'.repeat(16) }), { time: 0 }, (d) => {
     d.content = 'Text'
   })
 }
