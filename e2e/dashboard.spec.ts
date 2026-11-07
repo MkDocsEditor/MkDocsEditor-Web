@@ -68,6 +68,47 @@ test('pins pages for oneself and for everyone', async ({ browser }, testInfo) =>
   await expect(carol.getByTestId('pins-personal').getByText(name)).toBeVisible()
 })
 
+test('changes the order of the pins', async ({ browser }, testInfo) => {
+  test.skip(!(await features()).includes('pin-order'), 'the backend keeps no order of pins')
+  const first = testName('Erster', testInfo)
+  const second = testName('Zweiter', testInfo)
+  const ids = [await createDocument(first), await createDocument(second)]
+  const carol = await userPage(browser, USERS.carol)
+  for (const id of ids) {
+    await carol.goto(`/document/${id}`)
+    await carol.getByRole('button', { name: 'More' }).click()
+    await carol.getByTestId('item-pin-personal').click()
+  }
+  await carol.goto('/')
+  const pins = carol.getByTestId('pins-personal').getByTestId('pin')
+  const names = async () =>
+    (await pins.allInnerTexts()).filter((t) => t.includes(first) || t.includes(second))
+  const order = (...expected: string[]) =>
+    expect
+      .poll(async () => (await names()).map((t) => (t.includes(first) ? first : second)))
+      .toEqual(expected)
+  // new pins go to the end
+  await order(first, second)
+
+  // with the keyboard: the moved pin keeps the focus
+  const pinOf = (name: string) => pins.filter({ hasText: name })
+  await pinOf(second).focus()
+  await carol.keyboard.press('Alt+ArrowUp')
+  await order(second, first)
+  await expect(pinOf(second)).toBeFocused()
+
+  // the order is kept by the server
+  await carol.reload()
+  await order(second, first)
+
+  if (testInfo.project.name === 'desktop') {
+    await pinOf(second).dragTo(pinOf(first), { targetPosition: { x: 20, y: 40 } })
+    await order(first, second)
+    await carol.reload()
+    await order(first, second)
+  }
+})
+
 test('the feed says who changed which page', async ({ browser }, testInfo) => {
   test.skip(!(await features()).includes('feed'), 'the backend has no feed')
   const name = testName('Neuigkeit', testInfo)
