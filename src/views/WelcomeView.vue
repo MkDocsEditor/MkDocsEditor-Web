@@ -6,6 +6,7 @@ import AndroidAppHint from '@/components/auth/AndroidAppHint.vue'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import PasskeyStep from '@/components/auth/PasskeyStep.vue'
 import { useAndroidHint } from '@/composables/useAndroidHint'
+import { goToReturnPath, returnPathOf } from '@/services/returnPath'
 import { useAuthStore } from '@/stores/auth'
 import { useNotifyStore } from '@/stores/notify'
 
@@ -23,13 +24,8 @@ const passkeyOpen = ref(route.query.passkey === '1')
 const appOpen = ref(route.query.app === '1' && androidHintWanted())
 const nothingLeft = computed(() => !passkeyOpen.value && !appOpen.value)
 
-function target(): string {
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  return redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
-}
-
 async function next(): Promise<void> {
-  if (nothingLeft.value) await router.replace(target())
+  if (nothingLeft.value) await goToReturnPath(router, returnPathOf(route.query))
 }
 
 async function passkeyCreated(): Promise<void> {
@@ -48,7 +44,7 @@ async function appDismissed(): Promise<void> {
   await next()
 }
 
-if (nothingLeft.value) void router.replace(target())
+if (nothingLeft.value) void goToReturnPath(router, returnPathOf(route.query))
 </script>
 
 <template>

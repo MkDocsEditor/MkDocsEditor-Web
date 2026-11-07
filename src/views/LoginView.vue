@@ -11,6 +11,7 @@ import { authErrorText } from '@/services/authErrors'
 import { useAndroidHint } from '@/composables/useAndroidHint'
 import { vFocusOnce } from '@/services/focusOnce'
 import { passkeyReminderDue } from '@/services/passkeyReminder'
+import { goToReturnPath, returnPathOf } from '@/services/returnPath'
 import { getConfig } from '@/config'
 import {
   cancelPasskeyRequest,
@@ -42,12 +43,6 @@ const code = ref('')
 const canUsePasskeys = computed(() => auth.passkeysEnabled && passkeysSupported())
 const endedHint = ref(auth.sessionEnded)
 
-function redirectTarget(): string {
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  // only paths inside the app, never `//host`
-  return redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
-}
-
 async function done(response: SessionResponse): Promise<void> {
   cancelPasskeyRequest()
   auth.signedIn(response.user)
@@ -57,9 +52,9 @@ async function done(response: SessionResponse): Promise<void> {
   }
   const passkey = offerPasskey(response)
   const app = androidHintWanted()
-  const target = redirectTarget()
+  const target = returnPathOf(route.query)
   if (!passkey && !app) {
-    await router.replace(target)
+    await goToReturnPath(router, target)
     return
   }
   await router.replace({
@@ -195,6 +190,20 @@ onMounted(async () => {
   if (auth.setupRequired) {
     await router.replace({ name: 'setup' })
     return
+  }
+  // The wiki's login check sends here with `?next=` also when the session is still there in
+  // the app's eyes, for example right after signing in in another tab: then go on right away.
+  if ('next' in route.query) {
+    try {
+      await auth.ensureChecked()
+    } catch {
+      // the login shows the error when it is tried
+    }
+    // not while offline: the last user is only trusted then, and the wiki would send back here
+    if (auth.isLoggedIn && !auth.offline) {
+      await goToReturnPath(router, returnPathOf(route.query))
+      return
+    }
   }
   void startAutofill()
 })
