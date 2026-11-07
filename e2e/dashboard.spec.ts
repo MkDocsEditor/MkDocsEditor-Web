@@ -15,6 +15,8 @@ test('starts with the start page of the wiki, or with the files', async ({ page 
   await login(page)
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByTestId('dashboard-index')).toContainText('Das ist das Test-Wiki.')
+  // the title of the start page shows when it is opened, not here
+  await expect(page.getByTestId('dashboard-index').getByText('Willkommen')).toBeHidden()
 
   await page.getByTestId('all-files').click()
   await expect(page.getByTestId('section-title')).toHaveText('Wiki')
