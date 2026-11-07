@@ -1,7 +1,11 @@
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { expect, test } from '@playwright/test'
 
 import { settingsSection } from './accounts'
-import { createDocument, login, openEditor, testName, userPage } from './helpers'
+import { MAIN_WIKI } from './backend'
+import { createDocument, documentContent, login, openEditor, testName, userPage } from './helpers'
 import { BACKEND_URL, USERS } from './ports'
 
 async function features(): Promise<string[]> {
@@ -141,8 +145,10 @@ test('the feed says who changed which page, and opens it at the change', async (
   const previewFlash = bob.locator('.markdown-preview__flash:visible')
   await expect(editorFlash.or(previewFlash).first()).toBeInViewport()
   if (testInfo.project.name === 'desktop') {
-    // split: both panes show the section
-    await expect(editorFlash.first()).toContainText('Zutaten')
+    // split: both panes show the section; with changed lines from the server, the whole new text
+    // is the change, from its first line
+    if (!(await features()).includes('feed-ranges'))
+      await expect(editorFlash.first()).toContainText('Zutaten')
     await expect(previewFlash).toHaveCount(1)
   }
   if (await previewFlash.count()) {
@@ -160,4 +166,51 @@ test('the feed says who changed which page, and opens it at the change', async (
     expect(band.y + band.height).toBeGreaterThanOrEqual(text.y + text.height)
   }
   await expect(editorFlash.or(previewFlash)).toHaveCount(0, { timeout: 5_000 })
+})
+
+test('opens an edit at the lines it changed', async ({ browser }, testInfo) => {
+  test.skip(!(await features()).includes('feed-ranges'), 'the backend has no changed lines')
+  const name = testName('Nachtrag', testInfo)
+  const id = await createDocument(name)
+  // a page that is there before the edit, so only the new lines are the change
+  const filler = Array.from({ length: 60 }, (_, i) => `Zeile ${i + 1}`).join('\n\n')
+  writeFileSync(
+    path.join(MAIN_WIKI, 'docs', `${name}.md`),
+    `# ${name}\n\n## Zutaten\n\n${filler}\n\n## Ende\n\nletzte Zeile\n`,
+  )
+  await expect.poll(() => documentContent(id)).toContain('letzte Zeile')
+
+  const alice = await userPage(browser, USERS.alice)
+  await openEditor(alice, id)
+  await alice.locator('.cm-content').click()
+  await alice.keyboard.press('ControlOrMeta+End')
+  // a paragraph of its own, whether or not the text ends with a newline
+  await alice.keyboard.insertText('\n\nNachtrag\n')
+  await expect(alice.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
+
+  const bob = await userPage(browser, USERS.bob)
+  const entry = bob.getByTestId('feed-entry').filter({ hasText: name }).first()
+  await expect(async () => {
+    await bob.reload()
+    await expect(entry).toContainText('edited', { timeout: 2000 })
+  }).toPass({ timeout: 30_000 })
+  await entry.click()
+  await expect(bob).toHaveURL(new RegExp(`/document/${id}$`))
+
+  const editorFlash = bob.locator('.cm-flash-line:visible')
+  const previewFlash = bob.locator('.markdown-preview__flash:visible')
+  await expect(editorFlash.or(previewFlash).first()).toBeInViewport()
+  if (testInfo.project.name === 'desktop') {
+    // only the new lines, not the section around them
+    await expect(editorFlash.last()).toHaveText('Nachtrag')
+    expect(await editorFlash.count()).toBeLessThanOrEqual(3)
+  }
+  if (await previewFlash.count()) {
+    const band = (await previewFlash.first().boundingBox())!
+    const preview = bob.getByTestId('markdown-preview')
+    const added = (await preview.getByText('Nachtrag', { exact: true }).boundingBox())!
+    const before = (await preview.getByText('letzte Zeile', { exact: true }).boundingBox())!
+    expect(band.y).toBeGreaterThan(before.y + before.height - 1)
+    expect(band.y + band.height).toBeGreaterThanOrEqual(added.y + added.height)
+  }
 })

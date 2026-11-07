@@ -13,6 +13,7 @@ import './preview.css'
 import { renderMarkdown } from './render'
 import { previewAnchor, previewScrollTop, visibleSourceLines } from './sourceLines'
 import type { ScrollAnchor } from './sourceLines'
+import type { ChangeTarget } from './changeRanges'
 
 const props = defineProps<{
   text: string
@@ -134,49 +135,81 @@ watch(() => props.anchor, showAnchor)
 
 /** How long a highlight stays (it fades out over that time); the same as in the editor. */
 const FLASH_MS = 2_000
-/** Lines to highlight once they are rendered (0-based, inclusive). */
-let pendingFlash: { from: number; to: number } | null = null
+/** What to highlight once the text with it is rendered. */
+let pendingFlash: readonly ChangeTarget[] | null = null
 
-/** The top-level blocks of lines `from` to `to`, if the text with them is rendered yet. */
-function blocksOf(root: HTMLElement, from: number, to: number): HTMLElement[] {
-  if (debounced.value !== props.text) return []
-  return [...root.querySelectorAll<HTMLElement>(':scope > [data-source-line]')].filter((el) => {
-    const line = Number(el.dataset.sourceLine)
-    return line >= from && line <= to
-  })
+/** The rendered top-level blocks with their first source line (0-based), in text order. */
+function blocks(root: HTMLElement): { el: HTMLElement; line: number }[] {
+  return [...root.querySelectorAll<HTMLElement>(':scope > [data-source-line]')]
+    .map((el) => ({ el, line: Number(el.dataset.sourceLine) }))
+    .filter((b) => Number.isFinite(b.line))
+}
+
+/** One band over the blocks of a target, or a thin marker for removed lines. */
+function bandOf(
+  root: HTMLElement,
+  all: { el: HTMLElement; line: number }[],
+  target: ChangeTarget,
+): { top: number; height: number } | undefined {
+  const origin = root.getBoundingClientRect().top - root.scrollTop
+  const from = target.from - 1
+  const to = target.to - 1
+  if (target.removal) {
+    const after = all.find((b) => b.line >= from)
+    if (after) return { top: after.el.getBoundingClientRect().top - origin - 3, height: 3 }
+    const last = all.at(-1)
+    return last && { top: last.el.getBoundingClientRect().bottom - origin, height: 3 }
+  }
+  // a block covers the lines up to the next block, without the blank lines after it; take those
+  // that touch the target
+  const lines = debounced.value.split('\n')
+  const endOf = (i: number) => {
+    let end = (all[i + 1]?.line ?? lines.length) - 1
+    while (end > all[i]!.line && !lines[end]?.trim()) end--
+    return end
+  }
+  const hit = all.filter((b, i) => b.line <= to && endOf(i) >= from)
+  if (hit.length === 0) return undefined
+  const top = hit[0]!.el.getBoundingClientRect().top - origin
+  const bottom = Math.max(...hit.map((b) => b.el.getBoundingClientRect().bottom)) - origin
+  return { top: top - 4, height: bottom - top + 8 }
 }
 
 function applyFlash(): void {
   const root = container.value
-  if (!pendingFlash || !root) return
-  const blocks = blocksOf(root, pendingFlash.from, pendingFlash.to)
-  if (blocks.length === 0) return
+  if (!pendingFlash || !root || debounced.value !== props.text) return
+  const all = blocks(root)
+  const bands = pendingFlash
+    .map((target) => {
+      const band = bandOf(root, all, target)
+      return band && { ...band, removal: target.removal === true }
+    })
+    .filter((b) => !!b)
+  if (bands.length === 0) return
   pendingFlash = null
-  const first = blocks[0]!.getBoundingClientRect()
-  const last = blocks.at(-1)!.getBoundingClientRect()
-  const top = root.scrollTop + first.top - root.getBoundingClientRect().top
-  root.scrollTo({ top: top - 16 })
-  // one band over the whole section, gaps between the blocks included; the next render of the
-  // text replaces it along with the rest
-  root.querySelector('.markdown-preview__flash')?.remove()
-  const band = document.createElement('div')
-  band.className = 'markdown-preview__flash'
-  band.dataset.testid = 'preview-flash'
-  band.setAttribute('aria-hidden', 'true')
-  band.style.top = `${top - 4}px`
-  band.style.height = `${Math.max(last.bottom, first.bottom) - first.top + 8}px`
-  root.append(band)
-  setTimeout(() => band.remove(), FLASH_MS)
+  root.scrollTo({ top: bands[0]!.top - 12 })
+  // the next render of the text replaces the bands along with the rest
+  for (const old of root.querySelectorAll('.markdown-preview__flash')) old.remove()
+  for (const { top, height, removal } of bands) {
+    const band = document.createElement('div')
+    band.className = removal
+      ? 'markdown-preview__flash markdown-preview__flash--removed'
+      : 'markdown-preview__flash'
+    band.dataset.testid = 'preview-flash'
+    band.setAttribute('aria-hidden', 'true')
+    band.style.top = `${top}px`
+    band.style.height = `${height}px`
+    root.append(band)
+    setTimeout(() => band.remove(), FLASH_MS)
+  }
 }
 watch(html, () => nextTick(applyFlash))
 
 defineExpose({
-  /**
-   * Scrolls source lines `from` to `to` (0-based) to the top and highlights them for a moment,
-   * once they are rendered.
-   */
-  flashLines(from: number, to: number): void {
-    pendingFlash = { from, to }
+  /** Scrolls the first target to the top and highlights all for a moment, once rendered. */
+  flashLines(targets: readonly ChangeTarget[]): void {
+    if (targets.length === 0) return
+    pendingFlash = targets
     void nextTick(applyFlash)
   },
 })
@@ -235,6 +268,17 @@ defineExpose({
   to {
     background-color: transparent;
   }
+}
+@keyframes markdown-preview-flash-removed {
+  from {
+    background-color: rgba(var(--v-theme-primary), 0.9);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.markdown-preview__flash.markdown-preview__flash--removed {
+  animation-name: markdown-preview-flash-removed;
 }
 .markdown-preview__flash {
   position: absolute;

@@ -28,6 +28,8 @@ import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import { flashLines } from '@/editor/flashLines'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
+import { placeRanges, textHash } from '@/markdown/changeRanges'
+import type { ChangeRange, ChangeTarget } from '@/markdown/changeRanges'
 import { sectionOf } from '@/markdown/headings'
 import { pageTitle } from '@/markdown/pageTitle'
 import type { TextReference } from '@/markdown/references'
@@ -260,34 +262,75 @@ watch(
 )
 
 /**
- * `?section=Zutaten&section=…` (from the feed): show the section of the first of these headings
- * the page has, in the mode the page is in, and highlight it for a moment. Without a match, the
- * page stays at the top. Like `?line`, it waits for the server's text.
+ * From the feed, in the mode the page is in, highlighted for a moment; like `?line`, after the
+ * server's text:
+ * - `?change={"hash","ranges"}`: the lines an edit changed (`placeRanges`), scrolled to the first.
+ * - `?section=Zutaten&section=…`: the section of the first of these headings the page has (from
+ *   servers without changed lines). Without a match, the page stays at the top.
  */
-let sectionTimer: ReturnType<typeof setTimeout> | undefined
-onBeforeUnmount(() => clearTimeout(sectionTimer))
+let changeTimer: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => clearTimeout(changeTimer))
 
-function showSection(names: string[], attempt = 0): void {
+type ChangeQuery = { ranges: ChangeRange[]; hash?: string } | { sections: string[] }
+
+/** What the query asks to show; undefined without (or with a broken) one. */
+function changeQuery(change: unknown, section: unknown): ChangeQuery | undefined {
+  if (typeof change === 'string') {
+    try {
+      const parsed = JSON.parse(change) as { ranges?: unknown; hash?: unknown }
+      if (Array.isArray(parsed.ranges))
+        return {
+          ranges: parsed.ranges as ChangeRange[],
+          hash: typeof parsed.hash === 'string' ? parsed.hash : undefined,
+        }
+    } catch {
+      // a broken link opens the page at the top
+    }
+    return undefined
+  }
+  if (section === undefined || section === null) return undefined
+  const names = (Array.isArray(section) ? section : [section]).filter((n): n is string => !!n)
+  return { sections: names }
+}
+
+async function targetsOf(query: ChangeQuery): Promise<ChangeTarget[]> {
+  if ('sections' in query) {
+    const section = sectionOf(text.value, query.sections)
+    return section ? [section] : []
+  }
+  // the hash is over the text as Automerge has it (the editor turns CRLF into LF)
+  const exact = session.value?.getText() ?? text.value
+  const matches = query.hash !== undefined && (await textHash(exact)) === query.hash
+  return placeRanges(exact, query.ranges, matches)
+}
+
+async function showChange(query: ChangeQuery, attempt = 0): Promise<void> {
   const view = editorView()
   const editorShown = mode.value !== 'preview'
   // the panes come a moment after the text is ready
   if ((editorShown && (!view || view.state.doc.length < text.value.length)) || !preview.value) {
-    if (attempt < 40) sectionTimer = setTimeout(() => showSection(names, attempt + 1), 50)
+    if (attempt < 40) changeTimer = setTimeout(() => void showChange(query, attempt + 1), 50)
     return
   }
-  const section = sectionOf(text.value, names)
-  if (!section) return
-  if (editorShown && view) flashLines(view, section.from, section.to)
-  if (mode.value !== 'edit') preview.value.flashLines(section.from - 1, section.to - 1)
+  const targets = await targetsOf(query)
+  if (targets.length === 0) return
+  if (editorShown) flashLines(view!, targets)
+  if (mode.value !== 'edit') preview.value?.flashLines(targets)
 }
 
 watch(
-  () => [ready.value && status.value?.connection !== 'connecting', route.query.section] as const,
-  ([isReady, query]) => {
-    if (!isReady || query === undefined || query === null) return
-    void router.replace({ query: { ...route.query, section: undefined } })
-    clearTimeout(sectionTimer)
-    showSection((Array.isArray(query) ? query : [query]).filter((n): n is string => !!n))
+  () =>
+    [
+      ready.value && status.value?.connection !== 'connecting',
+      route.query.change,
+      route.query.section,
+    ] as const,
+  ([isReady, change, section]) => {
+    if (!isReady || (change === undefined && section === undefined)) return
+    void router.replace({ query: { ...route.query, change: undefined, section: undefined } })
+    clearTimeout(changeTimer)
+    const query = changeQuery(change, section)
+    if (query) void showChange(query)
   },
   { flush: 'post' },
 )
