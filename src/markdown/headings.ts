@@ -69,3 +69,31 @@ export function headingsOf(markdown: string): Heading[] {
   }
   return headings
 }
+
+/** Lines of a section: its heading up to the line before the next heading of its level or above. */
+export interface SectionLines {
+  /** 1-based line of the heading. */
+  from: number
+  /** 1-based last line of the section, without the blank lines at its end. */
+  to: number
+}
+
+/**
+ * The section of the first of `names` that is a heading of the page (the first match if several
+ * headings have that name), as the feed names them (`summary.headings`). Undefined if none is.
+ */
+export function sectionOf(markdown: string, names: readonly string[]): SectionLines | undefined {
+  const headings = headingsOf(markdown)
+  const key = (text: string) => plain(text).replace(/\s+/g, ' ')
+  for (const name of names) {
+    const index = headings.findIndex((h) => key(h.text) === key(name))
+    if (index < 0) continue
+    const heading = headings[index]!
+    const next = headings.slice(index + 1).find((h) => h.level <= heading.level)
+    const lines = markdown.split('\n')
+    let to = next ? next.line - 1 : lines.length
+    while (to > heading.line && !lines[to - 1]!.trim()) to--
+    return { from: heading.line, to }
+  }
+  return undefined
+}

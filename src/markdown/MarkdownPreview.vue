@@ -131,6 +131,55 @@ watch(html, () =>
   }),
 )
 watch(() => props.anchor, showAnchor)
+
+/** How long a highlight stays (it fades out over that time); the same as in the editor. */
+const FLASH_MS = 2_000
+/** Lines to highlight once they are rendered (0-based, inclusive). */
+let pendingFlash: { from: number; to: number } | null = null
+
+/** The top-level blocks of lines `from` to `to`, if the text with them is rendered yet. */
+function blocksOf(root: HTMLElement, from: number, to: number): HTMLElement[] {
+  if (debounced.value !== props.text) return []
+  return [...root.querySelectorAll<HTMLElement>(':scope > [data-source-line]')].filter((el) => {
+    const line = Number(el.dataset.sourceLine)
+    return line >= from && line <= to
+  })
+}
+
+function applyFlash(): void {
+  const root = container.value
+  if (!pendingFlash || !root) return
+  const blocks = blocksOf(root, pendingFlash.from, pendingFlash.to)
+  if (blocks.length === 0) return
+  pendingFlash = null
+  const first = blocks[0]!.getBoundingClientRect()
+  const last = blocks.at(-1)!.getBoundingClientRect()
+  const top = root.scrollTop + first.top - root.getBoundingClientRect().top
+  root.scrollTo({ top: top - 16 })
+  // one band over the whole section, gaps between the blocks included; the next render of the
+  // text replaces it along with the rest
+  root.querySelector('.markdown-preview__flash')?.remove()
+  const band = document.createElement('div')
+  band.className = 'markdown-preview__flash'
+  band.dataset.testid = 'preview-flash'
+  band.setAttribute('aria-hidden', 'true')
+  band.style.top = `${top - 4}px`
+  band.style.height = `${Math.max(last.bottom, first.bottom) - first.top + 8}px`
+  root.append(band)
+  setTimeout(() => band.remove(), FLASH_MS)
+}
+watch(html, () => nextTick(applyFlash))
+
+defineExpose({
+  /**
+   * Scrolls source lines `from` to `to` (0-based) to the top and highlights them for a moment,
+   * once they are rendered.
+   */
+  flashLines(from: number, to: number): void {
+    pendingFlash = { from, to }
+    void nextTick(applyFlash)
+  },
+})
 </script>
 
 <template>
@@ -148,6 +197,7 @@ watch(() => props.anchor, showAnchor)
 <style>
 /* stylelint-disable color-no-hex -- the highlight of ==marks==, which is not in the theme */
 .markdown-preview {
+  position: relative;
   height: 100%;
   overflow-y: auto;
   padding: var(--app-space-2) var(--app-space-6) var(--app-space-8);
@@ -177,5 +227,19 @@ watch(() => props.anchor, showAnchor)
 }
 .v-theme--dark .markdown-preview {
   --md-mark-background: #6b5a00;
+}
+@keyframes markdown-preview-flash {
+  from {
+    background-color: rgba(var(--v-theme-primary), 0.22);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.markdown-preview__flash {
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
+  animation: markdown-preview-flash 2s ease-in forwards;
 }
 </style>

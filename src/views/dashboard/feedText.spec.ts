@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ActivityPerson, FeedEntry } from '@/api'
 
-import { detailsOf, nameOf, peopleText, verbOf } from './feedText'
+import { detailsOf, headingsText, nameOf, peopleText, verbOf } from './feedText'
 
 const person = (displayName: string): ActivityPerson => ({
   displayName,
@@ -39,11 +39,14 @@ describe('feed text', () => {
 
   it('says where, and what an edit touched', () => {
     expect(nameOf('Rezepte/Kuchen.md')).toBe('Kuchen')
-    expect(
-      detailsOf(
-        entry({ summary: { linesAdded: 3, linesRemoved: 1, headings: ['Zutaten', 'Backen'] } }),
-      ),
-    ).toBe('in Rezepte · +3 −1 · Zutaten, Backen')
+    const edited = entry({
+      summary: { linesAdded: 3, linesRemoved: 1, headings: ['Zutaten', 'Backen'] },
+    })
+    expect(detailsOf(edited)).toBe('in Rezepte')
+    expect(headingsText(edited)).toBe('In Zutaten, Backen')
+    expect(headingsText(entry({ summary: { linesAdded: 1, linesRemoved: 0, headings: [] } }))).toBe(
+      '',
+    )
     expect(detailsOf(entry({ kind: 'created', path: 'index.md' }))).toBe('in the top folder')
     expect(detailsOf(entry({ kind: 'moved', oldPath: 'Rezepte/Torte.md' }))).toBe(
       'was “Torte” · in Rezepte',

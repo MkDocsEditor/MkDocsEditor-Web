@@ -109,15 +109,19 @@ test('changes the order of the pins', async ({ browser }, testInfo) => {
   }
 })
 
-test('the feed says who changed which page', async ({ browser }, testInfo) => {
+test('the feed says who changed which page, and opens it at the change', async ({
+  browser,
+}, testInfo) => {
   test.skip(!(await features()).includes('feed'), 'the backend has no feed')
   const name = testName('Neuigkeit', testInfo)
   const id = await createDocument(name)
   const alice = await userPage(browser, USERS.alice)
   await openEditor(alice, id)
   await alice.locator('.cm-content').click()
-  // a section, not a level-1 heading: that would become the name of the page in the feed
-  await alice.keyboard.insertText('## Zutaten\n\nMehl und Zucker\n')
+  // a section, not a level-1 heading: that would become the name of the page in the feed; far
+  // enough down that opening the page there has to scroll
+  const filler = Array.from({ length: 80 }, (_, i) => `Zeile ${i + 1}\n`).join('\n')
+  await alice.keyboard.insertText(`${filler}\n## Zutaten\n\nMehl und Zucker\n`)
   await expect(alice.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
 
   const bob = await userPage(browser, USERS.bob)
@@ -126,7 +130,34 @@ test('the feed says who changed which page', async ({ browser }, testInfo) => {
     await bob.reload()
     await expect(entry).toContainText('edited', { timeout: 2000 })
   }).toPass({ timeout: 30_000 })
-  await expect(entry).toContainText('Zutaten')
+  await expect(entry.getByTestId('feed-headings')).toHaveText('In Zutaten')
+  await expect(entry.getByTestId('feed-added')).toHaveText(/^\+\d+$/)
+  // nothing was removed: a count of zero is left out
+  await expect(entry.getByTestId('feed-removed')).toHaveCount(0)
   await entry.click()
+  // the section is shown and highlighted, in whichever pane is on screen; the link is clean again
   await expect(bob).toHaveURL(new RegExp(`/document/${id}$`))
+  const editorFlash = bob.locator('.cm-flash-line:visible')
+  const previewFlash = bob.locator('.markdown-preview__flash:visible')
+  await expect(editorFlash.or(previewFlash).first()).toBeInViewport()
+  if (testInfo.project.name === 'desktop') {
+    // split: both panes show the section
+    await expect(editorFlash.first()).toContainText('Zutaten')
+    await expect(previewFlash).toHaveCount(1)
+  }
+  if (await previewFlash.count()) {
+    // one band from the heading to the end of the section
+    const band = (await previewFlash.boundingBox())!
+    const heading = (await bob
+      .getByTestId('markdown-preview')
+      .getByRole('heading', { name: 'Zutaten' })
+      .boundingBox())!
+    const text = (await bob
+      .getByTestId('markdown-preview')
+      .getByText('Mehl und Zucker')
+      .boundingBox())!
+    expect(band.y).toBeLessThanOrEqual(heading.y)
+    expect(band.y + band.height).toBeGreaterThanOrEqual(text.y + text.height)
+  }
+  await expect(editorFlash.or(previewFlash)).toHaveCount(0, { timeout: 5_000 })
 })
