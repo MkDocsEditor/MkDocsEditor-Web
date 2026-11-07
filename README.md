@@ -59,13 +59,17 @@ together, in real time, from a phone or a desktop browser. It talks to the
   moving your cursor. Scrolling pauses it for 5 seconds, and for up to 40 seconds if you scroll again
   right after it resumed. Typing ends it. A user who leaves stays as a faint cursor for as long as
   the server says (60 seconds), and following ends when that is gone. Every tab and device counts by
-  itself, also your own, so you can follow yourself on another device. Under More → My cursor color,
-  a tab can get its own cursor color for the others, without changing the one of your account.
+  itself, also your own, so you can follow yourself on another device. Under View → My cursor
+  color, a tab can get its own cursor color for the others, without changing the one of your
+  account.
 - Editing works offline. Changes are kept in the browser and merged after the reconnect, even
   when the server lost its state meanwhile. The connection state is always visible, and text
   is never thrown away silently. Each account has its own local copies, so unsynced edits only
   ever sync under the account that made them.
 - "Who wrote what?" highlights who wrote which part of a page.
+- The View panel (the tune icon next to an open page) changes how the editor looks, live and next
+  to the text: who wrote what, sync scrolling in split view, line numbers, and the cursor color of
+  this tab. It writes the same values as Settings → Editor. The ⋮ menu keeps the actions.
 - Version history (when the backend has git enabled): see what each version changed, compare
   it with the current text, and restore it.
 - Preview close to MkDocs Material: admonitions, task lists, footnotes, tables, definition
