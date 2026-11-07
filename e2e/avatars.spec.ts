@@ -27,6 +27,13 @@ test('a profile picture shows wherever its user does', async ({ browser }, testI
   await expect(card.getByTestId('avatar-image')).toBeVisible()
   await expect(card.getByTestId('avatar-upload')).toHaveText('Replace')
 
+  // the own account button and its menu, also after a reload
+  await bob.reload()
+  await expect(bob.getByTestId('account-menu').getByTestId('avatar-image')).toBeVisible()
+  await bob.getByTestId('account-menu').click()
+  await expect(bob.getByTestId('menu-avatar').getByTestId('avatar-image')).toBeVisible()
+  await bob.keyboard.press('Escape')
+
   // in the editor of someone else: the online list and the cursor flag
   const id = await createDocument(`Avatar ${testInfo.project.name} ${testInfo.retry}`)
   await openEditor(bob, id)
@@ -41,4 +48,5 @@ test('a profile picture shows wherever its user does', async ({ browser }, testI
   await card.getByTestId('avatar-remove').click()
   await expect(card.getByTestId('avatar-image')).toBeHidden()
   await expect(card.getByTestId('avatar-upload')).toHaveText('Upload picture')
+  await expect(bob.getByTestId('account-menu').getByTestId('avatar-image')).toBeHidden()
 })

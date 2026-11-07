@@ -34,7 +34,14 @@ watchEffect((onCleanup) => {
 </script>
 
 <template>
-  <v-avatar :color="url ? undefined : color" :size="size" class="user-avatar">
+  <!-- a picture gets a ring in the colour of the person: their cursor has the same colour -->
+  <v-avatar
+    :color="url ? undefined : color"
+    :size="size"
+    class="user-avatar"
+    :class="{ 'user-avatar--ring': url && color !== 'grey' }"
+    :style="url ? { '--user-avatar-ring': color } : undefined"
+  >
     <img v-if="url" :src="url" alt="" class="user-avatar__image" data-testid="avatar-image" />
     <span v-else class="user-avatar__initials">{{ initialsOf(name) }}</span>
     <slot />
@@ -46,6 +53,11 @@ watchEffect((onCleanup) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.user-avatar--ring {
+  /* a thin ring with a gap: it reads as a frame, not as a status, on any background */
+  outline: 1.5px solid var(--user-avatar-ring);
+  outline-offset: 1.5px;
 }
 .user-avatar__initials {
   color: white;

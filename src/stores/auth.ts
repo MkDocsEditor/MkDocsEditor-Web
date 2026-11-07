@@ -13,7 +13,10 @@ const USER_KEY = 'mkdocseditor.user'
 /** Where older versions kept the Basic auth password. Removed on start. */
 const LEGACY_CREDENTIALS_KEY = 'mkdocseditor.credentials'
 
-export type SignedInUser = Pick<UserInfo, 'username' | 'displayName' | 'role' | 'color'> & {
+export type SignedInUser = Pick<
+  UserInfo,
+  'username' | 'displayName' | 'role' | 'color' | 'avatar'
+> & {
   id?: string
   secondFactorSetupRequired?: boolean
 }
@@ -25,6 +28,7 @@ function fromWhoAmI(who: WhoAmI | UserInfo): SignedInUser {
     displayName: who.displayName || who.username,
     role: who.role ?? 'reader',
     color: who.color ?? '',
+    avatar: who.avatar ?? null,
     secondFactorSetupRequired: who.secondFactorSetupRequired ?? false,
   }
 }

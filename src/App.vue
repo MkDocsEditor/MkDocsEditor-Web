@@ -18,6 +18,7 @@ import { ApiError } from '@/api'
 import { startPage } from '@/composables/useStartPage'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import TransferIndicator from '@/components/common/TransferIndicator.vue'
 import MoveDialog from '@/components/move/MoveDialog.vue'
 import DeleteDialogs from '@/components/tree/DeleteDialogs.vue'
@@ -214,19 +215,37 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               offset-y="8"
               data-testid="access-requests-badge"
             >
-              <v-btn
-                v-bind="props"
-                :icon="mdiAccountCircle"
-                aria-label="Account"
-                data-testid="account-menu"
-              />
+              <v-btn v-bind="props" icon aria-label="Account" data-testid="account-menu">
+                <UserAvatar
+                  v-if="auth.user"
+                  :name="auth.displayName || auth.username"
+                  :color="auth.user.color || undefined"
+                  :account-id="auth.user.id"
+                  :avatar="auth.user.avatar"
+                  size="32"
+                  class="text-label-medium"
+                />
+                <v-icon v-else :icon="mdiAccountCircle" />
+              </v-btn>
             </v-badge>
           </template>
           <v-list>
             <v-list-item
               :title="auth.displayName || auth.username"
               :subtitle="auth.role ? `signed in (${roleLabel(auth.role)})` : 'signed in'"
-            />
+            >
+              <template v-if="auth.user" #prepend>
+                <UserAvatar
+                  :name="auth.displayName || auth.username"
+                  :color="auth.user.color || undefined"
+                  :account-id="auth.user.id"
+                  :avatar="auth.user.avatar"
+                  size="40"
+                  class="mr-4 text-label-large"
+                  data-testid="menu-avatar"
+                />
+              </template>
+            </v-list-item>
             <v-divider />
             <v-list-item
               :prepend-icon="mdiAccountCog"
