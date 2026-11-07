@@ -167,17 +167,25 @@ async function movePin(scope: PinScope, pin: Pin, to: number): Promise<void> {
 }
 
 /** Where an entry leads: the page, or the folder found by its path, while it still exists. */
+/**
+ * Where an edit opens its page: at the lines it changed (servers with `feed-ranges`), else at
+ * the first section it touched that is still there. No changed lines: at the top.
+ */
+function changeQueryOf(entry: FeedEntry): Record<string, string | string[]> {
+  const summary = entry.kind === 'edited' ? entry.summary : undefined
+  if (!summary) return {}
+  if (summary.ranges)
+    return summary.ranges.length > 0
+      ? { change: JSON.stringify({ hash: summary.textHash, ranges: summary.ranges }) }
+      : {}
+  return summary.headings.length > 0 ? { section: summary.headings } : {}
+}
+
 function entryLink(entry: FeedEntry) {
   if (entry.kind === 'deleted') return undefined
   if (entry.itemType === 'document') {
     if (!entry.documentId) return undefined
-    // an edit opens the page at the first section it touched that is still there
-    const headings = entry.kind === 'edited' ? (entry.summary?.headings ?? []) : []
-    return {
-      name: 'document',
-      params: { id: entry.documentId },
-      query: headings.length > 0 ? { section: headings } : {},
-    }
+    return { name: 'document', params: { id: entry.documentId }, query: changeQueryOf(entry) }
   }
   const section = tree.byPath(entry.path)
   return section?.type === 'section' ? { name: 'section', params: { id: section.id } } : undefined

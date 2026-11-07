@@ -264,7 +264,24 @@ export interface FeedEntry {
   oldPath?: string
   authors: ActivityPerson[]
   /** Only for `edited`: the headings of the sections the change touched, in document order. */
-  summary?: { linesAdded: number; linesRemoved: number; headings: string[] }
+  summary?: {
+    linesAdded: number
+    linesRemoved: number
+    headings: string[]
+    /** `feed-ranges`: the first 16 hex digits of SHA-256 over the text after the edit. */
+    textHash?: string
+    /** `feed-ranges`: the changed lines; null for entries recorded before, [] for none. */
+    ranges?: FeedRange[] | null
+  }
+}
+
+/** Lines an edit changed, see `docs/dashboard.md` of the backend, "Changed lines". */
+export interface FeedRange {
+  line: number
+  count: number
+  heading: string | null
+  headingOccurrence: number
+  offset: number
 }
 
 export interface FeedPage {

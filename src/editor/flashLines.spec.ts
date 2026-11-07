@@ -13,15 +13,19 @@ describe('flashLines', () => {
       state: EditorState.create({ doc: 'a\nb\nc\nd', selection: { anchor: 1 } }),
       parent: document.body,
     })
-    flashLines(view, 2, 3)
+    flashLines(view, [
+      { from: 2, to: 3 },
+      { from: 4, to: 4, removal: true },
+    ])
     expect([...view.dom.querySelectorAll('.cm-flash-line')].map((l) => l.textContent)).toEqual([
       'b',
       'c',
     ])
+    expect(view.dom.querySelector('.cm-flash-removed')?.textContent).toBe('d')
     expect(view.state.doc.toString()).toBe('a\nb\nc\nd')
     expect(view.state.selection.main.anchor).toBe(1)
     vi.advanceTimersByTime(FLASH_MS)
-    expect(view.dom.querySelectorAll('.cm-flash-line')).toHaveLength(0)
+    expect(view.dom.querySelectorAll('.cm-flash-line, .cm-flash-removed')).toHaveLength(0)
     view.destroy()
   })
 })
