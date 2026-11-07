@@ -201,7 +201,11 @@ onMounted(async () => {
     }
     // not while offline: the last user is only trusted then, and the wiki would send back here
     if (auth.isLoggedIn && !auth.offline) {
-      await goToReturnPath(router, returnPathOf(route.query))
+      // the wiki lets no one in who still has to set up a second factor: that comes first,
+      // else the two would send the browser back and forth
+      if (auth.secondFactorSetupRequired)
+        await router.replace({ name: 'settings', params: { section: 'security' } })
+      else await goToReturnPath(router, returnPathOf(route.query))
       return
     }
   }

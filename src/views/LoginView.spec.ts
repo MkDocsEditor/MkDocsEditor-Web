@@ -215,6 +215,17 @@ describe('LoginView', () => {
       wrapper.unmount()
     })
 
+    it('sends an account without the required second factor to its setup, not back', async () => {
+      backend({
+        'GET /auth/whoami/': () =>
+          json({ ...sessionResponse().user, secondFactorSetupRequired: true }),
+      })
+      const { wrapper, router } = await mount('/login?next=%2Fview%2FHaus%2F')
+      expect(assign).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.fullPath).toBe('/settings/security')
+      wrapper.unmount()
+    })
+
     it('keeps the page after the passkey step', async () => {
       backend({
         'GET /auth/whoami/': () => json({ code: 'unauthenticated', message: '' }, 401),
