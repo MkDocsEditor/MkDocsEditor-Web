@@ -20,19 +20,29 @@ together, in real time, from a phone or a desktop browser. It talks to the
 - Share a page with a link (`/join/{id}?from={account}`). It holds no secret and grants nothing: it
   follows a sender who is still there, and otherwise opens the editor where the sender was last.
   Someone without an account can sign in or ask for access, and an admin decides under
-  Admin → Requests.
-- Account page: profile, colour and picture, password, authenticator app, recovery codes, passkeys,
-  and the signed-in devices (sign out one or all others).
-- Connect the Android app: Account → Devices creates a single-use link (5 minutes), shown as
+  Settings → Access requests.
+- One settings page (`/settings`, from the account menu), grouped like the Android app:
+  - Account: Profile (colour and picture), Sign-in and security (password, passkeys,
+    authenticator app, recovery codes), Sessions (the signed-in devices: sign out one or all
+    others).
+  - This browser: Editor (line numbers, who wrote what) and Appearance (theme, start page, files
+    in the tree).
+  - Administration, for admins: Users, Invitations, Access requests, Audit log, Server.
+  - About: the versions of the app and the server.
+
+  Wide screens show the sections in a side column; narrow ones show the list first. The old
+  `/account/…` and `/admin/…` addresses lead to the matching section.
+
+- Connect the Android app: Settings → Sessions creates a single-use link (5 minutes), shown as
   a QR code to scan with the phone's camera. On a phone, the first sign-in offers to open the
   app directly. Links the app does not take land on `/connect`, which explains how to install
   the app with [Obtainium](https://obtainium.imranr.dev) (with pre-releases turned on).
-- Admin pages: users (role, disable, delete, reset link), invites with QR code, audit log, and
-  "second factor required" for everyone.
+- Administration: users (role, disable, delete, reset link), invitations with QR code, audit log,
+  and "second factor required" for everyone.
 - "What’s going on" is the start page: the wiki's `index.md` first, then the pinned pages (for
   everyone, set by editors and admins, and your own), then the changes of all pages: who edited,
   created, moved or deleted what, when and where, with the headings an edit touched. Pin a page
-  from its menu. Account menu → Start page switches `/` back to the files on this device; they
+  from its menu. Settings → Appearance → Start page switches `/` back to the files in this browser; they
   are always at `/files`.
 - Browse the wiki as a folder tree, search names and page text (Ctrl+K), create pages and
   folders. Rename, move and delete folders, pages and files from the ⋮ menu of an entry (in the

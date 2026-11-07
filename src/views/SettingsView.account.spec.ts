@@ -12,7 +12,7 @@ import type { RecordedRequest } from '@/test/fetchMock'
 import { account, authStatus, user } from '@/test/fixtures'
 import { mountWithPlugins } from '@/test/mount'
 
-import AccountView from './AccountView.vue'
+import SettingsView from './SettingsView.vue'
 
 const passkeys = vi.hoisted(() => ({
   createPasskey: vi.fn<(options: unknown) => Promise<unknown>>(async () => ({ id: 'new-cred' })),
@@ -63,7 +63,7 @@ async function mount(tab: string, routes: Routes = {}, info: Partial<AccountInfo
   })
   setApiClient(new ApiClient({ baseUrl: 'http://backend', fetchFn: mock.fetchFn }))
   const Page = defineComponent({
-    render: () => [h(AccountView, { tab }), h(ReauthDialog)],
+    render: () => [h(SettingsView, { section: tab }), h(ReauthDialog)],
   })
   const result = await mountWithPlugins(Page)
   const auth = useAuthStore()
@@ -93,7 +93,7 @@ async function confirmReauth(password = 'my password!'): Promise<void> {
   await flushPromises()
 }
 
-describe('AccountView', () => {
+describe('SettingsView: account', () => {
   it('offers a reload and the password when the passkey provider fails', async () => {
     passkeys.getPasskey.mockRejectedValueOnce(new PasskeyProviderError('Something went wrong.'))
     const reload = vi.fn()

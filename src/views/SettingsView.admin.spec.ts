@@ -11,7 +11,7 @@ import type { RecordedRequest } from '@/test/fetchMock'
 import { account, authStatus, user } from '@/test/fixtures'
 import { mountWithPlugins } from '@/test/mount'
 
-import AdminView from './AdminView.vue'
+import SettingsView from './SettingsView.vue'
 
 type Routes = Parameters<typeof createFetchMock>[0]
 
@@ -54,7 +54,9 @@ async function mount(tab: string, routes: Routes) {
     ...routes,
   })
   setApiClient(new ApiClient({ baseUrl: 'http://backend', fetchFn: mock.fetchFn }))
-  const Page = defineComponent({ render: () => [h(AdminView, { tab }), h(ReauthDialog)] })
+  const Page = defineComponent({
+    render: () => [h(SettingsView, { section: tab }), h(ReauthDialog)],
+  })
   const result = await mountWithPlugins(Page)
   useAuthStore().signedIn(user())
   await flushPromises()
@@ -76,7 +78,7 @@ async function chooseOption(text: string): Promise<void> {
   await flushPromises()
 }
 
-describe('AdminView', () => {
+describe('SettingsView: administration', () => {
   beforeEach(() => localStorage.clear())
   afterEach(() => {
     document.body.innerHTML = ''
@@ -235,7 +237,7 @@ describe('AdminView', () => {
 
   it('shows a failed load in place, with a retry that works', async () => {
     let up = false
-    const { wrapper } = await mount('settings', {
+    const { wrapper } = await mount('server', {
       'GET /admin/settings/': () =>
         up ? json({ require2FA: false }) : json({ message: 'stack trace' }, 500),
     })
@@ -251,7 +253,7 @@ describe('AdminView', () => {
   })
 
   it('switches require2FA', async () => {
-    const { wrapper, mock } = await mount('settings', {
+    const { wrapper, mock } = await mount('server', {
       'GET /admin/settings/': () => json({ require2FA: false }),
       'PATCH /admin/settings/': (request) => json(body(request)),
     })

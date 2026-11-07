@@ -61,25 +61,35 @@ describe('router guard', () => {
     expect(router.currentRoute.value.hash).toBe('#mdl_abc')
   })
 
-  it('keeps non-admins out of the admin pages', async () => {
+  it('keeps non-admins out of the administration', async () => {
     backend(user({ role: 'editor' }))
     const router = buildRouter(createMemoryHistory())
+    await router.push('/settings/users')
+    expect(router.currentRoute.value.fullPath).toBe('/settings')
     await router.push('/admin/users')
-    expect(router.currentRoute.value.name).toBe('home')
+    expect(router.currentRoute.value.fullPath).toBe('/settings')
+    await router.push('/settings/appearance')
+    expect(router.currentRoute.value.fullPath).toBe('/settings/appearance')
   })
 
-  it('lets admins into the admin pages', async () => {
+  it('lets admins into the administration, also from the old addresses', async () => {
     backend(user({ role: 'admin' }))
     const router = buildRouter(createMemoryHistory())
     await router.push('/admin/invites')
-    expect(router.currentRoute.value.name).toBe('admin')
-    expect(router.currentRoute.value.params.tab).toBe('invites')
+    expect(router.currentRoute.value.name).toBe('settings')
+    expect(router.currentRoute.value.params.section).toBe('invites')
+    await router.push('/admin/settings')
+    expect(router.currentRoute.value.params.section).toBe('server')
+    await router.push('/account/sessions')
+    expect(router.currentRoute.value.fullPath).toBe('/settings/sessions')
+    await router.push('/account')
+    expect(router.currentRoute.value.fullPath).toBe('/settings/profile')
   })
 
   it('sends restricted sessions to the 2FA setup', async () => {
     backend(user({ secondFactorSetupRequired: true }))
     const router = buildRouter(createMemoryHistory())
     await router.push('/document/d1')
-    expect(router.currentRoute.value.fullPath).toBe('/account/security')
+    expect(router.currentRoute.value.fullPath).toBe('/settings/security')
   })
 })

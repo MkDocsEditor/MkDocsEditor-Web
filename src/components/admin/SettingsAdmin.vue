@@ -41,7 +41,7 @@ onMounted(load)
 </script>
 
 <template>
-  <v-card title="Settings" data-testid="settings-admin">
+  <v-card title="Sign-in and access" data-testid="settings-admin">
     <v-card-text v-if="settings">
       <v-switch
         :model-value="settings.require2FA"
@@ -70,8 +70,8 @@ onMounted(load)
           @update:model-value="save({ accessRequestsEnabled: $event === true })"
         />
         <p class="text-medium-emphasis mt-2">
-          People with a link to a page can ask for an invite. You decide each request under
-          Requests.
+          People with a link to a page can ask for an invite. You decide each request under Access
+          requests.
         </p>
       </template>
     </v-card-text>

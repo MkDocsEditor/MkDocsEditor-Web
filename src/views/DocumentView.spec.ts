@@ -2,6 +2,7 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient } from '@/api'
+import { authorHighlight } from '@/composables/preferences'
 import { useTreeStore } from '@/stores/tree'
 import { createFakeSession } from '@/test/fakeSession'
 import { createFetchMock, json } from '@/test/fetchMock'
@@ -68,9 +69,12 @@ describe('DocumentView', () => {
     expect(mode(first.wrapper)).toBe('marker')
     first.wrapper.unmount()
 
-    localStorage.setItem('mkdocseditor.authorHighlight', JSON.stringify('strip'))
+    // the same setting as under Settings > Editor, kept in this browser
+    authorHighlight.value = 'strip'
     const second = await setup()
     expect(mode(second.wrapper)).toBe('strip')
+    expect(localStorage.getItem('mkdocseditor.authorHighlight')).toBe('"strip"')
+    authorHighlight.value = 'marker'
   })
 
   it('shows editor and preview of the session text and follows remote edits', async () => {

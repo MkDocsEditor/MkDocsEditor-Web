@@ -172,7 +172,7 @@ async function passkeyCreated(): Promise<void> {
 
 async function goOn(): Promise<void> {
   if (auth.secondFactorSetupRequired)
-    await router.replace({ name: 'account', params: { tab: 'security' } })
+    await router.replace({ name: 'settings', params: { section: 'security' } })
   else await router.replace({ name: 'home' })
 }
 
@@ -272,7 +272,7 @@ watch(
         <v-btn
           :prepend-icon="mdiShieldKey"
           variant="outlined"
-          :to="{ name: 'account', params: { tab: 'security' } }"
+          :to="{ name: 'settings', params: { section: 'security' } }"
           data-testid="done-setup-totp"
         >
           Set up an authenticator app
