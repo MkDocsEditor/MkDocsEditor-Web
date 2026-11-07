@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { createDocument, login, openEditor, userPage } from './helpers'
+import { createDocument, login, openEditor, testName, userPage } from './helpers'
 import { BACKEND_URL, USERS } from './ports'
 
 const LINES = Array.from({ length: 300 }, (_, i) => `Zeile ${i + 1}`).join('\n')
@@ -26,7 +26,7 @@ test.describe('following another user', () => {
 
   test('follows, pauses on manual input, and can be stopped', async ({ browser }, testInfo) => {
     await requireJoinPresence()
-    const id = await createDocument(`Follow ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow', testInfo))
     const leader = await userPage(browser, USERS.alice)
     await openEditor(leader, id)
     await leader.locator('.cm-content').click()
@@ -62,7 +62,7 @@ test.describe('following another user', () => {
 
   test('ends without a note when the follower types', async ({ browser }, testInfo) => {
     await requireJoinPresence()
-    const id = await createDocument(`Follow typing ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow typing', testInfo))
     const leader = await userPage(browser, USERS.alice)
     await openEditor(leader, id)
     await leader.locator('.cm-content').click()
@@ -80,7 +80,7 @@ test.describe('following another user', () => {
 
   test('follows the own account on another device', async ({ browser }, testInfo) => {
     await requireInstances()
-    const id = await createDocument(`Follow own ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow own', testInfo))
     const device = await userPage(browser, USERS.alice)
     await openEditor(device, id)
     await device.locator('.cm-content').click()
@@ -125,7 +125,7 @@ test.describe('following another user', () => {
 
   test('treats two tabs of one browser as two instances', async ({ browser }, testInfo) => {
     await requireInstances()
-    const id = await createDocument(`Follow tabs ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow tabs', testInfo))
     const first = await userPage(browser, USERS.alice)
     await openEditor(first, id)
     await first.locator('.cm-content').click()
@@ -145,7 +145,7 @@ test.describe('following another user', () => {
 
   test('shows the color an instance chose to the others', async ({ browser }, testInfo) => {
     await requireInstances()
-    const id = await createDocument(`Follow color ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow color', testInfo))
     const chooser = await userPage(browser, USERS.alice)
     await openEditor(chooser, id)
     await chooser.locator('.cm-content').click()
@@ -178,7 +178,7 @@ test.describe('following another user', () => {
     browser,
   }, testInfo) => {
     await requireInstances()
-    const id = await createDocument(`Follow reload ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow reload', testInfo))
     const page = await userPage(browser, USERS.alice)
     await openEditor(page, id)
     await page.locator('.cm-content').click()
@@ -194,7 +194,7 @@ test.describe('following another user', () => {
 
   test('stays on the ghost of a user who has left', async ({ browser }, testInfo) => {
     await requireJoinPresence()
-    const id = await createDocument(`Follow ghost ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow ghost', testInfo))
     const leader = await userPage(browser, USERS.alice)
     await openEditor(leader, id)
     await leader.locator('.cm-content').click()
@@ -219,7 +219,7 @@ test.describe('following another user', () => {
 
   test('follows someone who only reads the preview', async ({ browser }, testInfo) => {
     await requireJoinPresence()
-    const id = await createDocument(`Follow preview ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Follow preview', testInfo))
     const leader = await userPage(browser, USERS.alice)
     await openEditor(leader, id)
     await leader.locator('.cm-content').click()
@@ -244,7 +244,7 @@ test.describe('following another user', () => {
   })
 
   test('scrolls editor and preview together in split mode', async ({ page }, testInfo) => {
-    const id = await createDocument(`Split ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Split', testInfo))
     await login(page)
     await openEditor(page, id)
     await page.getByRole('button', { name: 'Edit and preview', exact: true }).click()
@@ -253,6 +253,8 @@ test.describe('following another user', () => {
     await page.keyboard.press('ControlOrMeta+Home')
     const preview = page.getByTestId('markdown-preview')
     const editor = page.locator('.cm-scroller')
+    // the preview renders a moment after the typing; before, it has nothing to scroll
+    await expect(preview.getByText('Zeile 300', { exact: true })).toBeAttached()
 
     // the preview drives: the editor shows its reading line at the same height
     await preview.hover()

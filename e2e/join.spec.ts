@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 import { accountMenu, ADMIN, devicePage, uniqueUsername } from './accounts'
-import { createDocument, login, openEditor, userPage } from './helpers'
+import { createDocument, login, openEditor, testName, userPage } from './helpers'
 import { BACKEND_URL, USERS } from './ports'
 
 /** Older backends lack this; the backend clone of CI follows its master branch. */
@@ -29,7 +29,7 @@ async function senderOn(page: Page, id: string): Promise<void> {
 test.describe('join links', () => {
   test('lead into the editor at the position of the sender', async ({ browser }, testInfo) => {
     await requireFeature('join-presence')
-    const id = await createDocument(`Join ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Join', testInfo))
     const sender = await userPage(browser, USERS.alice)
     await senderOn(sender, id)
 
@@ -70,7 +70,7 @@ test.describe('join links', () => {
 
   test('find the last position of a sender who has left', async ({ browser }, testInfo) => {
     await requireFeature('join-presence')
-    const id = await createDocument(`Join left ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Join left', testInfo))
     const sender = await userPage(browser, USERS.alice)
     await senderOn(sender, id)
     const from = await sender.evaluate(
@@ -87,7 +87,7 @@ test.describe('join links', () => {
 
   test('say so when the sender is not there', async ({ browser }, testInfo) => {
     await requireFeature('join-presence')
-    const id = await createDocument(`Join gone ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Join gone', testInfo))
     const page = await userPage(browser, USERS.bob)
     await page.goto(`/join/${id}?from=somebody-else`)
     await expect(page.locator('.cm-content')).toBeVisible({ timeout: 15_000 })
@@ -99,7 +99,7 @@ test.describe('join links', () => {
   })
 
   test('come back after the sign-in', async ({ browser }, testInfo) => {
-    const id = await createDocument(`Join login ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Join login', testInfo))
     const page = await devicePage(browser, testInfo)
     await page.goto(`/join/${id}?from=somebody`)
     await page.getByTestId('join-sign-in').click()
@@ -120,7 +120,7 @@ test.describe('join links', () => {
     browser,
   }, testInfo) => {
     await requireFeature('access-requests')
-    const id = await createDocument(`Join ask ${testInfo.project.name} ${testInfo.retry}`)
+    const id = await createDocument(testName('Join ask', testInfo))
     const name = `Anna <b>${testInfo.project.name}</b>`
     const guest = await devicePage(browser, testInfo)
     await guest.goto(`/join/${id}?from=somebody`)

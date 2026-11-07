@@ -64,6 +64,8 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
 
   return {
     session,
+    /** Writable, unlike `session.status`. */
+    status,
     localChanges,
     selections,
     viewports,

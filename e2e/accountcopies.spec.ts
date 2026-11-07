@@ -15,12 +15,7 @@ import {
   userPage,
 } from './helpers'
 import { USERS } from './ports'
-import {
-  browserNow,
-  makeStoredCopyOwnerless,
-  storedCopyKeys,
-  storedCopyWritten,
-} from './storedCopies'
+import { makeStoredCopyOwnerless, storedCopyKeys, storedCopyText } from './storedCopies'
 import { blockableDocumentSockets } from './tabs'
 
 const OFFLINE = ' Von Alice offline.'
@@ -39,10 +34,9 @@ async function aliceLeavesUnsyncedEdits(page: Page, id: string) {
     'title',
     'Offline – changes stay here',
   )
-  const edited = await browserNow(page)
   await logout(page)
   // the copy is written when the session closes
-  await storedCopyWritten(page, id, edited)
+  await expect.poll(() => storedCopyText(page, id)).toBe(`Server.${OFFLINE}`)
   sockets.unblock()
 }
 

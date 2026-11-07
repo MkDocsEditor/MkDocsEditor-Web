@@ -1,5 +1,5 @@
-import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import * as A from '@automerge/automerge'
 
 /** The keys of the stored copies in the browser. */
 export function storedCopyKeys(page: Page): Promise<string[]> {
@@ -52,37 +52,29 @@ export function makeStoredCopyOwnerless(page: Page, documentId: string): Promise
 }
 
 /**
- * Waits until the stored copy of a document was written after `time` (`browserNow`). Copies are
- * written a moment after the last change.
+ * The text of the stored copy of a document, or null without one. Read from the copy itself:
+ * when it was written says nothing about which edits it holds, a copy can be written while
+ * typing (the switch to offline writes one, for example).
  */
-export async function storedCopyWritten(
-  page: Page,
-  documentId: string,
-  time: number,
-): Promise<void> {
-  const savedAt = () =>
-    page.evaluate(
-      (id) =>
-        new Promise<number>((resolve, reject) => {
-          const open = indexedDB.open('mkdocseditor')
-          open.onerror = () => reject(open.error as Error)
-          open.onsuccess = () => {
-            const store = open.result.transaction('documents').objectStore('documents')
-            const all = store.getAll()
-            all.onerror = () => reject(all.error as Error)
-            all.onsuccess = () => {
-              open.result.close()
-              const copies = all.result as { documentId: string; savedAt: number }[]
-              resolve(copies.find((copy) => copy.documentId.endsWith(id))?.savedAt ?? 0)
-            }
+export async function storedCopyText(page: Page, documentId: string): Promise<string | null> {
+  const bytes = await page.evaluate(
+    (id) =>
+      new Promise<number[] | null>((resolve, reject) => {
+        const open = indexedDB.open('mkdocseditor')
+        open.onerror = () => reject(open.error as Error)
+        open.onsuccess = () => {
+          const store = open.result.transaction('documents').objectStore('documents')
+          const all = store.getAll()
+          all.onerror = () => reject(all.error as Error)
+          all.onsuccess = () => {
+            open.result.close()
+            const copies = all.result as { documentId: string; bytes: Uint8Array }[]
+            const copy = copies.find((c) => c.documentId.endsWith(id))
+            resolve(copy ? [...copy.bytes] : null)
           }
-        }),
-      documentId,
-    )
-  await expect.poll(savedAt).toBeGreaterThanOrEqual(time)
-}
-
-/** The clock of the browser, which is the one stored copies are stamped with. */
-export function browserNow(page: Page): Promise<number> {
-  return page.evaluate(() => Date.now())
+        }
+      }),
+    documentId,
+  )
+  return bytes ? A.load<{ content: string }>(new Uint8Array(bytes)).content : null
 }
