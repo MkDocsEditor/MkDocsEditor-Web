@@ -35,6 +35,8 @@ export interface Excerpt {
 
 export interface SearchResult {
   item: DocumentModel | SectionModel | ResourceModel
+  /** The name to show: the title of a page from its front matter, else the name of the item. */
+  title: string
   /** Names of the folders it is in, without the root. */
   path: string[]
   /** Matches in the text of a page, which can be more than the excerpts show. */
@@ -176,7 +178,7 @@ export function sortByRelevance(results: SearchResult[], searchTerm: string): Se
   const words = wordsOf(searchTerm)
   const whole = words.join(' ')
   const nameRank = (result: SearchResult): number => {
-    const name = normalize(result.item.name)
+    const name = normalize(result.title)
     if (name === whole) return 0
     if (name.startsWith(whole)) return 1
     return words.every((word) => name.includes(word)) ? 2 : 3
@@ -185,13 +187,20 @@ export function sortByRelevance(results: SearchResult[], searchTerm: string): Se
     (a, b) =>
       nameRank(a) - nameRank(b) ||
       b.matchCount - a.matchCount ||
-      a.item.name.toLowerCase().localeCompare(b.item.name.toLowerCase(), 'en'),
+      a.title.toLowerCase().localeCompare(b.title.toLowerCase(), 'en'),
   )
+}
+
+export interface SearchOptions {
+  /** The title of a page from its front matter, searched besides its name. */
+  title?: (id: string) => string | undefined
+  /** Pages whose text is left out (front matter `search: exclude: true`); their names count. */
+  textExcluded?: (id: string) => boolean
 }
 
 /**
  * Searches the names of all items and the text of all stored pages. An item matches when every
- * word of the term is found; for a page, each word can be in its name or in its text.
+ * word of the term is found; for a page, each word can be in its name, title or text.
  *
  * @returns the best results, and how many there are in total
  */
@@ -199,6 +208,7 @@ export function searchWiki(
   index: TreeIndex,
   pageText: (id: string) => string | undefined,
   searchTerm: string,
+  options: SearchOptions = {},
 ): { results: SearchResult[]; total: number } {
   const term = searchTerm.trim()
   if (!isSearchable(term)) return { results: [], total: 0 }
@@ -206,11 +216,15 @@ export function searchWiki(
   const found: SearchResult[] = []
   for (const item of index.items.values()) {
     if (!index.parents.has(item.id)) continue // the root itself
-    const text = item.type === 'document' ? normalize(pageText(item.id) ?? '') : ''
-    const searched = `${normalize(item.name)}\n${text}`
+    const isPage = item.type === 'document'
+    const title = (isPage && options.title?.(item.id)) || item.name
+    const text =
+      isPage && !options.textExcluded?.(item.id) ? normalize(pageText(item.id) ?? '') : ''
+    const searched = `${normalize(item.name)}\n${normalize(title)}\n${text}`
     if (!words.every((word) => searched.includes(word))) continue
     found.push({
       item,
+      title,
       path: [],
       matchCount: words.reduce((sum, word) => sum + countIn(text, word), 0),
       excerpts: [],

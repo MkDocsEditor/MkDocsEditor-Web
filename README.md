@@ -75,6 +75,9 @@ together, in real time, from a phone or a desktop browser. It talks to the
 - Preview close to MkDocs Material: admonitions, task lists, footnotes, tables, definition
   lists, code highlighting, and images and links relative to the page. Edit, split and preview
   modes.
+- Front matter as in Material: the `title` names the page in the tree, lists, search and the
+  editor; `description`, `icon`, `status` and `tags` show where they fit. `search: exclude`
+  leaves the text of a page out of the search. Broken YAML shows a warning in the preview.
 - The file browser updates live when pages change elsewhere, and shows who has which page
   open.
 - Link to the published wiki page (optional).

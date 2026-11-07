@@ -4,7 +4,9 @@ import { computed } from 'vue'
 
 import type { SectionModel, TreeItem } from '@/api'
 import { colorFor, iconFor } from '@/services/icons'
+import { statusIcon, statusLabel } from '@/services/materialIcons'
 import { useMoveStore } from '@/stores/move'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import { useTreeStore } from '@/stores/tree'
 import { sortByName } from '@/services/treeIndex'
 
@@ -22,7 +24,17 @@ const props = defineProps<{
 const emit = defineEmits<{ toggle: [id: string]; navigate: [] }>()
 
 const subsections = computed(() => sortByName(props.section.subsections))
-const documents = computed(() => sortByName(props.section.documents))
+const pageMeta = usePageMetaStore()
+// listed by the name they show, the title from the front matter
+const documents = computed(() =>
+  sortByName(
+    props.section.documents.map((doc) => ({
+      doc,
+      name: pageMeta.title(doc),
+      status: pageMeta.meta(doc.id).status,
+    })),
+  ),
+)
 const resources = computed(() => (props.showFiles ? sortByName(props.section.resources) : []))
 const indent = computed(() => ({ paddingInlineStart: `${8 + props.depth * 16}px` }))
 
@@ -118,13 +130,13 @@ function onDrop(event: DragEvent, section: SectionModel): void {
     />
   </template>
   <v-list-item
-    v-for="doc in documents"
+    v-for="{ doc, name, status } in documents"
     :key="doc.id"
     :to="{ name: 'document', params: { id: doc.id } }"
     :active="doc.id === activeId"
     :style="indent"
     density="compact"
-    :title="doc.name"
+    :title="name"
     draggable="true"
     data-testid="tree-document"
     @click="emit('navigate')"
@@ -133,11 +145,20 @@ function onDrop(event: DragEvent, section: SectionModel): void {
     @contextmenu="onContextMenu"
   >
     <template #append>
+      <v-icon
+        v-if="statusIcon(status)"
+        :icon="statusIcon(status)"
+        :aria-label="statusLabel(status!)"
+        :title="statusLabel(status!)"
+        size="x-small"
+        class="nav-tree__status"
+        data-testid="tree-document-status"
+      />
       <ItemActionsMenu :item="doc" size="x-small" class="nav-tree__actions" />
     </template>
     <template #prepend>
       <span class="nav-tree__spacer" />
-      <v-icon :icon="iconFor(doc)" :color="colorFor(doc)" size="small" class="me-2" />
+      <v-icon :icon="pageMeta.icon(doc)" :color="colorFor(doc)" size="small" class="me-2" />
     </template>
   </v-list-item>
   <v-list-item
@@ -194,6 +215,10 @@ function onDrop(event: DragEvent, section: SectionModel): void {
   :deep(.nav-tree__actions) {
     opacity: 1;
   }
+}
+/* The page status of the front matter, quiet like in Material's navigation. */
+.nav-tree__status {
+  color: rgb(var(--v-theme-on-surface-variant));
 }
 /* Files are secondary in the tree: smaller and quieter than pages. */
 .nav-tree__file :deep(.v-list-item-title) {

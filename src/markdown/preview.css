@@ -275,3 +275,43 @@
 .markdown-preview .hljs-strong {
   font-weight: 700;
 }
+
+/* Front matter: the tags and the status of a page as Material shows them, and a warning when
+   the front matter cannot be read. */
+.markdown-preview .md-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  margin: 0.4em 0 0.8em;
+}
+.markdown-preview .md-tag {
+  padding: 0.1em 0.7em;
+  border-radius: 1em;
+  font-size: 0.8em;
+  background: rgba(var(--md-on-surface-rgb), 0.08);
+  color: rgba(var(--md-on-surface-rgb), 0.8);
+}
+.markdown-preview .md-status {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 0.1em 0.6em;
+  border-radius: 0.3em;
+  font-size: 0.45em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--md-primary);
+  color: var(--md-primary);
+}
+.markdown-preview .md-status-line .md-status {
+  font-size: 0.8em;
+}
+.markdown-preview .md-status--deprecated {
+  border-color: rgba(var(--md-on-surface-rgb), 0.45);
+  color: rgba(var(--md-on-surface-rgb), 0.7);
+}
+.markdown-preview .md-meta-error {
+  padding: 0.4em 0.8em;
+  border-left: 4px solid var(--md-error);
+  background: rgba(var(--md-on-surface-rgb), 0.05);
+  font-size: 0.85em;
+}

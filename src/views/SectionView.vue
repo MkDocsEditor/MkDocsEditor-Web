@@ -18,20 +18,23 @@ import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import SyncStatus from '@/components/tree/SyncStatus.vue'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
 import { openWhileSet } from '@/services/dialogTarget'
-import { colorFor, formatSize, iconFor } from '@/services/icons'
+import { colorFor, formatSize } from '@/services/icons'
+import { statusIcon, statusLabel } from '@/services/materialIcons'
 import { plural, stripMarkdownExtension } from '@/services/names'
 import { openFile } from '@/composables/useOpenFile'
 import { useLiveStore } from '@/stores/live'
 import { useMovedRedirect } from '@/composables/useMovedRedirect'
 import { useNotifyStore } from '@/stores/notify'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import { useTreeStore } from '@/stores/tree'
-import { sortByName } from '@/services/treeIndex'
+import { sortByName, sortByText } from '@/services/treeIndex'
 
 const props = defineProps<{ id?: string }>()
 
 const tree = useTreeStore()
 const live = useLiveStore()
 const notify = useNotifyStore()
+const pageMeta = usePageMetaStore()
 const router = useRouter()
 
 const section = computed(() =>
@@ -50,7 +53,7 @@ const entries = computed<TreeItem[]>(() =>
   section.value
     ? [
         ...sortByName(section.value.subsections),
-        ...sortByName(section.value.documents),
+        ...sortByText(section.value.documents, pageMeta.title),
         ...sortByName(section.value.resources),
       ]
     : [],
@@ -62,7 +65,7 @@ function subtitle(item: TreeItem): string {
     return plural(count, 'item')
   }
   if (item.type === 'resource') return formatSize(item.filesize)
-  return ''
+  return pageMeta.meta(item.id).description ?? ''
 }
 
 /** The routes are named like the item types. */
@@ -180,7 +183,7 @@ function onDrop(event: DragEvent): void {
           v-for="item in entries"
           :key="item.id"
           :to="linkTo(item)"
-          :title="item.name"
+          :title="pageMeta.title(item)"
           :subtitle="subtitle(item)"
           :data-testid="`entry-${item.type}`"
         >
@@ -192,10 +195,20 @@ function onDrop(event: DragEvent): void {
               class="me-4"
             />
             <span v-else class="section-view__icon me-4">
-              <v-icon :icon="iconFor(item)" :color="colorFor(item)" />
+              <v-icon :icon="pageMeta.icon(item)" :color="colorFor(item)" />
             </span>
           </template>
           <template #append>
+            <v-chip
+              v-if="item.type === 'document' && pageMeta.meta(item.id).status"
+              :prepend-icon="statusIcon(pageMeta.meta(item.id).status)"
+              size="small"
+              variant="tonal"
+              class="mr-2"
+              data-testid="entry-status"
+            >
+              {{ statusLabel(pageMeta.meta(item.id).status!) }}
+            </v-chip>
             <OnlineAvatars
               v-if="item.type === 'document'"
               :users="live.usersOf(item.id)"

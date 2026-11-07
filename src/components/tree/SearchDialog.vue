@@ -7,18 +7,20 @@ import { useDisplay } from 'vuetify'
 import AppDialog from '@/components/common/AppDialog.vue'
 import HighlightedText from '@/components/tree/HighlightedText.vue'
 import { useDebounced } from '@/composables/useDebounced'
-import { colorFor, formatSize, iconFor } from '@/services/icons'
+import { colorFor, formatSize } from '@/services/icons'
 import { plural } from '@/services/names'
 import { loadRecentSearches, rememberSearch } from '@/sync/recentSearches'
 import { MIN_SEARCH_LENGTH, findMatches, isSearchable, searchWiki } from '@/services/search'
 import type { SearchResult } from '@/services/search'
 import { formatWhen } from '@/services/time'
+import { usePageMetaStore } from '@/stores/pageMeta'
 import { usePagesStore } from '@/stores/pages'
 import { useTreeStore } from '@/stores/tree'
 
 const open = defineModel<boolean>({ required: true })
 const tree = useTreeStore()
 const pages = usePagesStore()
+const pageMeta = usePageMetaStore()
 const router = useRouter()
 
 // Material's search view: docked to the search bar from medium windows up, else the full screen
@@ -30,7 +32,10 @@ const recent = ref<string[]>([])
 const term = useDebounced(() => query.value, 300)
 
 const search = (searchTerm: string) =>
-  searchWiki(tree.index, (id) => pages.pages.get(id)?.text, searchTerm)
+  searchWiki(tree.index, (id) => pages.pages.get(id)?.text, searchTerm, {
+    title: (id) => pageMeta.meta(id).title,
+    textExcluded: (id) => pageMeta.meta(id).searchExclude,
+  })
 const found = computed(() => search(term.value))
 const results = computed(() => found.value.results)
 const tooShort = computed(() => query.value !== '' && !isSearchable(query.value))
@@ -148,13 +153,13 @@ function details(result: SearchResult): string {
             @click="choose(result)"
           >
             <template #prepend>
-              <v-icon :icon="iconFor(result.item)" :color="colorFor(result.item)" />
+              <v-icon :icon="pageMeta.icon(result.item)" :color="colorFor(result.item)" />
             </template>
             <div class="search-result__head">
               <HighlightedText
                 class="search-result__name text-title-small"
-                :text="result.item.name"
-                :matches="findMatches(result.item.name, term)"
+                :text="result.title"
+                :matches="findMatches(result.title, term)"
               />
               <span
                 v-if="result.matchCount > 0"

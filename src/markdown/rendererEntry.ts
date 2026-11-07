@@ -3,12 +3,17 @@
  * as an asset for its offline preview. It only sets this global and touches nothing else.
  */
 import './preview.css'
-import { renderMarkdown } from './render'
+import { parseFrontMatter } from './frontMatter'
+import { renderMarkdown, renderPage } from './render'
 
 declare global {
   interface Window {
-    MkDocsRenderer: { renderMarkdown: typeof renderMarkdown }
+    MkDocsRenderer: {
+      renderMarkdown: typeof renderMarkdown
+      renderPage: typeof renderPage
+      parseFrontMatter: typeof parseFrontMatter
+    }
   }
 }
 
-window.MkDocsRenderer = { renderMarkdown }
+window.MkDocsRenderer = { renderMarkdown, renderPage, parseFrontMatter }
