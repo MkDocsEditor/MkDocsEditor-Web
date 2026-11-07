@@ -1009,12 +1009,16 @@ describe('Automerge session: stored copy and other tabs', () => {
     const store = memoryStore()
     const first = client(server, 'anna', store)
     await online(first)
-    const second = client(server, 'anna', store, { timing: { retryClaimMs: 0 } })
+    // the second tab asks for the record until it gets it: keep it out while the record changes
+    let blocked = true
+    const gated = { ...store, claim: async (id: string) => (blocked ? null : store.claim(id)) }
+    const second = client(server, 'anna', gated, { timing: { retryClaimMs: 0 } })
     await online(second)
     first.session.close()
     await new Promise((r) => setTimeout(r, 5))
     const stored = (await store.get('doc-1'))!
     await store.put({ ...stored, epoch: 'another' })
+    blocked = false
 
     second.insert('end', 'x')
     await vi.waitFor(() => expect(server.text).toBe('Text\nx'))

@@ -34,6 +34,7 @@ export function createStoredCopy(options: StoredCopyOptions) {
   let closed = false
   let claiming = false
   let lastClaimAt = 0
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
   /** A record without an owner in use, until the server tells whose it is. */
   let unowned: { id: string; release: () => void } | null = null
 
@@ -50,18 +51,37 @@ export function createStoredCopy(options: StoredCopyOptions) {
     timer = null
     void persist()
   }
+  /** Asks for the claim again in a while, until it comes through or the session ends. */
+  function retryLater(): void {
+    if (closed || release || retryTimer) return
+    const wait = Math.max(0, lastClaimAt + options.retryClaimMs - Date.now())
+    retryTimer = setTimeout(() => {
+      retryTimer = null
+      void retryClaim()
+    }, wait)
+  }
+
   /**
-   * Another tab held the record when this session started, and without it edits here do not
-   * survive a reload. That tab may be gone by now, so ask again while there are changes to keep.
+   * Another tab held the record when this session started (or the tree's rescue of moved copies
+   * held it for a moment), and without it edits here do not survive a reload. The holder may be
+   * gone by now, so ask again: once changes are to be kept, until the claim comes through. Its
+   * record can hold edits that are not here yet, which only the late claim brings in.
    */
   async function retryClaim(): Promise<void> {
-    if (closed || claiming || Date.now() - lastClaimAt < options.retryClaimMs) return
+    if (closed || claiming || release) return
+    if (Date.now() - lastClaimAt < options.retryClaimMs) {
+      retryLater()
+      return
+    }
     claiming = true
     lastClaimAt = Date.now()
+    // a record the session refuses (another lineage) stays as it is: no point in asking again
+    let askAgain = true
     try {
       const id = options.documentId()
       const claim = await options.store.claim(id)
       if (!claim) return
+      askAgain = false
       const existing = closed ? undefined : await options.store.get(id)
       if (closed || !options.onLateClaim(existing)) {
         claim()
@@ -74,6 +94,7 @@ export function createStoredCopy(options: StoredCopyOptions) {
       console.error('mkdocseditor: could not claim the local copy', error)
     } finally {
       claiming = false
+      if (askAgain) retryLater()
     }
   }
 
@@ -188,6 +209,8 @@ export function createStoredCopy(options: StoredCopyOptions) {
       globalThis.document?.removeEventListener('visibilitychange', onHidden)
       if (timer) clearTimeout(timer)
       timer = null
+      if (retryTimer) clearTimeout(retryTimer)
+      retryTimer = null
       void persist().finally(() => {
         release?.()
         release = null

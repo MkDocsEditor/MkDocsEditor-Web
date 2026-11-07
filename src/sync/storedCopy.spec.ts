@@ -57,6 +57,31 @@ describe('createStoredCopy', () => {
     expect(writes).toEqual([])
   })
 
+  it('asks again for a claim another holder had, without waiting for further changes', async () => {
+    vi.useFakeTimers()
+    const store = memoryStore()
+    const release = (await store.claim('doc'))!
+    const onLateClaim = vi.fn(() => true)
+    const copy = createStoredCopy({
+      store,
+      persistMs: 10_000,
+      retryClaimMs: 5_000,
+      documentId: () => 'doc',
+      snapshot: () => contents,
+      onLateClaim,
+    })
+    expect(await copy.open('doc')).toBeUndefined()
+    // one change right away, and none after it: the retry must not depend on more of them
+    copy.schedule()
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(copy.claimed).toBe(false)
+    release()
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(copy.claimed).toBe(true)
+    expect(onLateClaim).toHaveBeenCalledTimes(1)
+    copy.close()
+  })
+
   it('groups changes into one delayed write', async () => {
     vi.useFakeTimers()
     const { store, writes } = recordingStore()
