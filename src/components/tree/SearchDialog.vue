@@ -33,7 +33,14 @@ const term = useDebounced(() => query.value, 300)
 
 const search = (searchTerm: string) =>
   searchWiki(tree.index, (id) => pages.pages.get(id)?.text, searchTerm, {
-    title: (id) => pageMeta.meta(id).title,
+    title: (id) => {
+      const item = tree.get(id)
+      return item && pageMeta.title(item)
+    },
+    keywords: (id) => {
+      const { description, tags } = pageMeta.meta(id)
+      return [description ?? '', ...tags].join('\n')
+    },
     textExcluded: (id) => pageMeta.meta(id).searchExclude,
   })
 const found = computed(() => search(term.value))

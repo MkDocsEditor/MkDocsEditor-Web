@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 
 import { ApiClient, setApiClient } from '@/api'
+import type { SectionModel } from '@/api'
 import { useTreeStore } from '@/stores/tree'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
@@ -35,11 +36,18 @@ const strand = {
 async function setup(
   component: typeof LinkPickerDialog | typeof ResourcePickerDialog,
   selection = '',
+  titles: Record<string, string> = {},
 ) {
   let uploaded = false
   const mock = createFetchMock({
     'GET /section/': () => {
       const tree = sampleTree()
+      // the names of the pages as MkDocs shows them, as a backend with `page-meta` sends them
+      const withTitles = (section: SectionModel): void => {
+        for (const doc of section.documents) if (titles[doc.id]) doc.title = titles[doc.id]
+        section.subsections.forEach(withTitles)
+      }
+      withTitles(tree)
       if (uploaded) {
         const urlaub = tree.subsections.find((s) => s.name === 'Urlaub')!
         urlaub.resources.push(strand)
@@ -98,6 +106,20 @@ describe('LinkPickerDialog', () => {
     byText('browser-hit-resource', 'logo.png').click()
     await flushPromises()
     expect(emitted()?.[0]).toEqual(['[logo.png](../../logo.png)'])
+    wrapper.unmount()
+  })
+
+  it('links a page with its name as MkDocs shows it, found by that name', async () => {
+    const { emitted, wrapper } = await setup(LinkPickerDialog, '', {
+      'd-suppe': 'Suppe vom Kürbis',
+    })
+    type('browser-search', 'vom kürbis')
+    await flushPromises()
+    byText('browser-hit-document', 'Suppe vom Kürbis').click()
+    await flushPromises()
+    el('link-page').click()
+    await flushPromises()
+    expect(emitted()?.[0]).toEqual(['[Suppe vom Kürbis](../Kürbissuppe.md)'])
     wrapper.unmount()
   })
 

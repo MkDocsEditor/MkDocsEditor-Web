@@ -35,7 +35,7 @@ export interface Excerpt {
 
 export interface SearchResult {
   item: DocumentModel | SectionModel | ResourceModel
-  /** The name to show: the title of a page from its front matter, else the name of the item. */
+  /** The name to show: the name of a page as MkDocs shows it, else the name of the item. */
   title: string
   /** Names of the folders it is in, without the root. */
   path: string[]
@@ -192,15 +192,18 @@ export function sortByRelevance(results: SearchResult[], searchTerm: string): Se
 }
 
 export interface SearchOptions {
-  /** The title of a page from its front matter, searched besides its name. */
+  /** The name of a page as MkDocs shows it (see `pageTitle`), searched besides its file name. */
   title?: (id: string) => string | undefined
+  /** More words of a page that count like its name: its description and tags. */
+  keywords?: (id: string) => string | undefined
   /** Pages whose text is left out (front matter `search: exclude: true`); their names count. */
   textExcluded?: (id: string) => boolean
 }
 
 /**
  * Searches the names of all items and the text of all stored pages. An item matches when every
- * word of the term is found; for a page, each word can be in its name, title or text.
+ * word of the term is found; for a page, each word can be in its name, title, description, tags
+ * or text.
  *
  * @returns the best results, and how many there are in total
  */
@@ -220,7 +223,8 @@ export function searchWiki(
     const title = (isPage && options.title?.(item.id)) || item.name
     const text =
       isPage && !options.textExcluded?.(item.id) ? normalize(pageText(item.id) ?? '') : ''
-    const searched = `${normalize(item.name)}\n${normalize(title)}\n${text}`
+    const keywords = isPage ? normalize(options.keywords?.(item.id) ?? '') : ''
+    const searched = `${normalize(item.name)}\n${normalize(title)}\n${keywords}\n${text}`
     if (!words.every((word) => searched.includes(word))) continue
     found.push({
       item,

@@ -29,7 +29,7 @@ describe('SectionView', () => {
     const { wrapper } = await setup()
     expect(wrapper.find('[data-testid="section-title"]').text()).toBe('Wiki')
     const titles = wrapper.findAll('.v-list-item-title').map((t) => t.text())
-    expect(titles).toEqual(['Rezepte', 'Urlaub', 'index', 'logo.png'])
+    expect(titles).toEqual(['Rezepte', 'Urlaub', 'Home', 'logo.png'])
     wrapper.unmount()
   })
 

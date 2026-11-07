@@ -90,7 +90,8 @@ describe('SearchDialog', () => {
     const { wrapper } = await setup()
     usePagesStore().edited('d-index', '# Start\n\nEin Kürbis und noch ein Kürbis')
     await type('kürbis')
-    const row = qa('[data-testid="search-result"]').find((e) => e.textContent?.includes('index'))!
+    // listed by its name as MkDocs shows it: the first heading
+    const row = qa('[data-testid="search-result"]').find((e) => e.textContent?.includes('Start'))!
     expect(row.querySelector('[data-testid="search-match-count"]')?.textContent).toContain(
       '2 matches',
     )

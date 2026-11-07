@@ -11,6 +11,20 @@ export interface DocumentModel {
   url: string
   /** Path relative to the docs folder, e.g. `Foo/Bar.md` (newer backends). */
   path?: string
+  /** The page name as MkDocs shows it (backends with `page-meta`); see `pageTitle`. */
+  title?: string
+  /** The front matter as the backend read it (backends with `page-meta`). */
+  meta?: ServerPageMeta
+}
+
+/** `meta` of a document: what its front matter says, `null` or empty where it says nothing. */
+export interface ServerPageMeta {
+  title: string | null
+  description: string | null
+  icon: string | null
+  status: string | null
+  tags: string[]
+  searchExclude: boolean
 }
 
 /** Kind of a resource, for icons and pickers (`docs/references.md` section 9). */
@@ -220,6 +234,8 @@ export interface Pin {
   path: string
   /** Without `.md`, as in the tree. */
   name: string
+  /** The page name as MkDocs shows it (backends with `page-meta`). */
+  title?: string
   pinnedBy: ActivityPerson
   pinnedAt: string
 }
@@ -242,6 +258,8 @@ export interface FeedEntry {
   /** Only for a page that still exists at `path`: its current id. Folders are found by path. */
   documentId?: string
   path: string
+  /** The page name of the document at `path`; null when there is none (`page-meta`). */
+  title?: string | null
   /** Only for `moved`. */
   oldPath?: string
   authors: ActivityPerson[]
