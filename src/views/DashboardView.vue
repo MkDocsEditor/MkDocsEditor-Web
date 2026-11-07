@@ -314,12 +314,19 @@ function entryLink(entry: FeedEntry) {
           </v-list-item-title>
           <v-list-item-subtitle class="text-wrap">
             {{ detailsOf(entry) }}
-            <template v-if="entry.summary">
+            <template v-if="entry.summary?.linesAdded || entry.summary?.linesRemoved">
               ·
-              <span class="dashboard-view__added" data-testid="feed-added"
+              <!-- a count of zero is left out: "+4", "−2" or "+4 −2" -->
+              <span
+                v-if="entry.summary.linesAdded"
+                class="dashboard-view__added"
+                data-testid="feed-added"
                 >+{{ entry.summary.linesAdded }}</span
               >
-              <span class="dashboard-view__removed" data-testid="feed-removed"
+              <span
+                v-if="entry.summary.linesRemoved"
+                class="dashboard-view__removed"
+                data-testid="feed-removed"
                 >−{{ entry.summary.linesRemoved }}</span
               >
             </template>

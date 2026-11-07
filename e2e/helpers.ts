@@ -123,8 +123,12 @@ export async function documentContent(id: string): Promise<string> {
 export async function openEditor(page: Page, id: string): Promise<void> {
   await page.goto(`/document/${id}`)
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
-  await expect(page.locator('.cm-content')).toBeVisible()
-  await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Saved')
+  // loading the page (Automerge, the server's text) can take more than the default 5 s on a busy
+  // machine
+  await expect(page.locator('.cm-content')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('connection-state')).toHaveAttribute('title', 'Saved', {
+    timeout: 30_000,
+  })
 }
 
 export function editorText(page: Page): Promise<string> {

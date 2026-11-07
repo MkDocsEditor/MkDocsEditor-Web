@@ -152,20 +152,21 @@ function applyFlash(): void {
   const blocks = blocksOf(root, pendingFlash.from, pendingFlash.to)
   if (blocks.length === 0) return
   pendingFlash = null
-  const margin = 16
-  root.scrollTo({
-    top:
-      root.scrollTop +
-      blocks[0]!.getBoundingClientRect().top -
-      root.getBoundingClientRect().top -
-      margin,
-  })
-  for (const block of blocks) {
-    block.classList.remove('markdown-preview__flash')
-    void block.offsetWidth // restarts the animation
-    block.classList.add('markdown-preview__flash')
-    setTimeout(() => block.classList.remove('markdown-preview__flash'), FLASH_MS)
-  }
+  const first = blocks[0]!.getBoundingClientRect()
+  const last = blocks.at(-1)!.getBoundingClientRect()
+  const top = root.scrollTop + first.top - root.getBoundingClientRect().top
+  root.scrollTo({ top: top - 16 })
+  // one band over the whole section, gaps between the blocks included; the next render of the
+  // text replaces it along with the rest
+  root.querySelector('.markdown-preview__flash')?.remove()
+  const band = document.createElement('div')
+  band.className = 'markdown-preview__flash'
+  band.dataset.testid = 'preview-flash'
+  band.setAttribute('aria-hidden', 'true')
+  band.style.top = `${top - 4}px`
+  band.style.height = `${Math.max(last.bottom, first.bottom) - first.top + 8}px`
+  root.append(band)
+  setTimeout(() => band.remove(), FLASH_MS)
 }
 watch(html, () => nextTick(applyFlash))
 
@@ -196,6 +197,7 @@ defineExpose({
 <style>
 /* stylelint-disable color-no-hex -- the highlight of ==marks==, which is not in the theme */
 .markdown-preview {
+  position: relative;
   height: 100%;
   overflow-y: auto;
   padding: var(--app-space-2) var(--app-space-6) var(--app-space-8);
@@ -235,6 +237,9 @@ defineExpose({
   }
 }
 .markdown-preview__flash {
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
   animation: markdown-preview-flash 2s ease-in forwards;
 }
 </style>

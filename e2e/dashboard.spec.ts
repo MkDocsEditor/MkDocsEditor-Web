@@ -132,12 +132,32 @@ test('the feed says who changed which page, and opens it at the change', async (
   }).toPass({ timeout: 30_000 })
   await expect(entry.getByTestId('feed-headings')).toHaveText('In Zutaten')
   await expect(entry.getByTestId('feed-added')).toHaveText(/^\+\d+$/)
-  await expect(entry.getByTestId('feed-removed')).toHaveText('−0')
+  // nothing was removed: a count of zero is left out
+  await expect(entry.getByTestId('feed-removed')).toHaveCount(0)
   await entry.click()
   // the section is shown and highlighted, in whichever pane is on screen; the link is clean again
   await expect(bob).toHaveURL(new RegExp(`/document/${id}$`))
-  const flashed = bob.locator('.cm-flash-line:visible, .markdown-preview__flash:visible')
-  await expect(flashed.first()).toBeInViewport()
-  await expect(flashed.first()).toContainText('Zutaten')
-  await expect(flashed).toHaveCount(0, { timeout: 5_000 })
+  const editorFlash = bob.locator('.cm-flash-line:visible')
+  const previewFlash = bob.locator('.markdown-preview__flash:visible')
+  await expect(editorFlash.or(previewFlash).first()).toBeInViewport()
+  if (testInfo.project.name === 'desktop') {
+    // split: both panes show the section
+    await expect(editorFlash.first()).toContainText('Zutaten')
+    await expect(previewFlash).toHaveCount(1)
+  }
+  if (await previewFlash.count()) {
+    // one band from the heading to the end of the section
+    const band = (await previewFlash.boundingBox())!
+    const heading = (await bob
+      .getByTestId('markdown-preview')
+      .getByRole('heading', { name: 'Zutaten' })
+      .boundingBox())!
+    const text = (await bob
+      .getByTestId('markdown-preview')
+      .getByText('Mehl und Zucker')
+      .boundingBox())!
+    expect(band.y).toBeLessThanOrEqual(heading.y)
+    expect(band.y + band.height).toBeGreaterThanOrEqual(text.y + text.height)
+  }
+  await expect(editorFlash.or(previewFlash)).toHaveCount(0, { timeout: 5_000 })
 })
