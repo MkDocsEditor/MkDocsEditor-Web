@@ -43,6 +43,8 @@ const selected = ref<Revision | null>(null)
 const canRevert = ref(false)
 /** Whether the server can restore a single section (`blame` covers it). */
 const canRestoreSection = ref(false)
+/** Whether the server can say beforehand if an undo would work (`revert-check`). */
+const canCheckRevert = ref(false)
 
 type View = 'changes' | 'current' | 'content'
 const view = ref<View>('changes')
@@ -62,6 +64,7 @@ async function load(): Promise<void> {
       .then((info) => {
         canRevert.value = info.features?.includes('revert') === true
         canRestoreSection.value = info.features?.includes('blame') === true
+        canCheckRevert.value = info.features?.includes('revert-check') === true
       })
       .catch(() => undefined)
     revisions.value = await useApi().getHistory(props.documentId)
@@ -301,11 +304,37 @@ async function undo(): Promise<void> {
   }
 }
 
+/** Where later changes are in the way of an undo, e.g. " in Setup, the start of the page". */
+function conflictPlaces(headings: (string | null)[] | undefined): string {
+  const named = (headings ?? []).map((h) => h ?? 'the start of the page')
+  return named.length > 0 ? ` in ${named.join(', ')}` : ''
+}
+
+/**
+ * Why the selected change cannot be undone, asked when it opens so the undo does not fail only
+ * after the tap; null while unknown, when it can, or on servers without the check.
+ */
+const undoBlocked = ref<string | null>(null)
+let undoCheck = 0
+
+watch([selected, canCheckRevert], async ([revision, canCheck]) => {
+  const check = ++undoCheck
+  undoBlocked.value = null
+  if (!revision || !canCheck || !revertable(revision)) return
+  try {
+    const answer = await useApi().checkRevert(props.documentId, revision.revision)
+    if (check !== undoCheck || answer.possible) return
+    if (answer.code === 'nothing-to-revert') undoBlocked.value = 'Already undone or edited away'
+    else if (answer.code === 'revert-conflict')
+      undoBlocked.value = `Can't undo: later changes${conflictPlaces(answer.details?.headings)} are in the way`
+  } catch {
+    // keep the button; the undo itself still says why it failed
+  }
+})
+
 function undoFailure(error: unknown): { type: 'error' | 'info'; text: string } {
   if (error instanceof ApiError && error.code === 'revert-conflict') {
-    const headings = (error.details.headings as (string | null)[] | undefined) ?? []
-    const named = headings.map((h) => h ?? 'the start of the page')
-    const where = named.length > 0 ? ` in ${named.join(', ')}` : ''
+    const where = conflictPlaces(error.details.headings as (string | null)[] | undefined)
     return {
       type: 'error',
       text: `Not undone: the same lines were changed again later${where}. Nothing was changed; edit them by hand.`,
@@ -400,8 +429,15 @@ const viewLabels: Record<View, string> = {
                   {{ authorLine(selected) }} · {{ title(selected) }} · {{ shortRev(selected) }}
                 </div>
               </div>
+              <span
+                v-if="revertable(selected) && undoBlocked"
+                class="text-body-medium text-medium-emphasis"
+                data-testid="history-undo-blocked"
+              >
+                {{ undoBlocked }}
+              </span>
               <v-btn
-                v-if="revertable(selected)"
+                v-else-if="revertable(selected)"
                 color="primary"
                 variant="outlined"
                 :prepend-icon="mdiUndo"

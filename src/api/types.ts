@@ -310,6 +310,14 @@ export interface DocumentChanges {
   summary: { linesAdded: number; linesRemoved: number; headings: string[] }
 }
 
+/** Whether a commit's change can be undone now (`GET …/history/{rev}/revert/`, changes nothing). */
+export interface RevertCheck {
+  possible: boolean
+  /** Why not: `nothing-to-revert` or `revert-conflict` (then with the headings in the way). */
+  code?: string
+  details?: { headings?: (string | null)[] }
+}
+
 /** Who wrote lines of a document and when (`GET /document/{id}/blame/`). */
 export interface Blame {
   /** The revision of the text the lines belong to; may lag behind fast typing. */
