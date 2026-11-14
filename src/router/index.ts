@@ -51,6 +51,14 @@ export function buildRouter(history: RouterHistory): Router {
         meta: { public: true },
       },
       {
+        // An MCP client asks for access; the backend sends the browser here (`docs/oauth.md`).
+        path: '/connect/authorize',
+        name: 'connect-authorize',
+        component: () => import('@/views/ConnectAuthorizeView.vue'),
+        props: (route) => ({ request: String(route.query.request ?? '') }),
+        meta: { standalone: true },
+      },
+      {
         // Android App Links need exactly this path.
         path: '/join/:id',
         name: 'join',

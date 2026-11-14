@@ -19,6 +19,7 @@ import type {
   LinkInfo,
   LinkInspection,
   LoginResponse,
+  OAuthRequest,
   Passkey,
   PasskeyCeremony,
   Role,
@@ -258,6 +259,21 @@ export class AuthApi {
 
   revokeAppToken(id: string): Promise<void> {
     return this.del(urlPath`/account/tokens/${id}`)
+  }
+
+  // OAuth consent for MCP clients
+
+  oauthRequest(id: string): Promise<OAuthRequest> {
+    return this.get(urlPath`/oauth/requests/${id}`)
+  }
+
+  /** `scope` can only lower the requested scope. Needs a recent authentication. */
+  approveOAuthRequest(id: string, scope?: AppTokenScope): Promise<{ redirectUrl: string }> {
+    return this.send('POST', urlPath`/oauth/requests/${id}/approve`, scope ? { scope } : {})
+  }
+
+  denyOAuthRequest(id: string): Promise<{ redirectUrl: string }> {
+    return this.send('POST', urlPath`/oauth/requests/${id}/deny`)
   }
 
   // admin

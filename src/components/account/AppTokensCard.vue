@@ -142,6 +142,14 @@ onMounted(load)
         >
           <v-list-item-title>
             {{ token.name }}
+            <v-chip
+              v-if="token.oauthClientId"
+              size="x-small"
+              class="ml-1"
+              data-testid="oauth-badge"
+            >
+              OAuth app
+            </v-chip>
             <v-chip v-if="expired(token)" size="x-small" class="ml-1">expired</v-chip>
           </v-list-item-title>
           <v-list-item-subtitle>{{ details(token) }}</v-list-item-subtitle>
@@ -224,7 +232,11 @@ onMounted(load)
     <ConfirmDialog
       :model-value="revoking !== null"
       title="Revoke the token?"
-      :text="`Scripts and agents that use “${revoking?.name}” stop working at once.`"
+      :text="
+        revoking?.oauthClientId
+          ? `“${revoking.name}” is disconnected at once. It has to ask for access again.`
+          : `Scripts and agents that use “${revoking?.name}” stop working at once.`
+      "
       confirm-text="Revoke"
       danger
       @update:model-value="(open: boolean) => !open && (revoking = null)"
