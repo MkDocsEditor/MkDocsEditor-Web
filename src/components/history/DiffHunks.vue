@@ -9,14 +9,18 @@ import type { DiffHunk } from '@/services/diff'
  * Hunks of a diff, each headed by its section: changed words marked in paired lines, the
  * unchanged lines between hunks folded. A hunk's heading asks to show it in the page.
  */
-const props = defineProps<{ hunks: readonly DiffHunk[] }>()
+const { hunks, linked = true } = defineProps<{
+  hunks: readonly DiffHunk[]
+  /** Whether a hunk's heading leads into the page. */
+  linked?: boolean
+}>()
 const emit = defineEmits<{ show: [range: ChangeRange] }>()
 
 const hunkViews = computed(() =>
-  props.hunks.map((hunk, i) => ({
+  hunks.map((hunk, i) => ({
     hunk,
     lines: showHunk(hunk),
-    folded: i > 0 ? linesBetween(props.hunks[i - 1]!, hunk) : hunk.newStart - 1,
+    folded: i > 0 ? linesBetween(hunks[i - 1]!, hunk) : hunk.newStart - 1,
   })),
 )
 
@@ -36,7 +40,11 @@ function hunkTitle(hunk: DiffHunk): string {
       <div v-if="shown.folded > 0" class="history__folded">
         {{ shown.folded === 1 ? '1 unchanged line' : `${shown.folded} unchanged lines` }}
       </div>
+      <div v-if="!linked" class="history__hunk-head history__hunk-head--plain">
+        {{ hunkTitle(shown.hunk) }}
+      </div>
       <button
+        v-else
         type="button"
         class="history__hunk-head"
         :title="`Show ${hunkTitle(shown.hunk)} in the page`"
@@ -122,8 +130,12 @@ function hunkTitle(hunk: DiffHunk): string {
   border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
   cursor: pointer;
 }
-.history__hunk-head:hover,
-.history__hunk-head:focus-visible {
+.history__hunk-head--plain {
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  cursor: default;
+}
+button.history__hunk-head:hover,
+button.history__hunk-head:focus-visible {
   background: rgba(var(--v-theme-primary), 0.08);
 }
 </style>
