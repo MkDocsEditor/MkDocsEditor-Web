@@ -1,5 +1,7 @@
 import type { Ref } from 'vue'
 
+import type { AgentInfo } from './protocol'
+
 /**
  * The contract between the editor and a sync implementation.
  *
@@ -59,8 +61,10 @@ export function instanceName(who: {
   displayName?: string
   username: string
   deviceName?: string
+  agent?: AgentInfo
 }): string {
   const name = who.displayName || who.username
+  if (who.agent) return `${who.agent.name} (agent of ${name})`
   return who.deviceName ? `${name} · ${who.deviceName}` : name
 }
 
@@ -74,6 +78,8 @@ export interface Peer extends SessionUser {
   selections: TextSelection[]
   /** The text this connection is looking at; absent while its editor is not visible. */
   viewport?: TextRange
+  /** An AI agent or script with an app token of the account: no cursor, not to follow. */
+  agent?: AgentInfo
 }
 
 /** The cursor of an instance that has left, which stays for a while. The server sets how long. */
@@ -83,12 +89,14 @@ export interface Ghost extends SessionUser {
   deviceName?: string
   selections: TextSelection[]
   viewport?: TextRange
+  agent?: AgentInfo
 }
 
 /** A range of text written by one user. Runs are sorted and do not overlap. */
 export interface AuthorRun {
   from: number
   to: number
+  /** The name to show: the person, and the agent when one wrote it ("Anna via Claude Code"). */
   username: string
   color: string
 }

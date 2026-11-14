@@ -39,6 +39,42 @@ describe('authors', () => {
     subject.stop()
   })
 
+  it('says which agent wrote a part, in the color of its person', async () => {
+    const subject = createAuthors({
+      automerge: () => ({ getHeads: () => ['h'] }) as unknown as AutomergeApi,
+      doc: () => ({ content: 'von Anna, vom Agent' }) as unknown as AmDoc,
+      documentId: () => 'd',
+      getAuthorship: async () => ({
+        heads: ['h'],
+        runs: [
+          { start: 0, end: 9, username: 'anna', actorId: 'browser' },
+          { start: 9, end: 19, username: 'anna', actorId: 'bot' },
+        ],
+      }),
+      refetchMs: 1_000,
+    })
+    subject.rememberUser({
+      actorId: 'browser',
+      username: 'anna',
+      displayName: 'Anna',
+      color: '#1971c2',
+    })
+    subject.rememberUser({
+      actorId: 'bot',
+      username: 'anna',
+      displayName: 'Anna',
+      color: '#1971c2',
+      agent: { name: 'Claude Code' },
+    })
+    subject.refresh()
+    await expect.poll(() => subject.authorship.value.length).toBe(2)
+    expect(subject.authorship.value).toEqual([
+      { from: 0, to: 9, username: 'Anna', color: '#1971c2' },
+      { from: 9, to: 19, username: 'Anna via Claude Code', color: '#1971c2' },
+    ])
+    subject.stop()
+  })
+
   it('names the author of remote changes when all of them are one person', () => {
     const subject = authors([])
     subject.rememberUser({ actorId: 'a1', username: 'anna', color: '#1971c2' })

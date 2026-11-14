@@ -42,6 +42,15 @@ describe('presence', () => {
   beforeEach(() => void vi.useFakeTimers())
   afterEach(() => void vi.useRealTimers())
 
+  it('lists an agent with its token and without a cursor', () => {
+    const { presence } = setup()
+    const agent = { tokenId: 't1', name: 'Claude Code on Linux' }
+    presence.update({ ...anna, clientId: 'c-9', instanceId: 'bot', selections: [], agent })
+    expect(presence.peers.value).toMatchObject([{ instanceId: 'bot', agent, selections: [] }])
+    presence.update(anna)
+    expect(presence.peers.value.find((p) => p.instanceId === 'tab-1')).not.toHaveProperty('agent')
+  })
+
   describe('ghosts', () => {
     it('keeps the cursor of the last connection that leaves, for the time of the server', () => {
       const { presence } = setup()

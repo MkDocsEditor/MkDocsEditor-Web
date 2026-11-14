@@ -3,6 +3,7 @@ import { ref, shallowRef } from 'vue'
 import { UNKNOWN_USER_COLOR } from './authors'
 import type { AmDoc, AutomergeApi } from './automerge'
 import type {
+  AgentInfo,
   GhostInfo,
   LastPosition,
   PresenceInfo,
@@ -42,6 +43,7 @@ interface GhostState {
   deviceName?: string
   selections: WireSelections
   viewport?: ViewportInfo
+  agent?: AgentInfo
   timer: ReturnType<typeof setTimeout>
 }
 
@@ -142,6 +144,7 @@ export function createPresence(options: PresenceOptions) {
         displayName: state.info.displayName ?? state.info.username,
         color: state.info.instanceColor ?? state.info.color ?? UNKNOWN_USER_COLOR,
         avatar: state.info.avatar,
+        ...(state.info.agent ? { agent: state.info.agent } : {}),
         ...state.resolved,
       })
     }
@@ -154,6 +157,7 @@ export function createPresence(options: PresenceOptions) {
       displayName: ghost.displayName ?? ghost.username,
       color: ghost.color ?? UNKNOWN_USER_COLOR,
       avatar: ghost.avatar,
+      ...(ghost.agent ? { agent: ghost.agent } : {}),
       ...resolved(ghost.selections, ghost.viewport, { selections: [] }),
     }))
   }
@@ -263,6 +267,7 @@ export function createPresence(options: PresenceOptions) {
             avatar: ghost.avatar,
             selections: ghost.selections,
             viewport: ghost.viewport,
+            agent: ghost.agent,
           },
           ghost.ghostMs,
         )
@@ -285,6 +290,7 @@ export function createPresence(options: PresenceOptions) {
             avatar: leave.avatar !== undefined ? leave.avatar : info?.avatar,
             selections: leave.selections,
             viewport: leave.viewport,
+            agent: info?.agent,
           },
           leave.ghostMs,
         )

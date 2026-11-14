@@ -181,8 +181,9 @@ onMounted(async () => {
               testid="snippet-curl-read"
             />
             <p class="mt-2">
-              Replace text in it. Each <code>old</code> must occur exactly once; open editors show
-              the change at once:
+              Replace text in it. Each <code>old</code> must occur exactly once, else the answer is
+              409 <code>edit-not-found</code> or <code>edit-ambiguous</code> and nothing changes.
+              Open editors show the change at once:
             </p>
             <CodeSnippet
               :code="curlEdit(backendUrl, token)"

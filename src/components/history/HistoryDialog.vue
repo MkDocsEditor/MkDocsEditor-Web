@@ -102,7 +102,9 @@ const stats = computed(() => diffStats(diffLines.value))
 
 function authorLine(revision: Revision): string {
   const others = revision.coAuthors?.length ?? 0
-  return others > 0 ? `${revision.author.name} and ${others} more` : revision.author.name
+  const people = others > 0 ? `${revision.author.name} and ${others} more` : revision.author.name
+  const tokens = revision.appTokens ?? []
+  return tokens.length > 0 ? `${people} via ${tokens.join(', ')}` : people
 }
 
 function shortRev(revision: Revision): string {

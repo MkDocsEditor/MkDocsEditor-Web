@@ -135,6 +135,17 @@ describe('HistoryDialog', () => {
     wrapper.unmount()
   })
 
+  it('names the app tokens an agent made a version with', async () => {
+    const { wrapper } = await setup({
+      'GET /document/d1/history/': () =>
+        json([{ ...revisions[0]!, appTokens: ['Claude Code on Linux'] }, revisions[1]]),
+    })
+    const entries = qa('[data-testid="history-entry"]')
+    expect(entries[0]!.textContent).toContain('Opa Hans via Claude Code on Linux')
+    expect(entries[1]!.textContent).not.toContain(' via ')
+    wrapper.unmount()
+  })
+
   it('explains when the server has no history', async () => {
     const { wrapper } = await setup({})
     expect(document.body.textContent).toContain('No version history')

@@ -75,4 +75,18 @@ describe('latestInstanceOf', () => {
     expect(latestInstanceOf([], [ghost({ instanceId: 'left' })], 'a')).toBe('left')
     expect(latestInstanceOf([peer({ accountId: 'b' })], [], 'a')).toBeNull()
   })
+
+  it('never takes an agent of the account: it has no cursor, and the link came from the person', () => {
+    const agent = { tokenId: 't1', name: 'Claude Code' }
+    const now = '2026-11-14T10:00:00Z'
+    expect(
+      latestInstanceOf(
+        [peer({ instanceId: 'bot', agent, lastActiveAt: now }), peer({ instanceId: 'tab' })],
+        [],
+        'a',
+      ),
+    ).toBe('tab')
+    expect(latestInstanceOf([peer({ instanceId: 'bot', agent })], [], 'a')).toBeNull()
+    expect(latestInstanceOf([], [ghost({ instanceId: 'bot', agent })], 'a')).toBeNull()
+  })
 })

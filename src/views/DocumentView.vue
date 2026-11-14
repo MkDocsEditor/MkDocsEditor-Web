@@ -491,11 +491,24 @@ async function share(): Promise<void> {
           <v-tooltip
             v-for="user in onlineUsers"
             :key="user.instanceId"
-            :text="followLabel(user)"
+            :text="user.agent ? `${user.name} is here` : followLabel(user)"
             location="bottom"
           >
             <template #activator="{ props: tip }">
+              <!-- an agent has no cursor and nothing to follow -->
+              <v-avatar
+                v-if="user.agent"
+                v-bind="tip"
+                :color="user.color"
+                size="30"
+                role="img"
+                :aria-label="`${user.name} is here`"
+                data-testid="online-agent"
+              >
+                <v-icon :icon="mdiRobotOutline" size="20" />
+              </v-avatar>
               <UserAvatar
+                v-else
                 v-bind="tip"
                 tag="button"
                 :name="user.initials"

@@ -13,6 +13,13 @@ export interface ViewportInfo {
   bottom: string
 }
 
+/** Marks a connection or actor of an AI agent or script: it acts for its account with this app token. */
+export interface AgentInfo {
+  tokenId: string
+  /** The name of the app token, e.g. "Claude Code on Linux". */
+  name: string
+}
+
 export interface PresenceInfo {
   clientId: string
   /** The client instance, which stays across reconnects and reloads; absent on older servers. */
@@ -33,6 +40,8 @@ export interface PresenceInfo {
   lastActiveAt?: string
   selections?: { anchor: string; head: string }[]
   viewport?: ViewportInfo
+  /** Present for an agent: it has no cursor and is listed with a robot. */
+  agent?: AgentInfo
 }
 
 /** Where an account was last in this document, also if it is offline now. */
@@ -57,6 +66,7 @@ export interface GhostInfo {
   deviceName?: string
   selections?: { anchor: string; head: string }[]
   viewport?: ViewportInfo
+  agent?: AgentInfo
   /** How much longer it stays. */
   ghostMs: number
 }

@@ -33,17 +33,24 @@ export function isPresent(
   )
 }
 
-/** The instance of an account to follow: active last and with a place to look at if possible. */
+/**
+ * The instance of an account to follow: active last and with a place to look at if possible. Not
+ * an agent of the account: it has no cursor, and the link came from the person.
+ */
 export function latestInstanceOf(
   peers: readonly Peer[],
   ghosts: readonly Ghost[],
   accountId: string,
 ): string | null {
   const own = peers
-    .filter((peer) => peer.accountId === accountId)
+    .filter((peer) => peer.accountId === accountId && !peer.agent)
     .sort((a, b) => activeAt(b) - activeAt(a))
   const latest = own.find((peer) => targetOf(peer)) ?? own[0]
-  return latest?.instanceId ?? ghosts.find((g) => g.accountId === accountId)?.instanceId ?? null
+  return (
+    latest?.instanceId ??
+    ghosts.find((g) => g.accountId === accountId && !g.agent)?.instanceId ??
+    null
+  )
 }
 
 function targetOf(who: Pick<Peer, 'viewport' | 'selections'>): TextRange | null {
