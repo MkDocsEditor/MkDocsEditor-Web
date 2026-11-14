@@ -304,9 +304,9 @@ async function undo(): Promise<void> {
   }
 }
 
-/** Where later changes are in the way of an undo, e.g. " in Setup, the start of the page". */
+/** Where later changes are in the way of an undo, e.g. " in Setup, Top of the page". */
 function conflictPlaces(headings: (string | null)[] | undefined): string {
-  const named = (headings ?? []).map((h) => h ?? 'the start of the page')
+  const named = (headings ?? []).map((h) => h ?? 'Top of the page')
   return named.length > 0 ? ` in ${named.join(', ')}` : ''
 }
 
@@ -324,9 +324,10 @@ watch([selected, canCheckRevert], async ([revision, canCheck]) => {
   try {
     const answer = await useApi().checkRevert(props.documentId, revision.revision)
     if (check !== undoCheck || answer.possible) return
-    if (answer.code === 'nothing-to-revert') undoBlocked.value = 'Already undone or edited away'
+    if (answer.code === 'nothing-to-revert')
+      undoBlocked.value = "Can't undo: this change was undone already or edited away."
     else if (answer.code === 'revert-conflict')
-      undoBlocked.value = `Can't undo: later changes${conflictPlaces(answer.details?.headings)} are in the way`
+      undoBlocked.value = `Can't undo: later changes${conflictPlaces(answer.details?.headings)} are in the way.`
   } catch {
     // keep the button; the undo itself still says why it failed
   }

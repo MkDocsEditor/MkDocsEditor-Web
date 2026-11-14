@@ -276,7 +276,7 @@ describe('HistoryDialog', () => {
     ;(q('[data-testid="history-undo-confirm"]') as HTMLElement).click()
     await flushPromises()
     expect(q('[data-testid="history-undo-error"]')?.textContent).toContain(
-      'changed again later in Setup, the start of the page',
+      'changed again later in Setup, Top of the page',
     )
     expect(open.value).toBe(true)
 
@@ -317,7 +317,7 @@ describe('HistoryDialog', () => {
     await reopen()
     expect(q('[data-testid="history-undo"]')).toBeNull()
     expect(q('[data-testid="history-undo-blocked"]')?.textContent).toContain(
-      'Already undone or edited away',
+      "Can't undo: this change was undone already or edited away.",
     )
 
     answer = () =>
@@ -328,7 +328,7 @@ describe('HistoryDialog', () => {
       })
     await reopen()
     expect(q('[data-testid="history-undo-blocked"]')?.textContent).toContain(
-      "Can't undo: later changes in Setup, the start of the page are in the way",
+      "Can't undo: later changes in Setup, Top of the page are in the way.",
     )
 
     // a failing check keeps the button: the undo says why
