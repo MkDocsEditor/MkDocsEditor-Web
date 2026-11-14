@@ -18,8 +18,15 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      # OCI labels (revision, source, created, …) so a running image can be traced to its commit
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: mkdocseditor/mkdocseditor-web
+          tags: type=raw,value=${{ github.ref_name }}
       - uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          tags: mkdocseditor/mkdocseditor-web:${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
