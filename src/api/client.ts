@@ -4,6 +4,7 @@ import type {
   Backlink,
   BrokenReference,
   DiffHunk,
+  DocumentChanges,
   DocumentModel,
   FeedPage,
   ItemRef,
@@ -99,6 +100,8 @@ export interface RequestInitOptions {
   quiet401?: boolean
   /** The HTTP cache mode of `fetch`; see `getQrCode`. */
   cache?: RequestCache
+  /** Lets the request finish after the page is gone (`fetch` keepalive). */
+  keepalive?: boolean
 }
 
 /**
@@ -156,6 +159,7 @@ export class ApiClient {
               body,
               credentials: 'include',
               ...(init.cache ? { cache: init.cache } : {}),
+              ...(init.keepalive ? { keepalive: true } : {}),
             })
     } catch (error) {
       throw new ApiError(
@@ -277,6 +281,23 @@ export class ApiClient {
     if (response.headers.get('Content-Type')?.includes('application/json'))
       return ((await response.json()) as { hunks: DiffHunk[] | null }).hunks ?? []
     return response.text()
+  }
+
+  /**
+   * What changed since the user last saw the document (`since` 'seen'), or since a revision.
+   * Null on backends without it.
+   */
+  async getChanges(id: string, since = 'seen'): Promise<DocumentChanges | null> {
+    const query = new URLSearchParams({ since })
+    return nullWhen(
+      [404, 405],
+      this.json<DocumentChanges>('GET', `${urlPath`/document/${id}/changes`}?${query}`),
+    )
+  }
+
+  /** Remembers that the user saw the document at `seenToken` (a revision of its text). */
+  async markSeen(id: string, seenToken: string, keepalive = false): Promise<void> {
+    await this.request('PUT', urlPath`/document/${id}/seen`, { json: { seenToken }, keepalive })
   }
 
   /** Sets the live document to the text of `revision` (arrives as a normal edit). */

@@ -8,7 +8,8 @@ import type { Revision } from '@/api'
 import AppDialog from '@/components/common/AppDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
-import { hunksOfUnifiedDiff, hunkStats, linesBetween, rangeOfHunk, showHunk } from '@/services/diff'
+import DiffHunks from '@/components/history/DiffHunks.vue'
+import { hunksOfUnifiedDiff, hunkStats } from '@/services/diff'
 import type { DiffHunk } from '@/services/diff'
 import type { ChangeRange } from '@/markdown/changeRanges'
 import { formatDate, formatWhen } from '@/services/time'
@@ -104,21 +105,9 @@ const showsContent = computed(
     (view.value === 'changes' && selected.value !== null && !previous(selected.value)),
 )
 const stats = computed(() => hunkStats(hunks.value))
-const shownHunks = computed(() =>
-  hunks.value.map((hunk, i) => ({
-    hunk,
-    lines: showHunk(hunk),
-    folded: i > 0 ? linesBetween(hunks.value[i - 1]!, hunk) : hunk.newStart - 1,
-  })),
-)
-
-function hunkTitle(hunk: DiffHunk): string {
-  return hunk.heading ?? 'Start of the page'
-}
-
-/** Opens the page at the hunk's lines, found again by its heading in today's text. */
-function showInPage(hunk: DiffHunk): void {
-  emit('show', rangeOfHunk(hunk))
+/** Opens the page at a hunk's lines, found again by its heading in today's text. */
+function showInPage(range: ChangeRange): void {
+  emit('show', range)
   open.value = false
 }
 
@@ -316,53 +305,7 @@ const viewLabels: Record<View, string> = {
                   <template v-if="view === 'current'"> · green was added since</template>
                 </template>
               </div>
-              <div class="history__diff" data-testid="history-diff">
-                <section
-                  v-for="(shown, h) in shownHunks"
-                  :key="h"
-                  class="history__hunk"
-                  data-testid="history-hunk"
-                >
-                  <div v-if="shown.folded > 0" class="history__folded">
-                    {{
-                      shown.folded === 1 ? '1 unchanged line' : `${shown.folded} unchanged lines`
-                    }}
-                  </div>
-                  <button
-                    type="button"
-                    class="history__hunk-head"
-                    :title="`Show ${hunkTitle(shown.hunk)} in the page`"
-                    data-testid="history-hunk-show"
-                    @click="showInPage(shown.hunk)"
-                  >
-                    {{ hunkTitle(shown.hunk) }}
-                  </button>
-                  <div
-                    v-for="(line, i) in shown.lines"
-                    :key="i"
-                    class="history__line"
-                    :class="{
-                      'history__line--add': line.op === '+',
-                      'history__line--del': line.op === '-',
-                    }"
-                    data-testid="history-line"
-                  >
-                    <span class="history__sign" aria-hidden="true">{{
-                      line.op === '+' ? '+' : line.op === '-' ? '−' : ''
-                    }}</span>
-                    <span class="history__line-text"
-                      ><template v-if="line.pieces"
-                        ><span
-                          v-for="(piece, p) in line.pieces"
-                          :key="p"
-                          :class="{ 'history__word--changed': piece.changed }"
-                          >{{ piece.text }}</span
-                        ></template
-                      ><template v-else>{{ line.text }}</template></span
-                    >
-                  </div>
-                </section>
-              </div>
+              <DiffHunks :hunks="hunks" @show="showInPage" />
             </template>
           </div>
         </div>
@@ -409,8 +352,7 @@ const viewLabels: Record<View, string> = {
   gap: var(--app-space-2);
   flex-wrap: wrap;
 }
-.history__text,
-.history__diff {
+.history__text {
   font-family: var(--app-font-mono);
   font-size: var(--md-sys-typescale-body-medium-size);
   line-height: 1.5;
@@ -421,51 +363,6 @@ const viewLabels: Record<View, string> = {
   padding: var(--app-space-2) var(--app-space-4);
   white-space: pre-wrap;
   word-break: break-word;
-}
-.history__line {
-  display: flex;
-  white-space: pre-wrap;
-  word-break: break-word;
-  padding: 0 var(--app-space-2) 0 0;
-}
-.history__sign {
-  flex: 0 0 24px;
-  text-align: center;
-  user-select: none;
-}
-.history__line--add {
-  background: rgba(var(--v-theme-code-inserted), 0.18);
-}
-.history__line--del {
-  background: rgba(var(--v-theme-code-deleted), 0.18);
-}
-.history__line--add .history__word--changed {
-  background: rgba(var(--v-theme-code-inserted), 0.4);
-}
-.history__line--del .history__word--changed {
-  background: rgba(var(--v-theme-code-deleted), 0.4);
-}
-.history__folded {
-  padding: var(--app-space-1) var(--app-space-4);
-  color: rgba(var(--v-theme-on-surface), 0.6);
-  background: rgba(var(--v-theme-on-surface), 0.04);
-}
-.history__hunk-head {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: var(--app-space-1) var(--app-space-4);
-  font: inherit;
-  font-weight: 500;
-  color: rgb(var(--v-theme-primary));
-  background: none;
-  border: none;
-  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
-  cursor: pointer;
-}
-.history__hunk-head:hover,
-.history__hunk-head:focus-visible {
-  background: rgba(var(--v-theme-primary), 0.08);
 }
 .history__added {
   color: rgb(var(--v-theme-code-inserted));
