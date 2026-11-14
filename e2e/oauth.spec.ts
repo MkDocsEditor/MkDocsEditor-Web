@@ -66,6 +66,11 @@ test('an MCP client connects with OAuth: sign in, allow, and revoke it in the se
   await expect(client).toContainText(`calls itself ${clientName}`)
   await expect(page.getByTestId('oauth-target-host')).toHaveText('127.0.0.1:9')
 
+  // a fixed end of 30 days instead of none; the name stays the client's
+  await expect(page.getByTestId('oauth-name').locator('input')).toHaveValue(clientName)
+  await page.getByTestId('oauth-expiry').click()
+  await page.getByRole('option', { name: 'In 30 days' }).click()
+  await expect(page.getByTestId('oauth-expiry-note')).toContainText('cannot change later')
   await page.getByTestId('oauth-approve').click()
   await confirmIfAsked(page, page.getByText('callback-ok'), user.password)
   const answer = new URL(callback)
@@ -91,11 +96,22 @@ test('an MCP client connects with OAuth: sign in, allow, and revoke it in the se
     fetch(`${BACKEND_URL}/mcp`, { headers: { Authorization: `Bearer ${accessToken}` } })
   expect((await mcp()).status).not.toBe(401)
 
-  // the grant is in the token list, and revoking it disconnects the client
+  // the grant is in the token list with its fixed end; it can be renamed, not given a new end
   await page.goto('/settings/agents')
-  const grant = page.getByTestId('app-token').filter({ hasText: clientName })
-  await expect(grant.getByTestId('oauth-badge')).toBeVisible()
-  await grant.getByRole('button', { name: `Revoke ${clientName}` }).click()
+  const original = page.getByTestId('app-token').filter({ hasText: clientName })
+  await expect(original.getByTestId('oauth-badge')).toBeVisible()
+  await expect(original).toContainText('expires')
+  await expect(original).not.toContainText('stays while used')
+  await original.getByRole('button', { name: `Rename ${clientName}` }).click()
+  await expect(page.getByTestId('app-token-expiry-note')).toContainText('connect the app again')
+  const renamed = `${clientName} 2`
+  await page.getByTestId('app-token-new-name').locator('input').fill(renamed)
+  await page.getByTestId('app-token-rename-save').click()
+  const grant = page.getByTestId('app-token').filter({ hasText: renamed })
+  await expect(grant).toBeVisible()
+
+  // revoking it disconnects the client
+  await grant.getByRole('button', { name: `Revoke ${renamed}` }).click()
   await page.getByTestId('confirm-button').click()
   await expect(grant).toHaveCount(0)
   expect((await mcp()).status).toBe(401)

@@ -4,9 +4,10 @@ import { computed, onMounted, ref } from 'vue'
 
 import { ApiError, useAuthApi } from '@/api'
 import type { AppTokenScope, OAuthRequest } from '@/api'
+import ExpiryField from '@/components/account/ExpiryField.vue'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import { describeOAuthTarget } from '@/services/oauthConsent'
-import { SCOPE_CHOICES } from '@/services/appTokens'
+import { SCOPE_CHOICES, tokenNameRule } from '@/services/appTokens'
 import { useAuthStore } from '@/stores/auth'
 import { describeError } from '@/stores/notify'
 import { ReauthCancelled, useReauthStore } from '@/stores/reauth'
@@ -27,6 +28,11 @@ const error = ref('')
 const loading = ref(true)
 const busy = ref<'approve' | 'deny' | null>(null)
 const scope = ref<AppTokenScope>('read')
+/** The name of the grant in the token list; the client's name to begin with. */
+const name = ref('')
+/** Null: no fixed end, the grant lives while the app uses it. Undefined: a date is missing. */
+const expiresAt = ref<string | null | undefined>(null)
+const valid = computed(() => tokenNameRule(name.value) === true && expiresAt.value !== undefined)
 /** After the answer, for clients the browser cannot leave this page for (custom schemes). */
 const decided = ref<'approved' | 'denied' | null>(null)
 
@@ -49,6 +55,7 @@ async function load(): Promise<void> {
     info.value = await api.oauthRequest(props.request)
     const requested = info.value.scope
     scope.value = info.value.allowedScopes.includes(requested) ? requested : 'read'
+    name.value = info.value.name || info.value.clientName.slice(0, 64)
   } catch (e) {
     error.value = failure(e)
   } finally {
@@ -64,7 +71,13 @@ async function decide(answer: 'approve' | 'deny'): Promise<void> {
   try {
     const { redirectUrl } =
       answer === 'approve'
-        ? await reauth.run(() => api.approveOAuthRequest(id, scope.value))
+        ? await reauth.run(() =>
+            api.approveOAuthRequest(id, {
+              scope: scope.value,
+              name: name.value.trim(),
+              expiresAt: expiresAt.value ?? null,
+            }),
+          )
         : await api.denyOAuthRequest(id)
     decided.value = answer === 'approve' ? 'approved' : 'denied'
     // built by the server from a redirect URI the client registered: http(s) or an app's scheme
@@ -150,9 +163,22 @@ onMounted(load)
       <p v-else class="mb-2" data-testid="oauth-read-only">
         Access: read only{{ info.scope === 'write' ? ' (your role cannot edit)' : '' }}
       </p>
-      <p class="mb-4 text-body-small text-medium-emphasis">
-        It gets a token that lasts as long as the app keeps using it. Revoke it any time in Settings
-        › AI agents and tokens.
+      <div class="d-flex flex-column ga-2 mb-2">
+        <v-text-field
+          v-model="name"
+          label="Name in your list of tokens"
+          :rules="[tokenNameRule]"
+          data-testid="oauth-name"
+        />
+        <ExpiryField v-model="expiresAt" :max="info.maxExpiresAt" testid="oauth-expiry" />
+      </div>
+      <p class="mb-4 text-body-small text-medium-emphasis" data-testid="oauth-expiry-note">
+        {{
+          expiresAt === null
+            ? 'Without a fixed end it stays connected as long as the app uses it at least every 30 days.'
+            : 'The end cannot change later: to go on after it, connect the app again.'
+        }}
+        Revoke it any time in Settings › AI agents and tokens.
       </p>
 
       <v-alert v-if="error" type="error" class="mb-4" role="alert">{{ error }}</v-alert>
@@ -171,7 +197,7 @@ onMounted(load)
           color="primary"
           variant="flat"
           :loading="busy === 'approve'"
-          :disabled="busy !== null"
+          :disabled="busy !== null || !valid"
           data-testid="oauth-approve"
           @click="decide('approve')"
         >

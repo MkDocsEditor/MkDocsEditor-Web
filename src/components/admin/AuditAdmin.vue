@@ -33,6 +33,7 @@ const TYPES: Record<string, string> = {
   'passkey.removed': 'Passkey removed',
   'app-token.created': 'App token created',
   'app-token.revoked': 'App token revoked',
+  'app-token.updated': 'App token renamed',
   'oauth.client-registered': 'OAuth app registered',
   'oauth.approved': 'OAuth app allowed',
   'oauth.denied': 'OAuth app refused',

@@ -652,6 +652,55 @@ describe('SettingsView: account', () => {
     wrapper.unmount()
   })
 
+  it('renames tokens and grants, and shows their end as it was made', async () => {
+    const grant = {
+      id: 'g1',
+      name: 'Claude Code',
+      scope: 'write',
+      createdAt: '2026-11-14T10:00:00Z',
+      lastUsedAt: null,
+      expiresAt: '2026-12-14T10:00:00Z',
+      oauthClientId: 'c1',
+      slidingExpiry: true,
+    }
+    const fixed = {
+      id: 't1',
+      name: 'Backup',
+      scope: 'read',
+      createdAt: '2026-11-14T10:00:00Z',
+      lastUsedAt: null,
+      expiresAt: '2099-12-24T22:59:59Z',
+    }
+    let tokens: Record<string, unknown>[] = [grant, fixed]
+    const { wrapper, mock } = await mount('agents', {
+      'GET /account/tokens/': () => json(tokens),
+      'PATCH /account/tokens/g1/': (request) => {
+        tokens = [{ ...grant, name: body(request).name }, fixed]
+        return json(tokens[0])
+      },
+    })
+    const list = () => wrapper.find('[data-testid="app-token-list"]').text()
+    expect(list()).toContain('stays while used')
+
+    await wrapper.find('[aria-label="Rename Backup"]').trigger('click')
+    await flushPromises()
+    expect(byTestId('app-token-expiry-note').textContent).toContain('cannot change')
+    expect(byTestId('app-token-expiry-note').textContent).toContain('create a new token')
+    document.querySelector<HTMLElement>('.v-overlay--active .v-btn:not([type="submit"])')?.click()
+    await flushPromises()
+
+    await wrapper.find('[aria-label="Rename Claude Code"]').trigger('click')
+    await flushPromises()
+    expect(byTestId('app-token-expiry-note').textContent).toContain('at least every 30 days')
+    await typeInto('app-token-new-name', 'Claude Code im Büro')
+    byTestId('app-token-rename-form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+    const patch = mock.requests.find((r) => r.method === 'PATCH')
+    expect(body(patch)).toEqual({ name: 'Claude Code im Büro' })
+    expect(list()).toContain('Claude Code im Büro')
+    wrapper.unmount()
+  })
+
   it('asks for a second factor when the instance requires one', async () => {
     const { wrapper } = await mount(
       'security',
