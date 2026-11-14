@@ -8,6 +8,7 @@ import {
   mdiImageSearchOutline,
   mdiPaperclip,
   mdiQrcode,
+  mdiRobotOutline,
   mdiShareVariant,
   mdiTune,
   mdiViewSplitVertical,
@@ -39,6 +40,7 @@ import type { TextReference } from '@/markdown/references'
 import MarkdownPreview from '@/markdown/MarkdownPreview.vue'
 import { lineRange } from '@/markdown/sourceLines'
 import type { ScrollAnchor } from '@/markdown/sourceLines'
+import { pageForAgent } from '@/services/agentSnippets'
 import { isImage, resourceKind } from '@/services/icons'
 import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
@@ -452,6 +454,17 @@ watch(
   { immediate: true },
 )
 
+/** Copies what an agent needs to find this page, for "edit this page" in a chat. */
+async function copyForAgent(): Promise<void> {
+  const text = pageForAgent({
+    id: props.id,
+    title: title.value,
+    path: tree.path(props.id) || undefined,
+  })
+  if (await copyText(text)) notify.success('Copied. Paste it into the chat with the agent.')
+  else notify.push(text, 'warning')
+}
+
 /** Shares the page with a link that leads others to where this user is right now. */
 async function share(): Promise<void> {
   const url = joinLink(props.id, auth.user?.id, session.value?.me.value?.instanceId ?? instanceId())
@@ -590,6 +603,12 @@ async function share(): Promise<void> {
               title="QR codes"
               data-testid="open-qr"
               @click="openQr()"
+            />
+            <v-list-item
+              :prepend-icon="mdiRobotOutline"
+              title="Copy for an AI agent"
+              data-testid="copy-for-agent"
+              @click="copyForAgent()"
             />
             <v-list-item
               v-if="wikiUrl"

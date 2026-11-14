@@ -69,6 +69,8 @@ test.describe('join links', () => {
   })
 
   test('find the last position of a sender who has left', async ({ browser }, testInfo) => {
+    // typing 150 lines and two logins take half a minute on a busy CI runner
+    test.setTimeout(90_000)
     await requireFeature('join-presence')
     const id = await createDocument(testName('Join left', testInfo))
     const sender = await userPage(browser, USERS.alice)
@@ -79,10 +81,12 @@ test.describe('join links', () => {
     await sender.context().close()
 
     const page = await userPage(browser, USERS.bob)
+    // A fresh page needs about 5 s on CI until the document is connected; a shorter wait per
+    // attempt reloads before it ever is.
     await expect(async () => {
       await page.goto(`/join/${id}?from=${from}`)
-      await expect(page.getByText('Zeile 149', { exact: true })).toBeInViewport({ timeout: 3000 })
-    }).toPass({ timeout: 30_000 })
+      await expect(page.getByText('Zeile 149', { exact: true })).toBeInViewport({ timeout: 10_000 })
+    }).toPass({ timeout: 45_000 })
   })
 
   test('say so when the sender is not there', async ({ browser }, testInfo) => {

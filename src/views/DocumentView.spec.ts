@@ -108,6 +108,20 @@ describe('DocumentView', () => {
     wrapper.unmount()
   })
 
+  it('copies what an agent needs to find the page', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const { wrapper } = await setup()
+    await wrapper.find('[aria-label="More"]').trigger('click')
+    await flushPromises()
+    ;(document.querySelector('[data-testid="copy-for-agent"]') as HTMLElement).click()
+    await flushPromises()
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringMatching(/^Wiki page “Apfelkuchen” \(.+\.md\), document id d-apfel$/),
+    )
+    wrapper.unmount()
+  })
+
   it('formats with the toolbar', async () => {
     const { wrapper } = await setup()
     await vi.waitFor(() =>

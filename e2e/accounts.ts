@@ -43,7 +43,7 @@ export async function devicePage(browser: Browser, testInfo: TestInfo, user?: Us
 /** Opens the account menu in the app bar and picks an entry. */
 export async function accountMenu(
   page: Page,
-  entry: 'menu-account' | 'menu-settings' | 'menu-admin' | 'menu-logout',
+  entry: 'menu-account' | 'menu-settings' | 'menu-admin' | 'menu-agents' | 'menu-logout',
 ) {
   await page.getByTestId('account-menu').click()
   await page.getByTestId(entry).click()

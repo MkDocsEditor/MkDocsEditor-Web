@@ -4,6 +4,7 @@ import {
   mdiCogOutline,
   mdiLinkVariantOff,
   mdiQrcode,
+  mdiRobotOutline,
   mdiLogout,
   mdiPaperclip,
   mdiPaperclipOff,
@@ -280,6 +281,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 <v-badge inline color="error" :content="pendingRequests" />
               </template>
             </v-list-item>
+            <v-list-item
+              :prepend-icon="mdiRobotOutline"
+              title="Connect an AI agent"
+              :to="{ name: 'settings', params: { section: 'agents' } }"
+              data-testid="menu-agents"
+            />
             <v-list-item
               v-if="qr.available"
               :prepend-icon="mdiQrcode"
