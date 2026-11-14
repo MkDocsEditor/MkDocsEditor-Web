@@ -5,6 +5,7 @@ import {
   curlEdit,
   curlRead,
   defaultAgentName,
+  mcpAvailable,
   mcpJson,
   mcpUrl,
   pageForAgent,
@@ -58,6 +59,18 @@ describe('agentSnippets', () => {
         `  https://wiki.example.com/api/document/d1/edits/`,
       ].join('\n'),
     )
+  })
+
+  it('counts every answer but 404 as a live MCP server', async () => {
+    const answer = (status: number) => async () => new Response(null, { status })
+    expect(await mcpAvailable(URL, answer(404))).toBe(false)
+    expect(await mcpAvailable(URL, answer(401))).toBe(true)
+    expect(await mcpAvailable(URL, answer(405))).toBe(true)
+    expect(await mcpAvailable(URL, answer(200))).toBe(true)
+    const offline = async () => {
+      throw new TypeError('Failed to fetch')
+    }
+    expect(await mcpAvailable(URL, offline)).toBeNull()
   })
 
   it('names the token after the device', () => {
