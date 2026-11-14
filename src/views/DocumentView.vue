@@ -17,6 +17,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
+import { useApi } from '@/api'
 import type { QrKey, ResourceModel } from '@/api'
 import ChangesBanner from '@/components/changes/ChangesBanner.vue'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
@@ -317,6 +318,11 @@ watch(
 let changeTimer: ReturnType<typeof setTimeout> | undefined
 onBeforeUnmount(() => clearTimeout(changeTimer))
 
+/** Who wrote which lines and when, for the editor's gutter (phones have no hover). */
+function loadBlame() {
+  return useApi().getBlame(props.id)
+}
+
 /** From the history: the lines of a change, like a feed entry's (`?change=`). */
 function showHistoryRange(range: ChangeRange): void {
   void router.replace({ query: { ...route.query, change: JSON.stringify({ ranges: [range] }) } })
@@ -360,7 +366,8 @@ async function showChange(query: ChangeQuery, attempt = 0): Promise<void> {
   const editorShown = mode.value !== 'preview'
   // the panes come a moment after the text is ready
   if ((editorShown && (!view || view.state.doc.length < text.value.length)) || !preview.value) {
-    if (attempt < 40) changeTimer = setTimeout(() => void showChange(query, attempt + 1), 50)
+    // up to 10 s: on a slow device or connection the panes take a while
+    if (attempt < 200) changeTimer = setTimeout(() => void showChange(query, attempt + 1), 50)
     return
   }
   const targets = await targetsOf(query)
@@ -696,6 +703,7 @@ async function share(): Promise<void> {
           :line-numbers="!mobile && lineNumbers"
           :format-override="shortcutOverride"
           :shown="mode !== 'preview'"
+          :load-blame="mobile ? undefined : loadBlame"
           @change="(t: string) => (text = t)"
           @local-edit="follow.stop()"
           @anchor="onEditorAnchor"

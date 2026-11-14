@@ -71,9 +71,10 @@ export function useEditorInsertion(
   /** Selects a line, once the text is there. */
   function revealLine(number: number, attempt = 0): void {
     const view = editorView()
-    // the editor creates its view a moment after the text is ready
+    // the editor creates its view a moment after the text is ready; on a slow device or
+    // connection that can take seconds (10 s here)
     if (!view || view.state.doc.length < text().length) {
-      if (attempt < 40) revealTimer = setTimeout(() => revealLine(number, attempt + 1), 50)
+      if (attempt < 200) revealTimer = setTimeout(() => revealLine(number, attempt + 1), 50)
       return
     }
     const target = view.state.doc.line(Math.min(number, view.state.doc.lines))

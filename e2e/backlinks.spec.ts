@@ -50,8 +50,9 @@ test('pages and files show what links to them', async ({ page }, testInfo) => {
   await expect(backlink).toContainText('line 3', { timeout: 10_000 })
   await backlink.click()
   await expect(page).toHaveURL(new RegExp(`/document/${quelle.id}$`))
-  // the line of the link is selected
-  await expect(page.locator('.cm-selectionBackground').first()).toBeVisible()
+  // the line of the link is selected, once the page is connected: on a busy CI runner the
+  // websocket can take 5 s and more
+  await expect(page.locator('.cm-selectionBackground').first()).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('.cm-activeLine')).toHaveText('![Bild](Bild.png) und [Ziel](Ziel.md)')
 
   // "used by" on the file page, and the delete warning
