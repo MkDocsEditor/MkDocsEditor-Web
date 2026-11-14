@@ -612,6 +612,46 @@ describe('SettingsView: account', () => {
     wrapper.unmount()
   })
 
+  it('leads with OAuth when the server has it, and marks its grants in the token list', async () => {
+    vi.stubGlobal('fetch', async () => new Response(null, { status: 401 }))
+    const { wrapper } = await mount('agents', {
+      'GET /server-info/': () =>
+        json({
+          name: 'w',
+          version: '1',
+          protocolVersion: 1,
+          backendUrl: null,
+          features: ['oauth'],
+        }),
+      'GET /account/tokens/': () =>
+        json([
+          {
+            id: 'g1',
+            name: 'Claude Code',
+            scope: 'write',
+            createdAt: '2026-11-14T10:00:00Z',
+            lastUsedAt: null,
+            expiresAt: '2026-12-14T10:00:00Z',
+            oauthClientId: 'c1',
+            resource: 'https://wiki.example.com/api/mcp',
+          },
+        ]),
+    })
+    expect(byTestId('snippet-claude-oauth').textContent).toMatch(
+      /^claude mcp add --transport http --scope user wiki \S+\/api\/mcp$/,
+    )
+    // the token form stays, for clients without OAuth
+    expect(document.querySelector('[data-testid="connect-agent-form"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="mcp-not-live"]')).toBeNull()
+    expect(byTestId('oauth-badge').textContent).toContain('OAuth app')
+
+    await wrapper.find('[aria-label="Revoke Claude Code"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('has to ask for access again')
+    vi.unstubAllGlobals()
+    wrapper.unmount()
+  })
+
   it('asks for a second factor when the instance requires one', async () => {
     const { wrapper } = await mount(
       'security',

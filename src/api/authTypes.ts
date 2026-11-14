@@ -246,8 +246,27 @@ export interface AppToken {
   scope: AppTokenScope
   createdAt: string
   lastUsedAt: string | null
-  /** Null: never expires. */
+  /** Null: never expires. For OAuth clients it moves 30 days ahead with each refresh. */
   expiresAt: string | null
+  /** Set when an MCP client got this token by signing in with OAuth. */
+  oauthClientId?: string
+  /** The server the OAuth client may use, e.g. `https://wiki.example.com/api/mcp`. */
+  resource?: string
+}
+
+/** An MCP client asks for access (`GET /oauth/requests/{id}/`, `docs/oauth.md`). */
+export interface OAuthRequest {
+  id: string
+  clientId: string
+  /** Chosen by the client itself: a claim, not a verified name. */
+  clientName: string
+  /** Where the browser goes after the decision, with the code or the refusal. */
+  redirectUri: string
+  scope: AppTokenScope
+  /** Only `read` for readers. */
+  allowedScopes: AppTokenScope[]
+  resource: string
+  expiresAt: string
 }
 
 export interface CreatedAppToken {

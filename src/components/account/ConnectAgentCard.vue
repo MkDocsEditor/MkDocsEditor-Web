@@ -41,6 +41,8 @@ const created = ref<CreatedAppToken | null>(null)
 const tab = ref('claude')
 /** False: the backend has no MCP server yet; null: unknown. */
 const mcpLive = ref<boolean | null>(null)
+/** The server signs MCP clients in with OAuth: then no token needs copying. */
+const oauth = ref(false)
 
 const token = computed(() => created.value?.token ?? '')
 
@@ -71,6 +73,10 @@ function reset(): void {
 }
 
 onMounted(async () => {
+  void api
+    .serverInfo()
+    .then((info) => (oauth.value = info.features?.includes('oauth') === true))
+    .catch(() => undefined)
   mcpLive.value = await mcpAvailable(url)
 })
 </script>
@@ -92,6 +98,25 @@ onMounted(async () => {
         This server does not offer MCP yet. The token and the REST API work already; the MCP setup
         works once the server is updated.
       </v-alert>
+
+      <div v-if="oauth && !created" class="mb-6" data-testid="connect-agent-oauth">
+        <p class="mb-2">
+          For Claude Code, run this in a terminal, then in Claude Code <code>/mcp</code> and
+          “Authenticate”:
+        </p>
+        <CodeSnippet
+          :code="claudeCommand(url, undefined, true)"
+          label="Command"
+          testid="snippet-claude-oauth"
+        />
+        <p class="mt-2 text-medium-emphasis">
+          The browser opens to sign in and allow it; no token to copy. Other clients with OAuth
+          (Claude Desktop, Cursor, …) need only the address <code>{{ url }}</code
+          >.
+        </p>
+        <v-divider class="my-4" />
+        <p class="text-title-small">For clients without OAuth: a token</p>
+      </div>
 
       <v-form v-if="!created" data-testid="connect-agent-form" @submit.prevent="create">
         <p class="mb-4">
