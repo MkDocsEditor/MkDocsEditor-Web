@@ -295,6 +295,21 @@ export interface DiffHunk {
   lines: HunkLine[]
 }
 
+/**
+ * What changed in a document since a user last saw it (`GET /document/{id}/changes/`), up to
+ * the live text.
+ */
+export interface DocumentChanges {
+  /** When the user last saw it and what they saw; null if they never did (then no hunks). */
+  since: { time: string; seenToken: string } | null
+  /** The revision of the live text these changes go to; `PUT …/seen/` after showing them. */
+  seenToken: string
+  /** Who changed it since, with the agents (token names) they used. */
+  authors: (ActivityPerson & { agents: string[] })[]
+  hunks: DiffHunk[]
+  summary: { linesAdded: number; linesRemoved: number; headings: string[] }
+}
+
 /** Someone named on the dashboard, with the current name, colour and picture. */
 export interface ActivityPerson {
   /** Absent for the server itself and for changes on disk. */

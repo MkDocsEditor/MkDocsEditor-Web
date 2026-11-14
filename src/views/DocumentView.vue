@@ -18,6 +18,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
 import type { QrKey, ResourceModel } from '@/api'
+import ChangesBanner from '@/components/changes/ChangesBanner.vue'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
 import LinkPickerDialog from '@/components/pickers/LinkPickerDialog.vue'
 import ResourcePickerDialog from '@/components/pickers/ResourcePickerDialog.vue'
@@ -58,6 +59,7 @@ import { useQrStore } from '@/stores/qr'
 import { useTreeStore } from '@/stores/tree'
 
 import { connectionBadge } from './document/connectionBadge'
+import { useChangesSinceVisit } from './document/useChangesSinceVisit'
 import { useDocumentSession } from './document/useDocumentSession'
 import { useEditorInsertion } from './document/useEditorInsertion'
 import { useFollow } from './document/useFollow'
@@ -157,6 +159,8 @@ const { session, text, ready, status, peers, ghosts, presenceKnown, onlineUsers 
     },
   )
 useSearchText(() => props.id, text, ready)
+const seen = useChangesSinceVisit(() => props.id, session, ready)
+const sinceVisit = seen.changes
 
 // The name of the page as MkDocs shows it, as it is typed; from the tree until the text is there.
 const pageMeta = usePageMetaStore()
@@ -651,6 +655,12 @@ async function share(): Promise<void> {
       >
         {{ status.message }}
       </v-alert>
+      <ChangesBanner
+        v-if="sinceVisit"
+        :changes="sinceVisit"
+        @dismiss="seen.dismiss"
+        @show="showHistoryRange"
+      />
     </div>
 
     <v-divider />

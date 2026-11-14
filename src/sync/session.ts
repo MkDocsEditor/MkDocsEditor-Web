@@ -127,6 +127,11 @@ export interface DocumentSession {
 
   /** The current text. */
   getText(): string
+  /**
+   * The revision of the text the server has too (its sorted heads joined by '.', like the
+   * content API's ETag); null before the first sync.
+   */
+  sharedRevision(): string | null
   /** Applies edits made in the local editor. */
   applyLocalChanges(changes: readonly TextChange[]): void
   /**

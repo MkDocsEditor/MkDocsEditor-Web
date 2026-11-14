@@ -571,6 +571,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     me,
     ready,
     getText: text,
+    sharedRevision: () => (serverHeads.length > 0 ? [...serverHeads].sort().join('.') : null),
     applyLocalChanges(changes) {
       if (!doc || changes.length === 0) return
       if (readOnly || status.value.connection === 'closed') return

@@ -42,6 +42,7 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     me,
     ready: Promise.resolve(),
     getText: () => text,
+    sharedRevision: () => 'r1',
     applyLocalChanges(changes) {
       localChanges.push([...changes])
       text = applyChanges(text, changes)
