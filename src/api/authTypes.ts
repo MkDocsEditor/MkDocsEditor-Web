@@ -252,6 +252,8 @@ export interface AppToken {
   oauthClientId?: string
   /** The server the OAuth client may use, e.g. `https://wiki.example.com/api/mcp`. */
   resource?: string
+  /** An OAuth grant without a fixed end: `expiresAt` moves 30 days ahead with each use. */
+  slidingExpiry?: boolean
 }
 
 /** An MCP client asks for access (`GET /oauth/requests/{id}/`, `docs/oauth.md`). */

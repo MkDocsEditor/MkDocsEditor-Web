@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiDelete, mdiKeyVariant, mdiPlus } from '@mdi/js'
+import { mdiDelete, mdiKeyVariant, mdiPencil, mdiPlus } from '@mdi/js'
 import { onMounted, ref } from 'vue'
 
 import { useAuthApi } from '@/api'
@@ -27,6 +27,8 @@ const scope = ref<AppTokenScope>('write')
 const expiresInDays = ref<number | null>(90)
 const created = ref<CreatedAppToken | null>(null)
 const revoking = ref<AppToken | null>(null)
+const renaming = ref<AppToken | null>(null)
+const newName = ref('')
 
 const { loading, loadError, load } = useLoad({
   failure: 'Could not load the app tokens',
@@ -35,6 +37,10 @@ const { loading, loadError, load } = useLoad({
     tokens.value = await api.appTokens()
   },
 })
+
+function slides(token: AppToken): boolean {
+  return token.slidingExpiry === true
+}
 
 function expired(token: AppToken): boolean {
   return token.expiresAt !== null && Date.parse(token.expiresAt) <= Date.now()
@@ -45,9 +51,11 @@ function details(token: AppToken): string {
     token.scope === 'write' ? 'Read and write' : 'Read only',
     `created ${formatTime(token.createdAt)}`,
     token.lastUsedAt ? `last used ${formatTime(token.lastUsedAt)}` : 'never used',
-    token.expiresAt
-      ? `${expired(token) ? 'expired' : 'expires'} ${formatTime(token.expiresAt)}`
-      : 'never expires',
+    slides(token) && !expired(token)
+      ? 'stays while used'
+      : token.expiresAt
+        ? `${expired(token) ? 'expired' : 'expires'} ${formatTime(token.expiresAt)}`
+        : 'never expires',
   ]
   return parts.join(' · ')
 }
@@ -75,6 +83,38 @@ async function create(): Promise<void> {
     await load()
   } catch (e) {
     if (!(e instanceof ReauthCancelled)) notify.error(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+/** The expiry stays as it was made (like GitHub); this says what that means and what to do. */
+function expiryNote(token: AppToken): string {
+  if (slides(token)) return 'It stays connected as long as the app uses it at least every 30 days.'
+  if (!token.expiresAt) return 'It never expires.'
+  const day = formatTime(token.expiresAt)
+  const again = token.oauthClientId ? 'connect the app again' : 'create a new token'
+  return expired(token)
+    ? `It expired on ${day}. To go on, ${again}.`
+    : `It expires on ${day}. The date cannot change: to go on after that, ${again}.`
+}
+
+function startRename(token: AppToken): void {
+  renaming.value = token
+  newName.value = token.name
+}
+
+async function rename(): Promise<void> {
+  const token = renaming.value
+  const name = newName.value.trim()
+  if (!token || tokenNameRule(name) !== true) return
+  busy.value = true
+  try {
+    await api.renameAppToken(token.id, name)
+    renaming.value = null
+    await load()
+  } catch (e) {
+    notify.error(e, 'Rename failed')
   } finally {
     busy.value = false
   }
@@ -155,6 +195,13 @@ onMounted(load)
           <v-list-item-subtitle>{{ details(token) }}</v-list-item-subtitle>
           <template #append>
             <v-btn
+              :icon="mdiPencil"
+              size="small"
+              :disabled="busy"
+              :aria-label="`Rename ${token.name}`"
+              @click="startRename(token)"
+            />
+            <v-btn
               :icon="mdiDelete"
               size="small"
               :disabled="busy"
@@ -224,6 +271,38 @@ onMounted(load)
               data-testid="app-token-create"
             >
               Create
+            </v-btn>
+          </v-card-actions>
+        </v-form>
+      </v-card>
+    </AppDialog>
+    <AppDialog :model-value="renaming !== null" @update:model-value="renaming = null">
+      <v-card title="Rename token">
+        <v-form data-testid="app-token-rename-form" @submit.prevent="rename">
+          <v-card-text class="d-flex flex-column ga-2">
+            <v-text-field
+              v-model="newName"
+              label="Name"
+              autofocus
+              :rules="[tokenNameRule]"
+              data-testid="app-token-new-name"
+            />
+            <p class="text-body-medium text-medium-emphasis" data-testid="app-token-expiry-note">
+              {{ renaming && expiryNote(renaming) }}
+            </p>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn @click="renaming = null">Cancel</v-btn>
+            <v-btn
+              type="submit"
+              color="primary"
+              variant="flat"
+              :loading="busy"
+              :disabled="tokenNameRule(newName) !== true"
+              data-testid="app-token-rename-save"
+            >
+              Save
             </v-btn>
           </v-card-actions>
         </v-form>

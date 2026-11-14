@@ -257,6 +257,11 @@ export class AuthApi {
     return this.send('POST', '/account/tokens', fields)
   }
 
+  /** Only the name: like GitHub, the expiry of a token stays as it was made. */
+  renameAppToken(id: string, name: string): Promise<AppToken> {
+    return this.send('PATCH', urlPath`/account/tokens/${id}`, { name })
+  }
+
   revokeAppToken(id: string): Promise<void> {
     return this.del(urlPath`/account/tokens/${id}`)
   }
@@ -267,9 +272,16 @@ export class AuthApi {
     return this.get(urlPath`/oauth/requests/${id}`)
   }
 
-  /** `scope` can only lower the requested scope. Needs a recent authentication. */
-  approveOAuthRequest(id: string, scope?: AppTokenScope): Promise<{ redirectUrl: string }> {
-    return this.send('POST', urlPath`/oauth/requests/${id}/approve`, scope ? { scope } : {})
+  /**
+   * `scope` can only lower the requested scope. `name` names the grant (default: the client's
+   * name); `expiresAt` null gives a grant that lives while it is used. Needs a recent
+   * authentication.
+   */
+  approveOAuthRequest(
+    id: string,
+    choice: { scope?: AppTokenScope; name?: string; expiresAt?: string | null } = {},
+  ): Promise<{ redirectUrl: string }> {
+    return this.send('POST', urlPath`/oauth/requests/${id}/approve`, choice)
   }
 
   denyOAuthRequest(id: string): Promise<{ redirectUrl: string }> {

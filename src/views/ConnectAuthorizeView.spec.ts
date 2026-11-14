@@ -80,7 +80,8 @@ describe('ConnectAuthorizeView', () => {
     await flushPromises()
 
     const approvals = mock.requests.filter((r) => r.url.endsWith('/approve/'))
-    expect(body(approvals.at(-1))).toEqual({ scope: 'write' })
+    // the client's name and no fixed end are the defaults
+    expect(body(approvals.at(-1))).toEqual({ scope: 'write', name: 'Claude Code', expiresAt: null })
     expect(assign).toHaveBeenCalledWith(CODE_URL)
     expect(byTestId('oauth-decided')?.textContent).toContain('Go back to Claude Code')
     wrapper.unmount()
@@ -98,8 +99,69 @@ describe('ConnectAuthorizeView', () => {
     expect(byTestId('oauth-client')?.textContent).toContain('wants to read the wiki')
     byTestId('oauth-approve')!.click()
     await flushPromises()
-    expect(body(mock.requests.find((r) => r.url.endsWith('/approve/')))).toEqual({ scope: 'read' })
+    expect(body(mock.requests.find((r) => r.url.endsWith('/approve/')))).toMatchObject({
+      scope: 'read',
+    })
     expect(assign).toHaveBeenCalledWith(CODE_URL)
+    wrapper.unmount()
+  })
+
+  it('names the grant and gives it an end, which then cannot change', async () => {
+    const { wrapper, mock } = await mount({
+      'GET /oauth/requests/r1/': () => json(REQUEST),
+      'POST /oauth/requests/r1/approve/': () => json({ redirectUrl: CODE_URL }),
+    })
+    expect(byTestId('oauth-name')!.querySelector('input')!.value).toBe('Claude Code')
+    expect(byTestId('oauth-expiry-note')!.textContent).toContain('at least every 30 days')
+
+    const input = byTestId('oauth-name')!.querySelector('input')!
+    input.value = 'Claude Code im Büro'
+    input.dispatchEvent(new Event('input'))
+    // the select's menu is hard to drive here: pick "in 30 days" through the field's model
+    const field = wrapper.findComponent({ name: 'ExpiryField' })
+    const select = field.findComponent({ name: 'VSelect' })
+    select.vm.$emit('update:modelValue', 30)
+    await flushPromises()
+    expect(byTestId('oauth-expiry-note')!.textContent).toContain('cannot change later')
+
+    byTestId('oauth-approve')!.click()
+    await flushPromises()
+    const sent = body(mock.requests.find((r) => r.url.endsWith('/approve/'))) as {
+      name: string
+      expiresAt: string
+    }
+    expect(sent.name).toBe('Claude Code im Büro')
+    const days = (Date.parse(sent.expiresAt) - Date.now()) / 86_400_000
+    expect(days).toBeGreaterThan(29.9)
+    expect(days).toBeLessThan(30.1)
+    wrapper.unmount()
+  })
+
+  it('cannot allow without a name or with a past date', async () => {
+    const { wrapper } = await mount({ 'GET /oauth/requests/r1/': () => json(REQUEST) })
+    const input = byTestId('oauth-name')!.querySelector('input')!
+    input.value = ' '
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(byTestId('oauth-approve')!.hasAttribute('disabled')).toBe(true)
+    input.value = 'Claude Code'
+    input.dispatchEvent(new Event('input'))
+    wrapper
+      .findComponent({ name: 'ExpiryField' })
+      .findComponent({ name: 'VSelect' })
+      .vm.$emit('update:modelValue', 'date')
+    await flushPromises()
+    // no day chosen yet
+    expect(byTestId('oauth-approve')!.hasAttribute('disabled')).toBe(true)
+    const day = byTestId('oauth-expiry-date')!.querySelector('input')!
+    day.value = '2000-01-01'
+    day.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(byTestId('oauth-approve')!.hasAttribute('disabled')).toBe(true)
+    day.value = '2099-01-01'
+    day.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(byTestId('oauth-approve')!.hasAttribute('disabled')).toBe(false)
     wrapper.unmount()
   })
 
