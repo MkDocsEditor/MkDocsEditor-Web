@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { mdiArrowLeft, mdiClose, mdiHistory, mdiRestore } from '@mdi/js'
+import { mdiArrowLeft, mdiClose, mdiHistory, mdiRestore, mdiRobotOutline } from '@mdi/js'
 import { computed, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 
@@ -8,14 +8,19 @@ import type { Revision } from '@/api'
 import AppDialog from '@/components/common/AppDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LoadError from '@/components/common/LoadError.vue'
-import { diffStats, parseUnifiedDiff } from '@/services/diff'
-import type { DiffLine } from '@/services/diff'
+import { hunksOfUnifiedDiff, hunkStats, linesBetween, rangeOfHunk, showHunk } from '@/services/diff'
+import type { DiffHunk } from '@/services/diff'
+import type { ChangeRange } from '@/markdown/changeRanges'
 import { formatDate, formatWhen } from '@/services/time'
 import { describeError, useNotifyStore } from '@/stores/notify'
 
 const props = defineProps<{ documentId: string; readOnly?: boolean }>()
 const open = defineModel<boolean>({ required: true })
-const emit = defineEmits<{ restored: [revision: Revision] }>()
+const emit = defineEmits<{
+  restored: [revision: Revision]
+  /** Show these lines in the page; the dialog closes. */
+  show: [range: ChangeRange]
+}>()
 
 const notify = useNotifyStore()
 const { mobile } = useDisplay()
@@ -29,7 +34,7 @@ const selected = ref<Revision | null>(null)
 type View = 'changes' | 'current' | 'content'
 const view = ref<View>('changes')
 const detailLoading = ref(false)
-const diffLines = ref<DiffLine[]>([])
+const hunks = ref<DiffHunk[]>([])
 const content = ref('')
 const detailError = ref<unknown>(null)
 const restoreError = ref<unknown>(null)
@@ -70,19 +75,19 @@ async function loadDetail(): Promise<void> {
   try {
     const api = useApi()
     const before = previous(revision)
-    let lines: DiffLine[] = []
+    let found: DiffHunk[] = []
     let text = ''
     if (view.value === 'content' || (view.value === 'changes' && !before)) {
       text = await api.getRevisionContent(props.documentId, revision.revision)
     } else {
-      const diff =
+      const answer =
         view.value === 'changes'
-          ? await api.getRevisionDiff(props.documentId, before!.revision, revision.revision)
-          : await api.getRevisionDiff(props.documentId, revision.revision, 'current')
-      lines = parseUnifiedDiff(diff)
+          ? await api.getRevisionHunks(props.documentId, before!.revision, revision.revision)
+          : await api.getRevisionHunks(props.documentId, revision.revision, 'current')
+      found = typeof answer === 'string' ? hunksOfUnifiedDiff(answer) : answer
     }
     if (token !== detailToken) return
-    diffLines.value = lines
+    hunks.value = found
     content.value = text
   } catch (error) {
     if (token === detailToken) detailError.value = error
@@ -98,13 +103,59 @@ const showsContent = computed(
     view.value === 'content' ||
     (view.value === 'changes' && selected.value !== null && !previous(selected.value)),
 )
-const stats = computed(() => diffStats(diffLines.value))
+const stats = computed(() => hunkStats(hunks.value))
+const shownHunks = computed(() =>
+  hunks.value.map((hunk, i) => ({
+    hunk,
+    lines: showHunk(hunk),
+    folded: i > 0 ? linesBetween(hunks.value[i - 1]!, hunk) : hunk.newStart - 1,
+  })),
+)
+
+function hunkTitle(hunk: DiffHunk): string {
+  return hunk.heading ?? 'Start of the page'
+}
+
+/** Opens the page at the hunk's lines, found again by its heading in today's text. */
+function showInPage(hunk: DiffHunk): void {
+  emit('show', rangeOfHunk(hunk))
+  open.value = false
+}
+
+function nameOf(author: Revision['author']): string {
+  return author.displayName || author.name
+}
+
+/** The agents (app tokens) of a commit; older backends only name the tokens. */
+function agentsOf(revision: Revision): string[] {
+  return revision.agents?.map((agent) => agent.name) ?? revision.appTokens ?? []
+}
 
 function authorLine(revision: Revision): string {
   const others = revision.coAuthors?.length ?? 0
-  const people = others > 0 ? `${revision.author.name} and ${others} more` : revision.author.name
-  const tokens = revision.appTokens ?? []
+  const name = nameOf(revision.author)
+  const people = others > 0 ? `${name} and ${others} more` : name
+  const tokens = agentsOf(revision)
   return tokens.length > 0 ? `${people} via ${tokens.join(', ')}` : people
+}
+
+/** The message the backend gives every edit it saves: it says nothing the summary does not. */
+function generic(revision: Revision): boolean {
+  return title(revision) === `Update ${revision.path}`
+}
+
+/**
+ * "+5 −1 · Setup, Install" from the commit's summary, after a message someone wrote (a git
+ * commit, a restore); older backends: the message.
+ */
+function summaryLine(revision: Revision): string {
+  const summary = revision.summary
+  if (!summary) return title(revision)
+  const counts = `+${summary.linesAdded} −${summary.linesRemoved}`
+  const parts = [counts]
+  if (summary.headings.length > 0) parts.push(summary.headings.join(', '))
+  if (!generic(revision)) parts.unshift(title(revision))
+  return parts.join(' · ')
 }
 
 function shortRev(revision: Revision): string {
@@ -196,9 +247,18 @@ const viewLabels: Record<View, string> = {
               @click="selected = revision"
             >
               <v-list-item-title>{{ formatWhen(revision.time) }}</v-list-item-title>
-              <v-list-item-subtitle>{{ authorLine(revision) }}</v-list-item-subtitle>
-              <v-list-item-subtitle class="text-body-small">
-                {{ title(revision) }}
+              <v-list-item-subtitle>
+                <v-icon
+                  v-if="agentsOf(revision).length > 0"
+                  :icon="mdiRobotOutline"
+                  size="x-small"
+                  aria-hidden="true"
+                  data-testid="history-agent"
+                />
+                {{ authorLine(revision) }}
+              </v-list-item-subtitle>
+              <v-list-item-subtitle class="text-body-small" data-testid="history-summary">
+                {{ summaryLine(revision) }}
               </v-list-item-subtitle>
             </v-list-item>
           </v-list>
@@ -249,7 +309,7 @@ const viewLabels: Record<View, string> = {
             }}</pre>
             <template v-else>
               <div v-if="!detailLoading" class="text-body-small text-medium-emphasis px-4 py-1">
-                <template v-if="diffLines.length === 0">No differences</template>
+                <template v-if="hunks.length === 0">No differences</template>
                 <template v-else>
                   <span class="history__added">+{{ stats.added }}</span>
                   <span class="history__removed ml-2">−{{ stats.removed }}</span>
@@ -257,19 +317,51 @@ const viewLabels: Record<View, string> = {
                 </template>
               </div>
               <div class="history__diff" data-testid="history-diff">
-                <div
-                  v-for="(line, i) in diffLines"
-                  :key="i"
-                  class="history__line"
-                  :class="`history__line--${line.kind}`"
+                <section
+                  v-for="(shown, h) in shownHunks"
+                  :key="h"
+                  class="history__hunk"
+                  data-testid="history-hunk"
                 >
-                  <span class="history__sign" aria-hidden="true">{{
-                    line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ''
-                  }}</span>
-                  <span class="history__line-text">{{
-                    line.kind === 'hunk' ? '…' : line.text
-                  }}</span>
-                </div>
+                  <div v-if="shown.folded > 0" class="history__folded">
+                    {{
+                      shown.folded === 1 ? '1 unchanged line' : `${shown.folded} unchanged lines`
+                    }}
+                  </div>
+                  <button
+                    type="button"
+                    class="history__hunk-head"
+                    :title="`Show ${hunkTitle(shown.hunk)} in the page`"
+                    data-testid="history-hunk-show"
+                    @click="showInPage(shown.hunk)"
+                  >
+                    {{ hunkTitle(shown.hunk) }}
+                  </button>
+                  <div
+                    v-for="(line, i) in shown.lines"
+                    :key="i"
+                    class="history__line"
+                    :class="{
+                      'history__line--add': line.op === '+',
+                      'history__line--del': line.op === '-',
+                    }"
+                    data-testid="history-line"
+                  >
+                    <span class="history__sign" aria-hidden="true">{{
+                      line.op === '+' ? '+' : line.op === '-' ? '−' : ''
+                    }}</span>
+                    <span class="history__line-text"
+                      ><template v-if="line.pieces"
+                        ><span
+                          v-for="(piece, p) in line.pieces"
+                          :key="p"
+                          :class="{ 'history__word--changed': piece.changed }"
+                          >{{ piece.text }}</span
+                        ></template
+                      ><template v-else>{{ line.text }}</template></span
+                    >
+                  </div>
+                </section>
               </div>
             </template>
           </div>
@@ -347,9 +439,33 @@ const viewLabels: Record<View, string> = {
 .history__line--del {
   background: rgba(var(--v-theme-code-deleted), 0.18);
 }
-.history__line--hunk {
-  color: rgba(var(--v-theme-on-surface), 0.5);
+.history__line--add .history__word--changed {
+  background: rgba(var(--v-theme-code-inserted), 0.4);
+}
+.history__line--del .history__word--changed {
+  background: rgba(var(--v-theme-code-deleted), 0.4);
+}
+.history__folded {
+  padding: var(--app-space-1) var(--app-space-4);
+  color: rgba(var(--v-theme-on-surface), 0.6);
   background: rgba(var(--v-theme-on-surface), 0.04);
+}
+.history__hunk-head {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--app-space-1) var(--app-space-4);
+  font: inherit;
+  font-weight: 500;
+  color: rgb(var(--v-theme-primary));
+  background: none;
+  border: none;
+  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+  cursor: pointer;
+}
+.history__hunk-head:hover,
+.history__hunk-head:focus-visible {
+  background: rgba(var(--v-theme-primary), 0.08);
 }
 .history__added {
   color: rgb(var(--v-theme-code-inserted));

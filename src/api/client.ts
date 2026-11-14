@@ -3,6 +3,7 @@ import type {
   AuthorshipResponse,
   Backlink,
   BrokenReference,
+  DiffHunk,
   DocumentModel,
   FeedPage,
   ItemRef,
@@ -264,6 +265,18 @@ export class ApiClient {
   async getRevisionDiff(id: string, from: string, to = 'current'): Promise<string> {
     const query = new URLSearchParams({ from, to })
     return (await this.request('GET', `${urlPath`/document/${id}/history/diff`}?${query}`)).text()
+  }
+
+  /**
+   * The changes between two revisions as hunks with their headings; `current` is the live
+   * text. Backends without `format=json` answer the unified diff as text instead.
+   */
+  async getRevisionHunks(id: string, from: string, to = 'current'): Promise<DiffHunk[] | string> {
+    const query = new URLSearchParams({ from, to, format: 'json' })
+    const response = await this.request('GET', `${urlPath`/document/${id}/history/diff`}?${query}`)
+    if (response.headers.get('Content-Type')?.includes('application/json'))
+      return ((await response.json()) as { hunks: DiffHunk[] | null }).hunks ?? []
+    return response.text()
   }
 
   /** Sets the live document to the text of `revision` (arrives as a normal edit). */
