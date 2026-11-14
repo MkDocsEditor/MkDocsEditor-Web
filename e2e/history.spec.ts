@@ -212,7 +212,7 @@ test('undoes one change and keeps the later ones', async ({ page }, testInfo) =>
   // asked again, the server says beforehand that there is nothing left to undo
   await entries.filter({ hasText: 'Heißer' }).click()
   await expect(dialog.getByTestId('history-undo-blocked')).toHaveText(
-    'Already undone or edited away',
+    "Can't undo: this change was undone already or edited away.",
   )
   await expect(dialog.getByTestId('history-undo')).toHaveCount(0)
 })
