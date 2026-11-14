@@ -387,6 +387,34 @@ test.describe('accounts', () => {
     await expect(card.getByTestId('connect-done')).toContainText('Pixel 8')
   })
 
+  test('an app token works against the API until it is revoked', async ({ browser }, testInfo) => {
+    await requireEndpoints('/account/tokens/')
+    const user = await createAccount(uniqueUsername('token', testInfo))
+    const page = await devicePage(browser, testInfo, user)
+    await accountMenu(page, 'menu-account')
+    await settingsSection(page, 'tokens')
+    const card = page.getByTestId('app-tokens-card')
+    await card.getByTestId('app-token-add').click()
+    await page.getByTestId('app-token-name').locator('input').fill('Agent')
+    await page.getByTestId('app-token-create').click()
+    await confirmIfAsked(page, card.getByTestId('app-token-created'), user.password)
+    const token = await fieldValue(card, 'app-token-value')
+    expect(token).toMatch(/^mdp_/)
+
+    const whoami = () =>
+      fetch(`${BACKEND_URL}/auth/whoami/`, { headers: { Authorization: `Bearer ${token}` } })
+    const before = await whoami()
+    expect(before.ok, await before.clone().text()).toBe(true)
+    expect(((await before.json()) as { authMethod: string }).authMethod).toBe('app-token')
+
+    await card.getByTestId('app-token-done').click()
+    await expect(card.getByTestId('app-token')).toContainText('Read and write')
+    await card.getByRole('button', { name: 'Revoke Agent' }).click()
+    await page.getByTestId('confirm-button').click()
+    await expect(card.getByTestId('app-token')).toHaveCount(0)
+    expect((await whoami()).status).toBe(401)
+  })
+
   test('on a phone, the first login offers the Android app', async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== 'phone', 'phone-sized screens only')
     await requireEndpoints('/account/device-links/')
