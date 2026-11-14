@@ -6,6 +6,8 @@ export interface Run {
   to: number
   /** null for text whose author is not known yet (until the next authorship fetch). */
   username: string | null
+  /** The app token an agent wrote this with, for "Anna via Claude Code". */
+  agent?: string
 }
 
 /** Converts a code point index into a UTF-16 index of `text`. */
@@ -23,7 +25,7 @@ export function codePointToUtf16(text: string, codePoint: number): number {
 /** Converts server runs (code points) to UTF-16 runs of `text`. */
 export function runsFromCodePoints(
   text: string,
-  runs: readonly { start: number; end: number; username: string }[],
+  runs: readonly { start: number; end: number; username: string; agent?: string }[],
 ): Run[] {
   // Runs are sorted, so walk the text once.
   const result: Run[] = []
@@ -41,7 +43,8 @@ export function runsFromCodePoints(
     if (run.start < cp) continue
     const from = advance(run.start)
     const to = advance(run.end)
-    if (to > from) result.push({ from, to, username: run.username })
+    if (to > from)
+      result.push({ from, to, username: run.username, ...(run.agent ? { agent: run.agent } : {}) })
   }
   return result
 }
@@ -84,7 +87,8 @@ function merge(runs: Run[]): Run[] {
   for (const run of runs) {
     if (run.to <= run.from) continue
     const last = result.at(-1)
-    if (last && last.username === run.username && last.to === run.from) last.to = run.to
+    if (last && last.username === run.username && last.agent === run.agent && last.to === run.from)
+      last.to = run.to
     else result.push({ ...run })
   }
   return result

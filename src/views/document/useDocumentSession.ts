@@ -13,6 +13,8 @@ export interface OnlineInstance {
   color: string
   accountId?: string
   avatar?: string | null
+  /** The name of the app token when this is an AI agent: shown with a robot, not to follow. */
+  agent?: string
 }
 
 /**
@@ -84,6 +86,7 @@ export function useDocumentSession(id: () => string, onRenamed: (newId: string) 
           color: peer.color,
           accountId: peer.accountId,
           avatar: peer.avatar,
+          ...(peer.agent ? { agent: peer.agent.name } : {}),
         })
     }
     return [...seen.values()].sort(

@@ -37,6 +37,8 @@ export function createAuthors(options: AuthorsOptions) {
   const users = new Map<string, { displayName: string; color: string }>()
   /** Actor id to username. The server binds each actor to one account and refuses foreign ones. */
   const actors = new Map<string, string>()
+  /** Actor id to the name of the app token, for actors of agents. */
+  const agents = new Map<string, string>()
   let runs: Run[] = []
   /** Since when a change waits for the server's answer, for the longest wait while typing. */
   let pendingSince: number | null = null
@@ -50,11 +52,12 @@ export function createAuthors(options: AuthorsOptions) {
     authorship.value = runs.flatMap((run) => {
       if (!hasAuthor(run.username)) return []
       const user = users.get(run.username)
+      const name = user?.displayName ?? run.username
       return [
         {
           from: run.from,
           to: run.to,
-          username: user?.displayName ?? run.username,
+          username: run.agent ? `${name} via ${run.agent}` : name,
           color: user?.color ?? UNKNOWN_USER_COLOR,
         },
       ]
@@ -77,7 +80,10 @@ export function createAuthors(options: AuthorsOptions) {
       scheduleRefetch() // our copy moved on meanwhile
       return
     }
-    runs = runsFromCodePoints(doc.content, response.runs)
+    runs = runsFromCodePoints(
+      doc.content,
+      response.runs.map((run) => ({ ...run, agent: agents.get(run.actorId) })),
+    )
     publish()
   }
 
@@ -105,9 +111,11 @@ export function createAuthors(options: AuthorsOptions) {
       displayName?: string
       color?: string
       actorId?: string
+      agent?: { name: string }
     }): void {
       if (!info.username) return
       if (info.actorId) actors.set(info.actorId, info.username)
+      if (info.actorId && info.agent) agents.set(info.actorId, info.agent.name)
       users.set(info.username, {
         displayName: info.displayName || info.username,
         color: info.color ?? users.get(info.username)?.color ?? UNKNOWN_USER_COLOR,

@@ -122,6 +122,28 @@ describe('DocumentView', () => {
     wrapper.unmount()
   })
 
+  it('shows an agent with a robot, and not to follow', async () => {
+    const { wrapper } = await setup()
+    const anna = { username: 'anna', displayName: 'Anna Muster', color: '#1971c2', selections: [] }
+    ;(fakes[0]!.session.peers as { value: unknown }).value = [
+      { ...anna, clientId: 'c1', instanceId: 'tab' },
+      {
+        ...anna,
+        clientId: 'c2',
+        instanceId: 'bot',
+        agent: { tokenId: 't1', name: 'Claude Code on Linux' },
+      },
+    ]
+    await flushPromises()
+    const agent = wrapper.find('[data-testid="online-agent"]')
+    expect(agent.attributes('aria-label')).toBe(
+      'Claude Code on Linux (agent of Anna Muster) is here',
+    )
+    expect(agent.element.tagName).not.toBe('BUTTON')
+    expect(wrapper.findAll('[data-testid="online-user"]')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
   it('formats with the toolbar', async () => {
     const { wrapper } = await setup()
     await vi.waitFor(() =>

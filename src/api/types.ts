@@ -231,6 +231,8 @@ export interface ActorInfo {
   username: string
   displayName?: string
   color?: string
+  /** Present when an AI agent or script made the changes of this actor with an app token. */
+  agent?: { tokenId: string; name: string }
 }
 
 export interface AuthorshipResponse {
@@ -256,6 +258,8 @@ export interface Revision {
   message: string
   /** The file's path in that commit (history follows renames). */
   path: string
+  /** Names of the app tokens (agents, scripts) that made changes in this commit. */
+  appTokens?: string[]
 }
 
 /** Someone named on the dashboard, with the current name, colour and picture. */
