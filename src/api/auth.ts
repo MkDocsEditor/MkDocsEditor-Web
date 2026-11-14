@@ -5,10 +5,13 @@ import type {
   AccountPatch,
   AdminUser,
   AdminUserPatch,
+  AppToken,
+  AppTokenScope,
   AuditPage,
   AuditQuery,
   AuthStatus,
   CreatedAccessRequest,
+  CreatedAppToken,
   CreatedDeviceLink,
   CreatedLink,
   DeviceLink,
@@ -236,6 +239,25 @@ export class AuthApi {
 
   revokeOtherSessions(): Promise<{ revoked: number }> {
     return this.send('POST', '/account/sessions/revoke-others')
+  }
+
+  // app tokens (scripts and agents)
+
+  appTokens(): Promise<AppToken[]> {
+    return this.get('/account/tokens')
+  }
+
+  /** Without `expiresInDays` the token never expires. Needs a recent authentication. */
+  createAppToken(fields: {
+    name: string
+    scope: AppTokenScope
+    expiresInDays?: number
+  }): Promise<CreatedAppToken> {
+    return this.send('POST', '/account/tokens', fields)
+  }
+
+  revokeAppToken(id: string): Promise<void> {
+    return this.del(urlPath`/account/tokens/${id}`)
   }
 
   // admin

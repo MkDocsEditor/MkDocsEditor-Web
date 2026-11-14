@@ -6,6 +6,7 @@ import { useDisplay } from 'vuetify'
 
 import { useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
+import AppTokensCard from '@/components/account/AppTokensCard.vue'
 import AvatarCard from '@/components/account/AvatarCard.vue'
 import ConnectAppCard from '@/components/account/ConnectAppCard.vue'
 import PasskeysCard from '@/components/account/PasskeysCard.vue'
@@ -119,6 +120,7 @@ watch(
           <ConnectAppCard @connected="sessionsVersion++" />
           <SessionsCard :key="sessionsVersion" />
         </div>
+        <AppTokensCard v-else-if="shown.id === 'tokens'" />
         <template v-else-if="shown.group === 'account'">
           <div v-if="!account">
             <v-progress-linear v-if="!error" indeterminate aria-label="Loading" />

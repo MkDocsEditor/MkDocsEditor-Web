@@ -498,6 +498,69 @@ describe('SettingsView: account', () => {
     wrapper.unmount()
   })
 
+  it('creates an app token after a step-up, shows it once and revokes it', async () => {
+    let tokens: Record<string, unknown>[] = [
+      {
+        id: 't1',
+        name: 'Backup script',
+        scope: 'read',
+        createdAt: '2026-10-01T10:00:00Z',
+        lastUsedAt: null,
+        expiresAt: '2026-10-08T10:00:00Z',
+      },
+    ]
+    const { wrapper, mock } = await mount('tokens', {
+      'GET /account/tokens/': () => json(tokens),
+      ...stepUpOnce('POST /account/tokens/', () => {
+        const appToken = {
+          id: 't2',
+          name: 'Claude Code',
+          scope: 'write',
+          createdAt: '2026-11-14T10:00:00Z',
+          lastUsedAt: null,
+          expiresAt: null,
+        }
+        tokens = [appToken, ...tokens]
+        return json({ appToken, token: 'mdp_secret' })
+      }),
+      'DELETE /account/tokens/t2/': () => {
+        tokens = tokens.filter((t) => t.id !== 't2')
+        return new Response(null, { status: 204 })
+      },
+    })
+    const list = () => wrapper.find('[data-testid="app-token-list"]').text()
+    expect(list()).toContain('Backup script')
+    expect(list()).toContain('Read only')
+    expect(list()).toContain('expired')
+    expect(list()).toContain('never used')
+
+    await wrapper.find('[data-testid="app-token-add"]').trigger('click')
+    await flushPromises()
+    await typeInto('app-token-name', 'Claude Code')
+    byTestId('app-token-form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+    await confirmReauth()
+
+    const created = mock.requests.filter((r) => r.method === 'POST' && r.url.endsWith('/tokens/'))
+    // write access and 90 days are the defaults
+    expect(body(created.at(-1))).toEqual({ name: 'Claude Code', scope: 'write', expiresInDays: 90 })
+    expect(byTestId('app-token-created').textContent).toContain("you won't see it again")
+    expect(byTestId('app-token-value').querySelector('input')?.value).toBe('mdp_secret')
+    expect(list()).toContain('never expires')
+
+    byTestId('app-token-done').click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="app-token-created"]')).toBeNull()
+
+    await wrapper.find('[aria-label="Revoke Claude Code"]').trigger('click')
+    await flushPromises()
+    byTestId('confirm-button').click()
+    await flushPromises()
+    expect(mock.requests.some((r) => r.method === 'DELETE' && r.url.endsWith('/t2/'))).toBe(true)
+    expect(list()).not.toContain('Claude Code')
+    wrapper.unmount()
+  })
+
   it('asks for a second factor when the instance requires one', async () => {
     const { wrapper } = await mount(
       'security',

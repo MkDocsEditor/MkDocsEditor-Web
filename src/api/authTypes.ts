@@ -237,6 +237,25 @@ export interface CreatedDeviceLink {
   connectUrl: string | null
 }
 
+export type AppTokenScope = 'read' | 'write'
+
+/** A long-lived token for scripts and agents (`docs/auth.md`, app token). */
+export interface AppToken {
+  id: string
+  name: string
+  scope: AppTokenScope
+  createdAt: string
+  lastUsedAt: string | null
+  /** Null: never expires. */
+  expiresAt: string | null
+}
+
+export interface CreatedAppToken {
+  appToken: AppToken
+  /** `mdp_…`; the server never shows it again. */
+  token: string
+}
+
 /** `GET /server-info/`: public facts for onboarding screens. */
 export interface ServerInfo {
   name: string
