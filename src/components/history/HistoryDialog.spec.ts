@@ -293,6 +293,48 @@ describe('HistoryDialog', () => {
     wrapper.unmount()
   })
 
+  it('restores one section of an older version', async () => {
+    let answer = () => new Response(null, { status: 204 })
+    const { wrapper, requests, open } = await setup({
+      'GET /server-info/': () => json({ features: ['blame'] }),
+      'GET /document/d1/history/': () =>
+        json([revisions[0], { ...revisions[1]!, revision: 'ccccccc' }, revisions[1]]),
+      'GET /document/d1/history/diff/': () => json(FIXTURE_DIFF),
+      'POST /document/d1/history/ccccccc/restore/': () => answer(),
+    })
+    // the newest version is the page: nothing to put back
+    ;(qa('[data-testid="history-entry"]')[0] as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-restore-section"]')).toBeNull()
+    ;(q('[aria-label="Back to the list"]') as HTMLElement).click()
+    await flushPromises()
+
+    ;(qa('[data-testid="history-entry"]')[1] as HTMLElement).click()
+    await flushPromises()
+    ;(q('[data-testid="history-restore-section"]') as HTMLElement).click()
+    await flushPromises()
+    expect(document.body.textContent).toContain('“Setup” and its subsections go back')
+
+    answer = () =>
+      json({ code: 'section-not-found', message: 'missing', details: { in: 'current' } }, 409)
+    ;(q('[data-testid="confirm-button"]') as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-restore-error"]')?.textContent).toContain(
+      '“Setup” is no longer in the page',
+    )
+
+    answer = () => new Response(null, { status: 204 })
+    ;(q('[data-testid="history-restore-section"]') as HTMLElement).click()
+    await flushPromises()
+    ;(q('[data-testid="confirm-button"]') as HTMLElement).click()
+    await flushPromises()
+    const posts = requests.filter((r) => r.method === 'POST')
+    expect(posts).toHaveLength(2)
+    expect(JSON.parse(posts[1]!.body as string)).toEqual({ heading: 'Setup', headingOccurrence: 1 })
+    expect(open.value).toBe(false)
+    wrapper.unmount()
+  })
+
   it('offers no undo on servers without it', async () => {
     const { wrapper } = await setup({
       'GET /document/d1/history/': () => json(revisions),

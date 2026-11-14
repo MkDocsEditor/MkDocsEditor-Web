@@ -40,19 +40,22 @@ function hunkTitle(hunk: DiffHunk): string {
       <div v-if="shown.folded > 0" class="history__folded">
         {{ shown.folded === 1 ? '1 unchanged line' : `${shown.folded} unchanged lines` }}
       </div>
-      <div v-if="!linked" class="history__hunk-head history__hunk-head--plain">
-        {{ hunkTitle(shown.hunk) }}
+      <div class="history__hunk-bar">
+        <div v-if="!linked" class="history__hunk-head history__hunk-head--plain">
+          {{ hunkTitle(shown.hunk) }}
+        </div>
+        <button
+          v-else
+          type="button"
+          class="history__hunk-head"
+          :title="`Show ${hunkTitle(shown.hunk)} in the page`"
+          data-testid="history-hunk-show"
+          @click="emit('show', rangeOfHunk(shown.hunk))"
+        >
+          {{ hunkTitle(shown.hunk) }}
+        </button>
+        <slot name="actions" :hunk="shown.hunk" />
       </div>
-      <button
-        v-else
-        type="button"
-        class="history__hunk-head"
-        :title="`Show ${hunkTitle(shown.hunk)} in the page`"
-        data-testid="history-hunk-show"
-        @click="emit('show', rangeOfHunk(shown.hunk))"
-      >
-        {{ hunkTitle(shown.hunk) }}
-      </button>
       <div
         v-for="(line, i) in shown.lines"
         :key="i"
@@ -117,9 +120,15 @@ function hunkTitle(hunk: DiffHunk): string {
   color: rgba(var(--v-theme-on-surface), 0.6);
   background: rgba(var(--v-theme-on-surface), 0.04);
 }
+.history__hunk-bar {
+  display: flex;
+  align-items: center;
+  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
 .history__hunk-head {
   display: block;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   text-align: left;
   padding: var(--app-space-1) var(--app-space-4);
   font: inherit;
@@ -127,7 +136,6 @@ function hunkTitle(hunk: DiffHunk): string {
   color: rgb(var(--v-theme-primary));
   background: none;
   border: none;
-  border-top: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
   cursor: pointer;
 }
 .history__hunk-head--plain {
