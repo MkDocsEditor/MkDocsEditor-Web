@@ -366,7 +366,8 @@ async function showChange(query: ChangeQuery, attempt = 0): Promise<void> {
   const editorShown = mode.value !== 'preview'
   // the panes come a moment after the text is ready
   if ((editorShown && (!view || view.state.doc.length < text.value.length)) || !preview.value) {
-    if (attempt < 40) changeTimer = setTimeout(() => void showChange(query, attempt + 1), 50)
+    // up to 10 s: on a slow device or connection the panes take a while
+    if (attempt < 200) changeTimer = setTimeout(() => void showChange(query, attempt + 1), 50)
     return
   }
   const targets = await targetsOf(query)
