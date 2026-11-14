@@ -27,7 +27,12 @@ function hunkTitle(hunk: DiffHunk): string {
 
 <template>
   <div class="history__diff" data-testid="history-diff">
-    <section v-for="(shown, h) in hunkViews" :key="h" class="history__hunk" data-testid="history-hunk">
+    <section
+      v-for="(shown, h) in hunkViews"
+      :key="h"
+      class="history__hunk"
+      data-testid="history-hunk"
+    >
       <div v-if="shown.folded > 0" class="history__folded">
         {{ shown.folded === 1 ? '1 unchanged line' : `${shown.folded} unchanged lines` }}
       </div>
