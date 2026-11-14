@@ -509,7 +509,7 @@ describe('SettingsView: account', () => {
         expiresAt: '2026-10-08T10:00:00Z',
       },
     ]
-    const { wrapper, mock } = await mount('tokens', {
+    const { wrapper, mock } = await mount('agents', {
       'GET /account/tokens/': () => json(tokens),
       ...stepUpOnce('POST /account/tokens/', () => {
         const appToken = {
@@ -558,6 +558,57 @@ describe('SettingsView: account', () => {
     await flushPromises()
     expect(mock.requests.some((r) => r.method === 'DELETE' && r.url.endsWith('/t2/'))).toBe(true)
     expect(list()).not.toContain('Claude Code')
+    wrapper.unmount()
+  })
+
+  it('connects an AI agent: a token, then the setup with it filled in', async () => {
+    const probe = vi.fn(async () => json({ code: 'not-found', message: 'x' }, 404))
+    vi.stubGlobal('fetch', probe)
+    let tokens: Record<string, unknown>[] = []
+    const { wrapper, mock } = await mount('agents', {
+      'GET /account/tokens/': () => json(tokens),
+      'POST /account/tokens/': (request) => {
+        const appToken = {
+          id: 't1',
+          name: body(request).name,
+          scope: body(request).scope,
+          createdAt: '2026-11-14T10:00:00Z',
+          lastUsedAt: null,
+          expiresAt: null,
+        }
+        tokens = [appToken]
+        return json({ appToken, token: 'mdp_agent' })
+      },
+    })
+    expect(probe).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/mcp$/),
+      expect.objectContaining({ credentials: 'include' }),
+    )
+    expect(byTestId('mcp-not-live').textContent).toContain('does not offer MCP yet')
+    expect(byTestId('connect-agent-name').querySelector('input')?.value).toMatch(/^Claude Code on /)
+
+    await typeInto('connect-agent-name', 'Claude Code on laptop')
+    byTestId('connect-agent-form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+
+    const created = mock.requests.find((r) => r.method === 'POST' && r.url.endsWith('/tokens/'))
+    expect(body(created)).toEqual({
+      name: 'Claude Code on laptop',
+      scope: 'write',
+      expiresInDays: 90,
+    })
+    expect(byTestId('snippet-claude').textContent).toMatch(
+      /^claude mcp add --transport http wiki http:\/\/\S+\/api\/mcp --header 'Authorization: Bearer mdp_agent'/,
+    )
+    expect(byTestId('snippet-claude-user').textContent).toContain('--scope user')
+    expect(byTestId('connect-agent-token').querySelector('input')?.value).toBe('mdp_agent')
+    // the token list below shows the new token
+    expect(wrapper.find('[data-testid="app-token-list"]').text()).toContain('Claude Code on laptop')
+
+    byTestId('connect-agent-done').click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="snippet-claude"]')).toBeNull()
+    vi.unstubAllGlobals()
     wrapper.unmount()
   })
 

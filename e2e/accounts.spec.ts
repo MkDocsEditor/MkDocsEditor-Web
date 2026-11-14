@@ -392,7 +392,7 @@ test.describe('accounts', () => {
     const user = await createAccount(uniqueUsername('token', testInfo))
     const page = await devicePage(browser, testInfo, user)
     await accountMenu(page, 'menu-account')
-    await settingsSection(page, 'tokens')
+    await settingsSection(page, 'agents')
     const card = page.getByTestId('app-tokens-card')
     await card.getByTestId('app-token-add').click()
     await page.getByTestId('app-token-name').locator('input').fill('Agent')
@@ -413,6 +413,38 @@ test.describe('accounts', () => {
     await page.getByTestId('confirm-button').click()
     await expect(card.getByTestId('app-token')).toHaveCount(0)
     expect((await whoami()).status).toBe(401)
+  })
+
+  test('connecting an AI agent shows the setup with a working token', async ({
+    browser,
+  }, testInfo) => {
+    await requireEndpoints('/account/tokens/')
+    const user = await createAccount(uniqueUsername('agent', testInfo))
+    const page = await devicePage(browser, testInfo, user)
+    await accountMenu(page, 'menu-agents')
+    const card = page.getByTestId('connect-agent')
+    await expect(card.getByTestId('connect-agent-name').locator('input')).toHaveValue(
+      /^Claude Code on /,
+    )
+    await card.getByTestId('connect-agent-create').click()
+    await confirmIfAsked(page, card.getByTestId('connect-agent-created'), user.password)
+    const token = await fieldValue(card, 'connect-agent-token')
+    // without credentials the backend answers 401 for any path; with them, 404 means no MCP yet
+    const mcp = await fetch(`${BACKEND_URL}/mcp`, { headers: { Authorization: `Bearer ${token}` } })
+    if (mcp.status === 404) await expect(card.getByTestId('mcp-not-live')).toBeVisible()
+    else await expect(card.getByTestId('mcp-not-live')).toHaveCount(0)
+    await expect(card.getByTestId('snippet-claude')).toContainText(
+      `claude mcp add --transport http wiki ${BROWSER_BACKEND_URL}/mcp --header 'Authorization: Bearer ${token}'`,
+    )
+    await expect(page.getByTestId('app-tokens-card').getByTestId('app-token')).toContainText(
+      'Claude Code on',
+    )
+
+    // the token of the setup reads the wiki
+    const tree = await fetch(`${BACKEND_URL}/section/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(tree.ok, await tree.clone().text()).toBe(true)
   })
 
   test('on a phone, the first login offers the Android app', async ({ browser }, testInfo) => {

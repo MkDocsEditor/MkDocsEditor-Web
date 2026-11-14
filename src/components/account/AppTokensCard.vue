@@ -101,9 +101,7 @@ onMounted(load)
   <v-card data-testid="app-tokens-card">
     <v-card-item>
       <v-card-title>App tokens</v-card-title>
-      <v-card-subtitle>
-        Keys for scripts and AI agents. They act as you, without a second factor.
-      </v-card-subtitle>
+      <v-card-subtitle>Keys for scripts and AI agents</v-card-subtitle>
     </v-card-item>
     <v-card-text>
       <!-- the new token, shown once -->
@@ -124,6 +122,9 @@ onMounted(load)
         </v-btn>
       </v-alert>
 
+      <p class="mb-2 text-medium-emphasis">
+        A token acts as you, without a second factor. Give it only to tools you trust.
+      </p>
       <v-progress-linear v-if="loading" indeterminate />
       <LoadError
         v-else-if="loadError"
@@ -131,7 +132,7 @@ onMounted(load)
         :error="loadError"
         @retry="load"
       />
-      <v-list v-else-if="tokens.length" lines="two" data-testid="app-token-list">
+      <v-list v-else-if="tokens.length" lines="three" data-testid="app-token-list">
         <v-list-item
           v-for="token in tokens"
           :key="token.id"

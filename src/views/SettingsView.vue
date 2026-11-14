@@ -7,6 +7,7 @@ import { useDisplay } from 'vuetify'
 import { useAuthApi } from '@/api'
 import type { AccountInfo } from '@/api'
 import AppTokensCard from '@/components/account/AppTokensCard.vue'
+import ConnectAgentCard from '@/components/account/ConnectAgentCard.vue'
 import AvatarCard from '@/components/account/AvatarCard.vue'
 import ConnectAppCard from '@/components/account/ConnectAppCard.vue'
 import PasskeysCard from '@/components/account/PasskeysCard.vue'
@@ -62,6 +63,8 @@ watch(
 const account = ref<AccountInfo | null>(null)
 /** Reloads the device list after the app was connected. */
 const sessionsVersion = ref(0)
+/** Reloads the token list after an agent was connected. */
+const tokensVersion = ref(0)
 const error = ref('')
 
 /** Reloads the account after a change; the shell's user (name, colour, picture) follows. */
@@ -120,7 +123,10 @@ watch(
           <ConnectAppCard @connected="sessionsVersion++" />
           <SessionsCard :key="sessionsVersion" />
         </div>
-        <AppTokensCard v-else-if="shown.id === 'tokens'" />
+        <div v-else-if="shown.id === 'agents'" class="d-flex flex-column ga-4">
+          <ConnectAgentCard @created="tokensVersion++" />
+          <AppTokensCard :key="tokensVersion" />
+        </div>
         <template v-else-if="shown.group === 'account'">
           <div v-if="!account">
             <v-progress-linear v-if="!error" indeterminate aria-label="Loading" />
