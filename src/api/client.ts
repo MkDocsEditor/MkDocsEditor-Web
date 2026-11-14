@@ -313,6 +313,22 @@ export class ApiClient {
     await this.request('POST', urlPath`/document/${id}/history/${revision}/restore`)
   }
 
+  /**
+   * Sets one section of the live document (the heading and everything up to the next heading of
+   * its level or higher) to its text in `revision`; the rest stays. 409 `section-not-found`
+   * with `details.in` 'revision' or 'current'.
+   */
+  async restoreSection(
+    id: string,
+    revision: string,
+    heading: string,
+    headingOccurrence = 1,
+  ): Promise<void> {
+    await this.request('POST', urlPath`/document/${id}/history/${revision}/restore`, {
+      json: { heading, headingOccurrence },
+    })
+  }
+
   /** References to an item from all documents ("used by"), sorted by source path and line. */
   async getBacklinks(type: ItemType, id: string): Promise<Backlink[]> {
     const answer = await this.json<{ backlinks: Backlink[] }>(
