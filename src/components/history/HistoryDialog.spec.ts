@@ -293,6 +293,54 @@ describe('HistoryDialog', () => {
     wrapper.unmount()
   })
 
+  it('asks beforehand whether an undo would work and says why not', async () => {
+    let answer = () => json({ possible: true })
+    const { wrapper, requests } = await setup({
+      'GET /server-info/': () => json({ features: ['revert', 'revert-check'] }),
+      'GET /document/d1/history/': () => json(revisions),
+      'GET /document/d1/history/diff/': () => json(FIXTURE_DIFF),
+      'GET /document/d1/history/bbbbbbb/revert/': () => answer(),
+    })
+    const entries = () => qa('[data-testid="history-entry"]')
+    const reopen = async () => {
+      ;(entries()[1] as HTMLElement).click()
+      await flushPromises()
+      ;(entries()[0] as HTMLElement).click()
+      await flushPromises()
+    }
+    ;(entries()[0] as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-undo"]')).not.toBeNull()
+    expect(q('[data-testid="history-undo-blocked"]')).toBeNull()
+
+    answer = () => json({ possible: false, code: 'nothing-to-revert' })
+    await reopen()
+    expect(q('[data-testid="history-undo"]')).toBeNull()
+    expect(q('[data-testid="history-undo-blocked"]')?.textContent).toContain(
+      'Already undone or edited away',
+    )
+
+    answer = () =>
+      json({
+        possible: false,
+        code: 'revert-conflict',
+        details: { conflicts: [], headings: ['Setup', null] },
+      })
+    await reopen()
+    expect(q('[data-testid="history-undo-blocked"]')?.textContent).toContain(
+      "Can't undo: later changes in Setup, the start of the page are in the way",
+    )
+
+    // a failing check keeps the button: the undo says why
+    answer = () => json({ code: 'internal', message: 'boom' }, 500)
+    await reopen()
+    expect(q('[data-testid="history-undo"]')).not.toBeNull()
+    // the first commit cannot be undone, so it is not asked about
+    expect(requests.filter((r) => r.url.includes('/revert/'))).toHaveLength(4)
+    expect(requests.every((r) => !r.url.includes('/aaaaaaa/revert/'))).toBe(true)
+    wrapper.unmount()
+  })
+
   it('restores one section of an older version', async () => {
     let answer = () => new Response(null, { status: 204 })
     const { wrapper, requests, open } = await setup({

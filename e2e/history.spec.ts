@@ -208,6 +208,13 @@ test('undoes one change and keeps the later ones', async ({ page }, testInfo) =>
   await page.getByRole('button', { name: 'More' }).click()
   await page.getByTestId('open-history').click()
   await expect(entries.first()).toContainText('Revert')
+
+  // asked again, the server says beforehand that there is nothing left to undo
+  await entries.filter({ hasText: 'Heißer' }).click()
+  await expect(dialog.getByTestId('history-undo-blocked')).toHaveText(
+    'Already undone or edited away',
+  )
+  await expect(dialog.getByTestId('history-undo')).toHaveCount(0)
 })
 
 test('restores one section and keeps the rest of the page', async ({ page }, testInfo) => {

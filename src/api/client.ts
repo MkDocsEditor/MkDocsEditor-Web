@@ -3,6 +3,7 @@ import type {
   AuthorshipResponse,
   Backlink,
   Blame,
+  RevertCheck,
   BrokenReference,
   DiffHunk,
   DocumentChanges,
@@ -307,6 +308,11 @@ export class ApiClient {
    */
   async revertRevision(id: string, revision: string): Promise<Revision> {
     return this.json<Revision>('POST', urlPath`/document/${id}/history/${revision}/revert`)
+  }
+
+  /** Whether undoing `revision` would work now, against the live text; changes nothing. */
+  async checkRevert(id: string, revision: string): Promise<RevertCheck> {
+    return this.json<RevertCheck>('GET', urlPath`/document/${id}/history/${revision}/revert`)
   }
 
   /** Who wrote which lines and when; null on servers without it (or without git). */
