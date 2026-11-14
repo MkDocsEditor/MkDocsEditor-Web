@@ -1,10 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, ref, shallowRef } from 'vue'
 
 import { ApiClient, setApiClient } from '@/api'
 import type { DocumentChanges } from '@/api'
 import type { DocumentSession } from '@/sync'
+import { useAuthStore } from '@/stores/auth'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { createFakeSession } from '@/test/fakeSession'
 
@@ -60,6 +62,7 @@ function setup(answer: () => Response, initiallyReady = true) {
     'PUT /document/d2/seen/': () => new Response(null, { status: 204 }),
   })
   setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
+  setActivePinia(pinia)
   const id = ref('d1')
   const session = shallowRef<DocumentSession | null>(createFakeSession('x').session)
   const ready = ref(initiallyReady)
@@ -79,7 +82,12 @@ function setup(answer: () => Response, initiallyReady = true) {
   return { ...mock, id, session, ready, wrapper, result, seen }
 }
 
+let pinia = createPinia()
+
 describe('useChangesSinceVisit', () => {
+  beforeEach(() => {
+    pinia = createPinia()
+  })
   afterEach(() => {
     document.body.innerHTML = ''
   })
@@ -110,6 +118,22 @@ describe('useChangesSinceVisit', () => {
     wrapper.unmount()
     await flushPromises()
     expect(seen()).toEqual(['/document/d1/seen/ r1', '/document/d2/seen/ r1'])
+  })
+
+  it('leaves out the own edits, not the ones of the own agents', async () => {
+    const mine = { ...CHANGES.authors[0]!, username: 'me' }
+    const { result, wrapper } = setup(() => json({ ...CHANGES, authors: [mine] }))
+    useAuthStore().user = { username: 'me' } as never
+    await flushPromises()
+    expect(result.changes.value).toBeNull()
+    wrapper.unmount()
+
+    const again = setup(() =>
+      json({ ...CHANGES, authors: [mine, { ...mine, agents: ['Claude Code'] }] }),
+    )
+    await flushPromises()
+    expect(again.result.changes.value?.authors.map((a) => a.agents)).toEqual([['Claude Code']])
+    again.wrapper.unmount()
   })
 
   it('works on backends without it', async () => {

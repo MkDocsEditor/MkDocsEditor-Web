@@ -3,18 +3,21 @@ import type { Ref } from 'vue'
 
 import { useApi } from '@/api'
 import type { DocumentChanges } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 import type { DocumentSession } from '@/sync'
 
 /**
  * What changed in the page since the user last saw it (`GET …/changes/`), and remembering what
  * they saw (`PUT …/seen/`): when they dismiss the changes, and when they leave the page, at the
- * text they had then. A first visit shows nothing; it only starts remembering.
+ * text they had then. A first visit shows nothing; it only starts remembering. The user's own
+ * edits are no news to them, the ones of their agents are.
  */
 export function useChangesSinceVisit(
   id: () => string,
   session: Readonly<Ref<DocumentSession | null>>,
   ready: Readonly<Ref<boolean>>,
 ) {
+  const auth = useAuthStore()
   /** Set while there are changes to show. */
   const changes = shallowRef<DocumentChanges | null>(null)
   /** The page being looked at; `token` is what the server last said it is at. */
@@ -47,7 +50,11 @@ export function useChangesSinceVisit(
     }
     if (visit?.session !== current || !answer) return
     visit.token = answer.seenToken
-    if (answer.since && answer.hunks.length > 0) changes.value = answer
+    const authors = answer.authors.filter(
+      (author) => author.agents.length > 0 || author.username !== auth.username,
+    )
+    if (answer.since && answer.hunks.length > 0 && authors.length > 0)
+      changes.value = { ...answer, authors }
   }
 
   watch(
