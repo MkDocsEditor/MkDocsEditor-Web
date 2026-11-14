@@ -6,7 +6,38 @@ import { ApiClient, setApiClient } from '@/api'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { mountWithPlugins } from '@/test/mount'
 
+import type { ChangeRange } from '@/markdown/changeRanges'
+
 import HistoryDialog from './HistoryDialog.vue'
+
+/** `format=json` of the backend for Bob's agent changing two lines (from its test setup). */
+const FIXTURE_DIFF = {
+  from: 'aaaaaaa',
+  to: 'bbbbbbb',
+  hunks: [
+    {
+      heading: 'Setup',
+      headingOccurrence: 1,
+      offset: 0,
+      oldStart: 1,
+      oldLines: 8,
+      newStart: 1,
+      newLines: 8,
+      lines: [
+        { op: ' ', text: '# Setup' },
+        { op: ' ', text: '' },
+        { op: '-', text: 'Some text.' },
+        { op: '+', text: 'Some better text.' },
+        { op: ' ', text: '' },
+        { op: ' ', text: '## Install' },
+        { op: ' ', text: '' },
+        { op: ' ', text: 'Run the installer.' },
+        { op: '-', text: 'Then reboot.' },
+        { op: '+', text: 'Then reboot twice.' },
+      ],
+    },
+  ],
+}
 
 const revisions = [
   {
@@ -31,6 +62,7 @@ async function setup(routes: Parameters<typeof createFetchMock>[0], readOnly = f
   const mock = createFetchMock(routes)
   setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
   const open = ref(false)
+  const shown: ChangeRange[] = []
   const Host = defineComponent({
     setup: () => () =>
       h(HistoryDialog, {
@@ -38,13 +70,14 @@ async function setup(routes: Parameters<typeof createFetchMock>[0], readOnly = f
         readOnly,
         modelValue: open.value,
         'onUpdate:modelValue': (v: boolean) => (open.value = v),
+        onShow: (range: ChangeRange) => shown.push(range),
       }),
   })
   const result = await mountWithPlugins(Host)
   open.value = true
   await flushPromises()
   await flushPromises()
-  return { ...result, ...mock, open }
+  return { ...result, ...mock, open, shown }
 }
 
 const q = (selector: string) => document.querySelector(selector)
@@ -143,6 +176,49 @@ describe('HistoryDialog', () => {
     const entries = qa('[data-testid="history-entry"]')
     expect(entries[0]!.textContent).toContain('Opa Hans via Claude Code on Linux')
     expect(entries[1]!.textContent).not.toContain(' via ')
+    wrapper.unmount()
+  })
+
+  it('summarizes versions and shows hunks by heading, with the changed words', async () => {
+    // answers of the backend (docs/history.md): Bob's agent changed two lines
+    const { wrapper, shown, open } = await setup({
+      'GET /document/d1/history/': () =>
+        json([
+          {
+            ...revisions[0]!,
+            author: { ...revisions[0]!.author, displayName: 'Bob', color: '#2f9e44' },
+            message: 'Update a.md',
+            appTokens: ['Claude Code'],
+            agents: [{ name: 'Claude Code', accountId: 'b' }],
+            summary: { linesAdded: 2, linesRemoved: 2, headings: ['Setup', 'Install'] },
+          },
+          revisions[1],
+        ]),
+      'GET /document/d1/history/diff/': () => json(FIXTURE_DIFF),
+    })
+    const entries = qa('[data-testid="history-entry"]')
+    expect(entries[0]!.textContent).toContain('Bob via Claude Code')
+    expect(entries[0]!.querySelector('[data-testid="history-agent"]')).not.toBeNull()
+    expect(entries[0]!.querySelector('[data-testid="history-summary"]')?.textContent).toContain(
+      '+2 −2 · Setup, Install',
+    )
+    // older backends: the commit message
+    expect(entries[1]!.textContent).toContain('Erste Fassung')
+    expect(entries[1]!.querySelector('[data-testid="history-agent"]')).toBeNull()
+
+    ;(entries[0] as HTMLElement).click()
+    await flushPromises()
+    expect(qa('[data-testid="history-hunk-show"]').map((b) => b.textContent?.trim())).toEqual([
+      'Setup',
+    ])
+    expect(qa('.history__word--changed').map((w) => w.textContent)).toEqual(['better ', ' twice'])
+    ;(q('[data-testid="history-hunk-show"]') as HTMLElement).click()
+    await flushPromises()
+    // the hunk starts at the heading; it changed lines 3 to 8, found again under "Setup"
+    expect(shown).toEqual([
+      { line: 3, count: 6, heading: 'Setup', headingOccurrence: 1, offset: 2 },
+    ])
+    expect(open.value).toBe(false)
     wrapper.unmount()
   })
 

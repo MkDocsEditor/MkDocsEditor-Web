@@ -313,6 +313,11 @@ watch(
 let changeTimer: ReturnType<typeof setTimeout> | undefined
 onBeforeUnmount(() => clearTimeout(changeTimer))
 
+/** From the history: the lines of a change, like a feed entry's (`?change=`). */
+function showHistoryRange(range: ChangeRange): void {
+  void router.replace({ query: { ...route.query, change: JSON.stringify({ ranges: [range] }) } })
+}
+
 type ChangeQuery = { ranges: ChangeRange[]; hash?: string } | { sections: string[] }
 
 /** What the query asks to show; undefined without (or with a broken) one. */
@@ -766,7 +771,12 @@ async function share(): Promise<void> {
       :suggested="qrSuggested"
       @change="setQrKeys"
     />
-    <HistoryDialog v-model="historyOpen" :document-id="id" :read-only="status?.readOnly ?? true" />
+    <HistoryDialog
+      v-model="historyOpen"
+      :document-id="id"
+      :read-only="status?.readOnly ?? true"
+      @show="showHistoryRange"
+    />
   </div>
 </template>
 

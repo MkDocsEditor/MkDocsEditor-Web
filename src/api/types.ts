@@ -246,6 +246,11 @@ interface RevisionAuthor {
   email: string
   /** Empty for authors who are not configured users. */
   username: string
+  /** The account as it is now (newer backends); empty for authors without an account. */
+  accountId?: string
+  displayName?: string
+  color?: string
+  avatar?: string | null
 }
 
 /** A git commit that touched a document (`GET /document/{id}/history/`). */
@@ -260,6 +265,34 @@ export interface Revision {
   path: string
   /** Names of the app tokens (agents, scripts) that made changes in this commit. */
   appTokens?: string[]
+  /** The app tokens of this commit with the account they act for (newer backends). */
+  agents?: { name: string; accountId: string }[]
+  /** What the commit changed, like a feed entry's summary (newer backends). */
+  summary?: { linesAdded: number; linesRemoved: number; headings: string[] }
+}
+
+/** A line of a structured diff: unchanged, removed or added. */
+export interface HunkLine {
+  op: ' ' | '-' | '+'
+  text: string
+}
+
+/**
+ * A block of changes with up to 3 unchanged lines around it (`format=json` of
+ * `GET /document/{id}/history/diff/`, backend `docs/history.md`).
+ */
+export interface DiffHunk {
+  /** The heading at or above the first changed line, in the new text; null without one. */
+  heading: string | null
+  /** Which heading with this text it is, from 1; 0 without a heading. */
+  headingOccurrence: number
+  /** `newStart` minus the heading's line, or `newStart - 1` without one; negative above it. */
+  offset: number
+  oldStart: number
+  oldLines: number
+  newStart: number
+  newLines: number
+  lines: HunkLine[]
 }
 
 /** Someone named on the dashboard, with the current name, colour and picture. */
