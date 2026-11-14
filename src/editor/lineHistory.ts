@@ -7,6 +7,9 @@ import { formatWhen } from '@/services/time'
 
 /** How long the pointer rests on a line's gutter before its history shows. */
 const HOVER_MS = 350
+/** How often and how long to wait for the server's blame to reach the editor's text. */
+const CATCH_UP_TRIES = 5
+const CATCH_UP_MS = 500
 
 /** What a line's tooltip says: who and when, in words. */
 export function describeLine(block: BlameBlock | undefined, now = Date.now()): string[] {
@@ -119,8 +122,7 @@ export function lineHistory(load: () => Promise<Blame | null>) {
           .then((blame) => {
             if (!blame) this.unsupported = true
             this.blame = blame
-            // the author of new lines can take a moment to be known
-            this.changedSince = blame?.blocks.some((b) => b.pending && !b.author) ?? false
+            this.changedSince = false
           })
           .catch(() => undefined) // asked again on the next hover
           .finally(() => (this.loading = null))
@@ -129,6 +131,15 @@ export function lineHistory(load: () => Promise<Blame | null>) {
 
       async show(line: number): Promise<void> {
         await this.refresh()
+        // the blame is of the text the server had when asked: a line typed a moment ago may not
+        // be in it yet, so it is asked again while its line count is not the editor's
+        for (let tries = 0; tries < CATCH_UP_TRIES; tries++) {
+          if (this.line !== line || !this.blame) return
+          if (this.blame.lines === this.view.state.doc.lines) break
+          await new Promise((resolve) => setTimeout(resolve, CATCH_UP_MS))
+          this.changedSince = true
+          await this.refresh()
+        }
         if (this.line !== line || !this.blame) return
         if (line > this.view.state.doc.lines) return
         const pos = this.view.state.doc.line(line).from
