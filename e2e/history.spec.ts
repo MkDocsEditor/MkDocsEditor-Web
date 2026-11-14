@@ -167,3 +167,45 @@ test('shows what changed since the last visit, once', async ({ browser }, testIn
   await expect.poll(() => editorText(page)).toContain('Zucker')
   await expect(banner).toHaveCount(0)
 })
+
+test('undoes one change and keeps the later ones', async ({ page }, testInfo) => {
+  const name = testName('Rückgängig', testInfo)
+  const id = await createDocument(name)
+  const file = path.join(MAIN_WIKI, 'docs', `${name}.md`)
+  const text = (flour: string, heat: string) =>
+    `# Rezept\n\n## Zutaten\n\n${flour}\n\n## Backen\n\nBei ${heat} Grad.\n`
+  const commit = (content: string, message: string, author: string) => {
+    writeFileSync(file, content)
+    git(MAIN_WIKI, ['commit', '-q', '-m', message, '--', file], author)
+  }
+  commit(text('Mehl.', '180'), 'Erste Fassung', 'Oma Erna <oma@example.com>')
+  commit(text('Mehl.', '200'), 'Heißer', 'Opa Hans <opa@example.com>')
+  commit(text('Mehl und Zucker.', '200'), 'Süßer', 'Oma Erna <oma@example.com>')
+  await expect.poll(() => documentContent(id)).toContain('Zucker')
+
+  await login(page)
+  await openEditor(page, id)
+  await expect.poll(() => editorText(page)).toContain('Zucker')
+  await page.getByRole('button', { name: 'More' }).click()
+  await page.getByTestId('open-history').click()
+  const dialog = page.getByTestId('history-dialog')
+  const entries = dialog.getByTestId('history-entry')
+  await entries.filter({ hasText: 'Heißer' }).click()
+  await dialog.getByTestId('history-undo').click()
+
+  // the confirmation shows who made it and what it changed
+  const confirm = page.getByTestId('history-undo-dialog')
+  await expect(confirm.getByTestId('history-undo-makers')).toHaveText('Made by Opa Hans.')
+  await expect(confirm.getByTestId('history-undo-shared')).toHaveCount(0)
+  await expect(confirm.locator('.history__word--changed')).toHaveText(['180', '200'])
+  await confirm.getByTestId('history-undo-confirm').click()
+  await expect(dialog).toBeHidden()
+
+  // the oven goes back to 180, the sugar of the later change stays
+  await expect.poll(() => editorText(page)).toContain('Bei 180 Grad.')
+  expect(await editorText(page)).toContain('Mehl und Zucker.')
+  await expect.poll(() => documentContent(id)).toBe(text('Mehl und Zucker.', '180'))
+  await page.getByRole('button', { name: 'More' }).click()
+  await page.getByTestId('open-history').click()
+  await expect(entries.first()).toContainText('Revert')
+})

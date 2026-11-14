@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { mdiArrowLeft, mdiClose, mdiHistory, mdiRestore, mdiRobotOutline } from '@mdi/js'
+import {
+  mdiAlertOutline,
+  mdiArrowLeft,
+  mdiClose,
+  mdiHistory,
+  mdiRestore,
+  mdiRobotOutline,
+  mdiUndo,
+} from '@mdi/js'
 import { computed, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 
-import { useApi } from '@/api'
+import { ApiError, useApi, useAuthApi } from '@/api'
 import type { Revision } from '@/api'
 import AppDialog from '@/components/common/AppDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -31,6 +39,8 @@ const revisions = ref<Revision[] | null>([])
 const loading = ref(false)
 const loadError = ref<unknown>(null)
 const selected = ref<Revision | null>(null)
+/** Whether the server can undo a single change (`revert`). */
+const canRevert = ref(false)
 
 type View = 'changes' | 'current' | 'content'
 const view = ref<View>('changes')
@@ -45,6 +55,10 @@ async function load(): Promise<void> {
   loadError.value = null
   selected.value = null
   try {
+    void useAuthApi()
+      .serverInfo()
+      .then((info) => (canRevert.value = info.features?.includes('revert') === true))
+      .catch(() => undefined)
     revisions.value = await useApi().getHistory(props.documentId)
     const first = revisions.value?.[0]
     if (first && !mobile.value) selected.value = first
@@ -176,6 +190,72 @@ async function restore(): Promise<void> {
   }
 }
 
+/**
+ * Whether the change of a commit can be undone: not the file's first commit (that would empty
+ * it; restore an older version instead), and not one that changed no lines (a move).
+ */
+function revertable(revision: Revision): boolean {
+  if (props.readOnly || !canRevert.value || !previous(revision)) return false
+  const summary = revision.summary
+  return !summary || summary.linesAdded + summary.linesRemoved > 0
+}
+
+/** The people and agents of a commit, for the confirmation. */
+function makers(revision: Revision): { people: string[]; agents: string[] } {
+  return {
+    people: [revision.author, ...(revision.coAuthors ?? [])].map(nameOf),
+    agents: agentsOf(revision),
+  }
+}
+
+const undoOpen = ref(false)
+const undoing = ref(false)
+const undoError = ref<unknown>(null)
+const undoMakers = computed(() => (selected.value ? makers(selected.value) : null))
+/** Undoing removes the changes of everyone in the commit, which matters with more than one. */
+const undoShared = computed(() => {
+  const m = undoMakers.value
+  return m ? m.people.length + m.agents.length > 1 : false
+})
+
+function askUndo(): void {
+  undoError.value = null
+  view.value = 'changes' // the confirmation shows this commit's changes
+  undoOpen.value = true
+}
+
+async function undo(): Promise<void> {
+  const revision = selected.value
+  if (!revision) return
+  undoing.value = true
+  undoError.value = null
+  try {
+    await useApi().revertRevision(props.documentId, revision.revision)
+    notify.success(`Undid the change of ${formatDate(revision.time)}`)
+    undoOpen.value = false
+    open.value = false
+  } catch (error) {
+    undoError.value = error
+  } finally {
+    undoing.value = false
+  }
+}
+
+function undoFailure(error: unknown): { type: 'error' | 'info'; text: string } {
+  if (error instanceof ApiError && error.code === 'revert-conflict') {
+    const headings = (error.details.headings as (string | null)[] | undefined) ?? []
+    const named = headings.map((h) => h ?? 'the start of the page')
+    const where = named.length > 0 ? ` in ${named.join(', ')}` : ''
+    return {
+      type: 'error',
+      text: `Not undone: the same lines were changed again later${where}. Nothing was changed; edit them by hand.`,
+    }
+  }
+  if (error instanceof ApiError && error.code === 'nothing-to-revert')
+    return { type: 'info', text: 'This change is already gone: it was undone before, or by hand.' }
+  return { type: 'error', text: describeError(error) }
+}
+
 const viewLabels: Record<View, string> = {
   changes: 'Changes',
   current: 'Compare with now',
@@ -261,6 +341,16 @@ const viewLabels: Record<View, string> = {
                 </div>
               </div>
               <v-btn
+                v-if="revertable(selected)"
+                color="primary"
+                variant="outlined"
+                :prepend-icon="mdiUndo"
+                data-testid="history-undo"
+                @click="askUndo"
+              >
+                Undo this change
+              </v-btn>
+              <v-btn
                 v-if="!readOnly && selected !== revisions[0]"
                 color="primary"
                 variant="outlined"
@@ -269,7 +359,7 @@ const viewLabels: Record<View, string> = {
                 data-testid="history-restore"
                 @click="confirmOpen = true"
               >
-                Restore
+                Restore this version
               </v-btn>
             </div>
             <v-tabs v-model="view" class="px-4">
@@ -323,10 +413,72 @@ const viewLabels: Record<View, string> = {
       confirm-text="Restore"
       @confirm="restore"
     />
+
+    <AppDialog v-model="undoOpen" size="medium" :fullscreen="mobile" scrollable>
+      <v-card v-if="selected && undoMakers" data-testid="history-undo-dialog">
+        <v-card-title>Undo this change?</v-card-title>
+        <v-card-text class="pb-0">
+          <p class="mb-2">
+            The lines of {{ formatDate(selected.time) }} go back to how they were before. Later
+            changes stay. Undoing is a change of its own, so it can be undone too.
+          </p>
+          <p class="mb-2" data-testid="history-undo-makers">
+            Made by {{ undoMakers.people.join(', ')
+            }}<template v-if="undoMakers.agents.length > 0">
+              via {{ undoMakers.agents.join(', ') }}</template
+            >.
+          </p>
+          <v-alert
+            v-if="undoShared"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            :icon="mdiAlertOutline"
+            class="mb-2"
+            data-testid="history-undo-shared"
+          >
+            More than one made this change: undoing it removes the changes of all of them.
+          </v-alert>
+          <v-alert
+            v-if="undoError"
+            :type="undoFailure(undoError).type"
+            variant="tonal"
+            role="alert"
+            class="mb-2"
+            data-testid="history-undo-error"
+          >
+            {{ undoFailure(undoError).text }}
+          </v-alert>
+        </v-card-text>
+        <v-progress-linear v-if="detailLoading" indeterminate />
+        <div class="history__undo-diff">
+          <DiffHunks :hunks="hunks" :linked="false" />
+        </div>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="undoOpen = false">Cancel</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="undoing"
+            :disabled="detailLoading"
+            data-testid="history-undo-confirm"
+            @click="undo"
+          >
+            Undo
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </AppDialog>
   </AppDialog>
 </template>
 
 <style scoped>
+.history__undo-diff {
+  max-height: 40vh;
+  overflow: auto;
+  border-block: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
 .history__body {
   min-height: 60vh;
 }

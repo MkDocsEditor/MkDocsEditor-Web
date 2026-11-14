@@ -222,6 +222,88 @@ describe('HistoryDialog', () => {
     wrapper.unmount()
   })
 
+  it('undoes one change after showing who made it, and says why it could not', async () => {
+    let answer = () => json({}, 200)
+    const shared = {
+      ...revisions[0]!,
+      coAuthors: [{ name: 'Anna', email: '', username: 'anna' }],
+      agents: [{ name: 'Claude Code', accountId: 'b' }],
+      summary: { linesAdded: 1, linesRemoved: 1, headings: ['Setup'] },
+    }
+    const { wrapper, requests, open } = await setup({
+      'GET /server-info/': () => json({ features: ['revert'] }),
+      'GET /document/d1/history/': () =>
+        json([
+          shared,
+          {
+            ...revisions[0]!,
+            revision: 'mmmmmmm',
+            summary: { linesAdded: 0, linesRemoved: 0, headings: [] },
+          },
+          revisions[1],
+        ]),
+      'GET /document/d1/history/diff/': () => json(FIXTURE_DIFF),
+      'POST /document/d1/history/bbbbbbb/revert/': () => answer(),
+    })
+    const entries = qa('[data-testid="history-entry"]')
+    // a move changed no lines; the first commit cannot be undone
+    ;(entries[1] as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-undo"]')).toBeNull()
+    ;(q('[aria-label="Back to the list"]') as HTMLElement).click()
+    await flushPromises()
+    ;(entries[2] as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-undo"]')).toBeNull()
+    ;(q('[aria-label="Back to the list"]') as HTMLElement).click()
+    await flushPromises()
+
+    ;(entries[0] as HTMLElement).click()
+    await flushPromises()
+    ;(q('[data-testid="history-undo"]') as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-undo-makers"]')?.textContent).toContain(
+      'Made by Opa Hans, Anna via Claude Code',
+    )
+    expect(q('[data-testid="history-undo-shared"]')).not.toBeNull()
+    expect(qa('[data-testid="history-undo-dialog"] [data-testid="history-line"]').length).toBe(10)
+
+    answer = () =>
+      json(
+        { code: 'revert-conflict', message: 'conflict', details: { headings: ['Setup', null] } },
+        409,
+      )
+    ;(q('[data-testid="history-undo-confirm"]') as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-undo-error"]')?.textContent).toContain(
+      'changed again later in Setup, the start of the page',
+    )
+    expect(open.value).toBe(true)
+
+    answer = () => json({ code: 'nothing-to-revert', message: 'gone' }, 409)
+    ;(q('[data-testid="history-undo-confirm"]') as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-undo-error"]')?.textContent).toContain('already gone')
+
+    answer = () => json({ ...shared, revision: 'rrrrrrr', message: 'Revert bbbbbbb' })
+    ;(q('[data-testid="history-undo-confirm"]') as HTMLElement).click()
+    await flushPromises()
+    expect(requests.filter((r) => r.url.endsWith('/bbbbbbb/revert/'))).toHaveLength(3)
+    expect(open.value).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('offers no undo on servers without it', async () => {
+    const { wrapper } = await setup({
+      'GET /document/d1/history/': () => json(revisions),
+      'GET /document/d1/history/diff/': () => json(FIXTURE_DIFF),
+    })
+    ;(qa('[data-testid="history-entry"]')[0] as HTMLElement).click()
+    await flushPromises()
+    expect(q('[data-testid="history-undo"]')).toBeNull()
+    wrapper.unmount()
+  })
+
   it('explains when the server has no history', async () => {
     const { wrapper } = await setup({})
     expect(document.body.textContent).toContain('No version history')

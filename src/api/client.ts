@@ -300,6 +300,14 @@ export class ApiClient {
     await this.request('PUT', urlPath`/document/${id}/seen`, { json: { seenToken }, keepalive })
   }
 
+  /**
+   * Undoes the changes of one commit in the live text (a 3-way merge); answers the new commit.
+   * 409 `revert-conflict` (nothing changed; `details.headings`), 409 `nothing-to-revert`.
+   */
+  async revertRevision(id: string, revision: string): Promise<Revision> {
+    return this.json<Revision>('POST', urlPath`/document/${id}/history/${revision}/revert`)
+  }
+
   /** Sets the live document to the text of `revision` (arrives as a normal edit). */
   async restoreRevision(id: string, revision: string): Promise<void> {
     await this.request('POST', urlPath`/document/${id}/history/${revision}/restore`)
