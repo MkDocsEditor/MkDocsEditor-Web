@@ -9,25 +9,30 @@ import type { ExpiryChoice } from '@/services/appTokens'
  * null without one, and undefined while a chosen date is missing or past.
  */
 const props = withDefaults(
-  defineProps<{ initial?: ExpiryChoice; initialDate?: string; testid?: string }>(),
-  { initial: 'none', initialDate: '', testid: 'expiry' },
+  defineProps<{ initial?: ExpiryChoice; initialDate?: string; max?: string; testid?: string }>(),
+  { initial: 'none', initialDate: '', max: '', testid: 'expiry' },
 )
 const model = defineModel<string | null | undefined>()
 
 const choice = ref<ExpiryChoice>(props.initial)
 const date = ref(props.initialDate)
 const today = localDay(Date.now())
+/** The latest day the server allows, if it says. */
+const lastDay = computed(() => (props.max ? localDay(Date.parse(props.max)) : undefined))
 
-const dateError = computed(() =>
-  choice.value === 'date' && expiryTime('date', date.value) === undefined
-    ? 'Choose a day after today'
-    : '',
+const tooLate = computed(
+  () => choice.value === 'date' && !!lastDay.value && date.value > lastDay.value,
 )
+const dateError = computed(() => {
+  if (choice.value !== 'date') return ''
+  if (expiryTime('date', date.value) === undefined) return 'Choose a day after today'
+  return tooLate.value ? `At the latest ${lastDay.value}` : ''
+})
 
 watch(
   [choice, date],
   () => {
-    model.value = expiryTime(choice.value, date.value)
+    model.value = tooLate.value ? undefined : expiryTime(choice.value, date.value)
   },
   { immediate: true },
 )
@@ -48,6 +53,7 @@ watch(
       type="date"
       label="Last day"
       :min="today"
+      :max="lastDay"
       :error-messages="dateError"
       :data-testid="`${testid}-date`"
     />

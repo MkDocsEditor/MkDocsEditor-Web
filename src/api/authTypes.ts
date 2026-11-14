@@ -268,7 +268,11 @@ export interface OAuthRequest {
   /** Only `read` for readers. */
   allowedScopes: AppTokenScope[]
   resource: string
+  /** When this request ends (10 minutes), not the grant. */
   expiresAt: string
+  /** Defaults of the grant: its name, its end (null: none), and the latest end allowed. */
+  name?: string
+  maxExpiresAt?: string
 }
 
 export interface CreatedAppToken {

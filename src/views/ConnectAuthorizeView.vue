@@ -55,7 +55,7 @@ async function load(): Promise<void> {
     info.value = await api.oauthRequest(props.request)
     const requested = info.value.scope
     scope.value = info.value.allowedScopes.includes(requested) ? requested : 'read'
-    name.value = info.value.clientName.slice(0, 64)
+    name.value = info.value.name || info.value.clientName.slice(0, 64)
   } catch (e) {
     error.value = failure(e)
   } finally {
@@ -170,7 +170,7 @@ onMounted(load)
           :rules="[tokenNameRule]"
           data-testid="oauth-name"
         />
-        <ExpiryField v-model="expiresAt" testid="oauth-expiry" />
+        <ExpiryField v-model="expiresAt" :max="info.maxExpiresAt" testid="oauth-expiry" />
       </div>
       <p class="mb-4 text-body-small text-medium-emphasis" data-testid="oauth-expiry-note">
         {{
