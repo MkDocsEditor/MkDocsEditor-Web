@@ -310,6 +310,30 @@ export interface DocumentChanges {
   summary: { linesAdded: number; linesRemoved: number; headings: string[] }
 }
 
+/** Who wrote lines of a document and when (`GET /document/{id}/blame/`). */
+export interface Blame {
+  /** The revision of the text the lines belong to; may lag behind fast typing. */
+  revision: string
+  lines: number
+  /** Consecutive lines of one commit, or of one person (and agent) not committed yet. */
+  blocks: BlameBlock[]
+}
+
+export interface BlameBlock {
+  /** 1-based and inclusive. */
+  start: number
+  end: number
+  /** The lines differ from the last commit: written since, not in the history yet. */
+  pending: boolean
+  revision: string | null
+  time: string | null
+  message: string | null
+  /** The commit's author, or who wrote most of a pending line; null if unknown. */
+  author: ActivityPerson | null
+  /** Names of the app tokens. */
+  agents: string[]
+}
+
 /** Someone named on the dashboard, with the current name, colour and picture. */
 export interface ActivityPerson {
   /** Absent for the server itself and for changes on disk. */

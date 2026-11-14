@@ -2,6 +2,7 @@ import type {
   ActorInfo,
   AuthorshipResponse,
   Backlink,
+  Blame,
   BrokenReference,
   DiffHunk,
   DocumentChanges,
@@ -306,6 +307,11 @@ export class ApiClient {
    */
   async revertRevision(id: string, revision: string): Promise<Revision> {
     return this.json<Revision>('POST', urlPath`/document/${id}/history/${revision}/revert`)
+  }
+
+  /** Who wrote which lines and when; null on servers without it (or without git). */
+  async getBlame(id: string): Promise<Blame | null> {
+    return nullWhen([404, 405], this.json<Blame>('GET', urlPath`/document/${id}/blame`))
   }
 
   /** Sets the live document to the text of `revision` (arrives as a normal edit). */

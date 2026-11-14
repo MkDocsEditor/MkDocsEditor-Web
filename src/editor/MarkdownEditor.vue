@@ -15,6 +15,7 @@ import {
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { scrollProgress } from '@/markdown/sourceLines'
+import type { Blame } from '@/api'
 import type { ScrollAnchor } from '@/markdown/sourceLines'
 import type { DocumentSession } from '@/sync/session'
 
@@ -24,6 +25,7 @@ import { isLocalEdit, sessionBinding } from './binding'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { formattingKeymap } from './formatting'
 import type { FormatName } from './formatting'
+import { lineHistory } from './lineHistory'
 import { remoteCursors, setPeers } from './remoteCursors'
 import { fileUpload } from './upload'
 import type { UploadFiles } from './upload'
@@ -40,6 +42,8 @@ const props = defineProps<{
   formatOverride?: Partial<Record<FormatName, () => boolean>>
   /** Whether the pane of the editor is on screen, which followers of this user need to know. */
   shown?: boolean
+  /** Who wrote which lines and when, for the tooltip on the gutter; none without it. */
+  loadBlame?: () => Promise<Blame | null>
 }>()
 const emit = defineEmits<{
   /** The reading place after a scroll or an edit, for scrolling the preview along. */
@@ -120,6 +124,7 @@ onMounted(() => {
       remoteCursors(),
       authorship(),
       sessionBinding(props.session),
+      props.loadBlame ? lineHistory(props.loadBlame) : [],
       props.upload ? fileUpload(props.upload) : [],
       EditorView.updateListener.of((update) => {
         if (update.docChanged) emit('change', update.state.doc.toString())

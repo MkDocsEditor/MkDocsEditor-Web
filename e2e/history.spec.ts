@@ -209,3 +209,35 @@ test('undoes one change and keeps the later ones', async ({ page }, testInfo) =>
   await page.getByTestId('open-history').click()
   await expect(entries.first()).toContainText('Revert')
 })
+
+test('says who wrote a line and when', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'phones have no hover; the Android app has it')
+  const name = testName('Wer', testInfo)
+  const id = await createDocument(name)
+  const file = path.join(MAIN_WIKI, 'docs', `${name}.md`)
+  writeFileSync(file, '# Rezept\n\nMehl.\n')
+  git(MAIN_WIKI, ['commit', '-q', '-m', 'Erste Fassung', '--', file], 'Oma Erna <oma@example.com>')
+  await expect.poll(() => documentContent(id)).toContain('Mehl.')
+
+  await login(page)
+  await openEditor(page, id)
+  await expect.poll(() => editorText(page)).toContain('Mehl.')
+  const numbers = page.locator('.cm-lineNumbers .cm-gutterElement')
+  await numbers.filter({ hasText: /^3$/ }).hover()
+  const tooltip = page.getByTestId('line-history')
+  await expect(tooltip).toContainText('Oma Erna')
+  await expect(tooltip).toContainText('Erste Fassung')
+
+  // a line typed now is not in the history yet
+  await page.locator('.cm-content').click()
+  await page.keyboard.press('ControlOrMeta+End')
+  await page.keyboard.type('Zucker.')
+  await expect.poll(() => documentContent(id)).toContain('Zucker.')
+  // the server learns who wrote the line a moment after it arrives
+  await expect(async () => {
+    await page.mouse.move(600, 600)
+    await expect(tooltip).toBeHidden()
+    await numbers.filter({ hasText: /^4$/ }).hover()
+    await expect(tooltip).toContainText('alice, not in the history yet', { timeout: 2000 })
+  }).toPass({ timeout: 15_000 })
+})

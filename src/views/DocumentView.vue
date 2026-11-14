@@ -17,6 +17,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
+import { useApi } from '@/api'
 import type { QrKey, ResourceModel } from '@/api'
 import ChangesBanner from '@/components/changes/ChangesBanner.vue'
 import HistoryDialog from '@/components/history/HistoryDialog.vue'
@@ -316,6 +317,11 @@ watch(
  */
 let changeTimer: ReturnType<typeof setTimeout> | undefined
 onBeforeUnmount(() => clearTimeout(changeTimer))
+
+/** Who wrote which lines and when, for the editor's gutter (phones have no hover). */
+function loadBlame() {
+  return useApi().getBlame(props.id)
+}
 
 /** From the history: the lines of a change, like a feed entry's (`?change=`). */
 function showHistoryRange(range: ChangeRange): void {
@@ -696,6 +702,7 @@ async function share(): Promise<void> {
           :line-numbers="!mobile && lineNumbers"
           :format-override="shortcutOverride"
           :shown="mode !== 'preview'"
+          :load-blame="mobile ? undefined : loadBlame"
           @change="(t: string) => (text = t)"
           @local-edit="follow.stop()"
           @anchor="onEditorAnchor"
