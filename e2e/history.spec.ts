@@ -210,6 +210,39 @@ test('undoes one change and keeps the later ones', async ({ page }, testInfo) =>
   await expect(entries.first()).toContainText('Revert')
 })
 
+test('restores one section and keeps the rest of the page', async ({ page }, testInfo) => {
+  const name = testName('Abschnitt', testInfo)
+  const id = await createDocument(name)
+  const file = path.join(MAIN_WIKI, 'docs', `${name}.md`)
+  // far enough apart to be two hunks
+  const filler = Array.from({ length: 10 }, (_, i) => `Schritt ${i + 1}`).join('\n')
+  const text = (flour: string, heat: string) =>
+    `# Rezept\n\n## Zutaten\n\n${flour}\n\n## Backen\n\n${filler}\n\nBei ${heat} Grad.\n`
+  const commit = (content: string, message: string) => {
+    writeFileSync(file, content)
+    git(MAIN_WIKI, ['commit', '-q', '-m', message, '--', file], 'Oma Erna <oma@example.com>')
+  }
+  commit(text('Mehl.', '180'), 'Erste Fassung')
+  commit(text('Mehl und Zucker.', '200'), 'Beides anders')
+  await expect.poll(() => documentContent(id)).toContain('200')
+
+  await login(page)
+  await openEditor(page, id)
+  await expect.poll(() => editorText(page)).toContain('200')
+  await page.getByRole('button', { name: 'More' }).click()
+  await page.getByTestId('open-history').click()
+  const dialog = page.getByTestId('history-dialog')
+  await dialog.getByTestId('history-entry').filter({ hasText: 'Erste Fassung' }).click()
+  await dialog.getByRole('tab', { name: 'Compare with now' }).click()
+  await dialog.getByRole('button', { name: 'Restore “Backen”' }).click()
+  await page.getByTestId('confirm-button').click()
+  await expect(dialog).toBeHidden()
+
+  // the oven goes back, the ingredients stay
+  await expect.poll(() => documentContent(id)).toBe(text('Mehl und Zucker.', '180'))
+  await expect.poll(() => editorText(page)).toContain('Bei 180 Grad.')
+})
+
 test('says who wrote a line and when', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'phones have no hover; the Android app has it')
   const name = testName('Wer', testInfo)

@@ -41,6 +41,8 @@ const loadError = ref<unknown>(null)
 const selected = ref<Revision | null>(null)
 /** Whether the server can undo a single change (`revert`). */
 const canRevert = ref(false)
+/** Whether the server can restore a single section (`blame` covers it). */
+const canRestoreSection = ref(false)
 
 type View = 'changes' | 'current' | 'content'
 const view = ref<View>('changes')
@@ -57,7 +59,10 @@ async function load(): Promise<void> {
   try {
     void useAuthApi()
       .serverInfo()
-      .then((info) => (canRevert.value = info.features?.includes('revert') === true))
+      .then((info) => {
+        canRevert.value = info.features?.includes('revert') === true
+        canRestoreSection.value = info.features?.includes('blame') === true
+      })
       .catch(() => undefined)
     revisions.value = await useApi().getHistory(props.documentId)
     const first = revisions.value?.[0]
@@ -198,6 +203,61 @@ function revertable(revision: Revision): boolean {
   if (props.readOnly || !canRevert.value || !previous(revision)) return false
   const summary = revision.summary
   return !summary || summary.linesAdded + summary.linesRemoved > 0
+}
+
+/** A section of the selected version to put back, waiting for confirmation. */
+const sectionToRestore = ref<{ heading: string; occurrence: number } | null>(null)
+const sectionConfirmOpen = ref(false)
+
+/** Restoring a section of the newest version would change nothing it has not got already. */
+function sectionRestorable(hunk: DiffHunk): boolean {
+  return (
+    !props.readOnly &&
+    canRestoreSection.value &&
+    hunk.heading !== null &&
+    selected.value !== null &&
+    selected.value !== revisions.value?.[0]
+  )
+}
+
+function askRestoreSection(hunk: DiffHunk): void {
+  if (hunk.heading === null) return
+  sectionToRestore.value = { heading: hunk.heading, occurrence: hunk.headingOccurrence || 1 }
+  sectionConfirmOpen.value = true
+}
+
+async function restoreSection(): Promise<void> {
+  const revision = selected.value
+  const section = sectionToRestore.value
+  if (!revision || !section) return
+  restoring.value = true
+  restoreError.value = null
+  try {
+    await useApi().restoreSection(
+      props.documentId,
+      revision.revision,
+      section.heading,
+      section.occurrence,
+    )
+    notify.success(`Restored “${section.heading}” to the version of ${formatDate(revision.time)}`)
+    emit('restored', revision)
+    open.value = false
+  } catch (error) {
+    restoreError.value = error
+  } finally {
+    restoring.value = false
+  }
+}
+
+/** Why a restore failed, in words. */
+function restoreFailure(error: unknown): string {
+  if (error instanceof ApiError && error.code === 'section-not-found') {
+    const heading = sectionToRestore.value?.heading ?? 'The section'
+    return error.details.in === 'current'
+      ? `“${heading}” is no longer in the page. Restore the whole version instead, or copy it from the text.`
+      : `“${heading}” is not in this version.`
+  }
+  return describeError(error)
 }
 
 /** The people and agents of a commit, for the confirmation. */
@@ -373,7 +433,7 @@ const viewLabels: Record<View, string> = {
               role="alert"
               class="ma-4"
               title="Restore failed"
-              :text="describeError(restoreError)"
+              :text="restoreFailure(restoreError)"
               data-testid="history-restore-error"
             />
             <LoadError
@@ -395,7 +455,22 @@ const viewLabels: Record<View, string> = {
                   <template v-if="view === 'current'"> · green was added since</template>
                 </template>
               </div>
-              <DiffHunks :hunks="hunks" @show="showInPage" />
+              <DiffHunks :hunks="hunks" @show="showInPage">
+                <template #actions="{ hunk }">
+                  <v-btn
+                    v-if="sectionRestorable(hunk)"
+                    variant="text"
+                    size="small"
+                    :prepend-icon="mdiRestore"
+                    class="mr-2"
+                    :title="`Put “${hunk.heading}” back as it was in this version`"
+                    data-testid="history-restore-section"
+                    @click="askRestoreSection(hunk)"
+                  >
+                    Restore “{{ hunk.heading }}”
+                  </v-btn>
+                </template>
+              </DiffHunks>
             </template>
           </div>
         </div>
@@ -412,6 +487,18 @@ const viewLabels: Record<View, string> = {
       "
       confirm-text="Restore"
       @confirm="restore"
+    />
+
+    <ConfirmDialog
+      v-model="sectionConfirmOpen"
+      title="Restore this section?"
+      :text="
+        selected && sectionToRestore
+          ? `“${sectionToRestore.heading}” and its subsections go back to the state of ${formatDate(selected.time)}. The rest of the page stays as it is. This is a normal change and can be undone.`
+          : ''
+      "
+      confirm-text="Restore section"
+      @confirm="restoreSection"
     />
 
     <AppDialog v-model="undoOpen" size="medium" :fullscreen="mobile" scrollable>
