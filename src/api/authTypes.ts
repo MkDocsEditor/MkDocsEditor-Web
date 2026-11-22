@@ -167,6 +167,50 @@ export interface InstanceSettings {
   accessRequestsEnabled?: boolean
 }
 
+/** State of the connection to the git host that gives the server its push credential. */
+export type GitRemoteState = 'not-configured' | 'disconnected' | 'connected' | 'expired' | 'error'
+
+/**
+ * `GET /admin/git-remote`: the server pushes with an OAuth2 grant of a user on the git host (only
+ * Forgejo so far). Without `git.oauth` in the server config the state is `not-configured` and every
+ * field except `pushEnabled` is null or false.
+ */
+export interface GitRemoteStatus {
+  state: GitRemoteState
+  /** `git.push` of the server config: off, the server commits but never pushes. */
+  pushEnabled: boolean
+  /** Id of the provider, like `forgejo`. */
+  provider: string | null
+  /** Its name for texts, like `Forgejo`. */
+  providerName: string | null
+  providerUrl: string | null
+  /** The page where a user of the provider removes the apps they approved; null if it has none. */
+  grantsUrl: string | null
+  /** The provider grants narrower rights than all of the user's; Forgejo doesn't. */
+  scopedGrants: boolean
+  /** `owner/name` on the provider. */
+  repo: string | null
+  /** The login the server accepts; null accepts any. */
+  expectedUser: string | null
+  /** Whether the server accepts an admin of the provider. */
+  allowAdmin: boolean
+  remoteUser: { login: string; avatarUrl: string | null; isAdmin: boolean } | null
+  /** The remote user may push to `repo`, checked on every request; null if the check failed. */
+  canPush: boolean | null
+  connectedAt: string | null
+  /** Username of the admin who connected. */
+  connectedBy: string | null
+  lastRefreshAt: string | null
+  /** When the refresh token runs out unless the server refreshes it before. */
+  refreshExpiresAt: string | null
+  /** `permanent`: the provider refused the refresh token (`invalid_grant`), the state is `expired`. */
+  lastRefreshError: { at: string; message: string; permanent: boolean } | null
+  lastPushAt: string | null
+  lastPushError: { at: string; message: string } | null
+  /** Commits not on the remote yet; absent if the server can't tell. */
+  pendingCommits?: number | null
+}
+
 export type AccessRequestStatus = 'pending' | 'approved' | 'rejected' | 'expired'
 
 /** `name` and `message` are untrusted plain text: show them as text only. */

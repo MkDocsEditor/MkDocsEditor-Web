@@ -15,6 +15,7 @@ import type {
   CreatedDeviceLink,
   CreatedLink,
   DeviceLink,
+  GitRemoteStatus,
   InstanceSettings,
   LinkInfo,
   LinkInspection,
@@ -368,6 +369,20 @@ export class AuthApi {
 
   updateSettings(patch: Partial<InstanceSettings>): Promise<InstanceSettings> {
     return this.send('PATCH', '/admin/settings', patch)
+  }
+
+  gitRemote(): Promise<GitRemoteStatus> {
+    return this.get('/admin/git-remote')
+  }
+
+  /** Starts the OAuth2 flow with the git host: the browser goes to `authorizeUrl` next. */
+  connectGitRemote(): Promise<{ authorizeUrl: string }> {
+    return this.send('POST', '/admin/git-remote/connect')
+  }
+
+  /** Returns the status afterwards, `disconnected`. */
+  disconnectGitRemote(): Promise<GitRemoteStatus> {
+    return this.api.json('DELETE', '/admin/git-remote')
   }
 
   audit(query: AuditQuery = {}): Promise<AuditPage> {

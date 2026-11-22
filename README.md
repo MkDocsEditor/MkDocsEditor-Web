@@ -38,7 +38,9 @@ together, in real time, from a phone or a desktop browser. It talks to the
   app directly. Links the app does not take land on `/connect`, which explains how to install
   the app with [Obtainium](https://obtainium.imranr.dev) (with pre-releases turned on).
 - Administration: users (role, disable, delete, reset link), invitations with QR code, audit log,
-  and "second factor required" for everyone.
+  "second factor required" for everyone, and the connection to the git host (Forgejo) the server
+  pushes the wiki to: connect a user there through OAuth2, see when it last pushed and renewed,
+  and warnings when that user is an admin, may not push, or the connection is about to end.
 - "What’s going on" is the start page: the wiki's `index.md` first, then the pinned pages (for
   everyone, set by editors and admins, and your own), then the changes of all pages: who edited,
   created, moved or deleted what, when and where, with the headings an edit touched. Pin a page
