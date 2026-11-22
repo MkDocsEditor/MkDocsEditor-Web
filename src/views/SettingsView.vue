@@ -18,6 +18,7 @@ import TotpCard from '@/components/account/TotpCard.vue'
 import AccessRequestsAdmin from '@/components/admin/AccessRequestsAdmin.vue'
 import AuditAdmin from '@/components/admin/AuditAdmin.vue'
 import InvitesAdmin from '@/components/admin/InvitesAdmin.vue'
+import GitRemoteCard from '@/components/admin/GitRemoteCard.vue'
 import SettingsAdmin from '@/components/admin/SettingsAdmin.vue'
 import UsersAdmin from '@/components/admin/UsersAdmin.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -149,7 +150,10 @@ watch(
         <InvitesAdmin v-else-if="shown.id === 'invites'" />
         <AccessRequestsAdmin v-else-if="shown.id === 'requests'" />
         <AuditAdmin v-else-if="shown.id === 'audit'" />
-        <SettingsAdmin v-else-if="shown.id === 'server'" />
+        <div v-else-if="shown.id === 'server'" class="d-flex flex-column ga-4">
+          <SettingsAdmin />
+          <GitRemoteCard />
+        </div>
         <AboutSettings v-else-if="shown.id === 'about'" />
       </section>
     </div>

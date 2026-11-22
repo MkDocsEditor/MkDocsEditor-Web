@@ -53,12 +53,16 @@ const TYPES: Record<string, string> = {
   'account.enabled': 'Account enabled',
   'account.deleted': 'Account deleted',
   'settings.changed': 'Settings changed',
+  'git.connected': 'Forgejo connected',
+  'git.disconnected': 'Forgejo disconnected',
+  'git.refresh-failed': 'Forgejo connection ended',
+  'git.connect-refused': 'Forgejo connection refused',
   'rate-limit.triggered': 'Too many attempts',
 }
 const typeItems = Object.entries(TYPES).map(([value, title]) => ({ value, title }))
 
 function isWarning(event: AuditEvent): boolean {
-  return /failed|rate-limit|disabled|deleted/.test(event.type)
+  return /failed|refused|rate-limit|disabled|deleted/.test(event.type)
 }
 
 function detailText(event: AuditEvent): string {
