@@ -231,7 +231,16 @@ const animator = ViewPlugin.fromClass(
 
 /** Fading in text others write; `animateText` marks what fades. */
 export function appearance(config: Partial<AppearanceConfig> = {}): Extension {
-  return [appearanceConfig.of(config), appearing, animator, revealing, revealer, revealTheme]
+  return [
+    appearanceConfig.of(config),
+    appearing,
+    animator,
+    revealing,
+    revealer,
+    revealTheme,
+    growing,
+    grower,
+  ]
 }
 
 /*
@@ -470,4 +479,127 @@ const revealTheme = EditorView.baseTheme({
 /** The ranges that fade right now, for tests. */
 export function appearingRanges(state: EditorView['state']): readonly TaggedRange[] {
   return state.field(appearing, false)?.map(({ tag, from, to }) => ({ tag, from, to })) ?? []
+}
+
+/*
+ * Inserted text of others grows its space: it starts about zero wide and widens to its full width
+ * over `GROW_MS`, with the ease-out of the carets, so the text after it, a new wrap and the lines
+ * below move smoothly instead of jumping. Done by letter-spacing from -1ch (one advance less per
+ * character: zero in the editor's monospace font) to normal, so the browser lays it all out on
+ * the way; hidden text of a reveal ends up keeping its full space. For live agent changes and for
+ * remote inserts of `MIN_GROW_CHARS` or more; never for local typing (only `animateText` and
+ * `revealText` mark text), and under the settings of the fade.
+ */
+export const GROW_MS = 120
+export const MIN_GROW_CHARS = 4
+/** Ease-out cubic, as the carets glide (`cursorGlide`). */
+const GROW_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)'
+
+interface Growing {
+  from: number
+  to: number
+  start: number
+  id: number
+}
+
+const expireGrowing = StateEffect.define<number>()
+
+const growing = StateField.define<readonly Growing[]>({
+  create: () => [],
+  update(ranges, tr) {
+    let next = ranges
+    if (tr.docChanged && next.length > 0)
+      next = next
+        .map((r) => ({ ...r, from: tr.changes.mapPos(r.from, 1), to: tr.changes.mapPos(r.to, -1) }))
+        .filter((r) => r.to > r.from)
+    const config = tr.state.facet(appearanceConfig)
+    const grows =
+      config.enabled &&
+      !reducedMotion() &&
+      (typeof document === 'undefined' || document.visibilityState !== 'hidden')
+    for (const effect of tr.effects) {
+      if (effect.is(expireGrowing)) next = next.filter((r) => r.start + GROW_MS > effect.value)
+      if (!grows || !tr.docChanged) continue
+      const revealed = effect.is(revealText)
+      if (!revealed && !effect.is(animateText)) continue
+      const added = (effect.value as readonly TaggedRange[]).filter(
+        (r) => revealed || r.to - r.from >= MIN_GROW_CHARS,
+      )
+      if (added.reduce((sum, r) => sum + r.to - r.from, 0) > config.revealMaxChars) continue
+      const start = now()
+      next = [...next, ...added.map((r) => ({ from: r.from, to: r.to, start, id: nextId++ }))]
+    }
+    return grows ? next : []
+  },
+  provide: (field) =>
+    EditorView.decorations.from(field, (ranges): DecorationSet =>
+      Decoration.set(
+        ranges.map((r) =>
+          Decoration.mark({ attributes: { 'data-grow': String(r.id) } }).range(r.from, r.to),
+        ),
+        true,
+      ),
+    ),
+})
+
+/** Runs the growing as Web Animations, which go on in spans drawn anew (see `animator`). */
+const grower = ViewPlugin.fromClass(
+  class implements PluginValue {
+    private readonly started = new WeakSet<Element>()
+    private timer: ReturnType<typeof setTimeout> | null = null
+
+    constructor(private readonly view: EditorView) {
+      this.schedule()
+    }
+
+    update(update: ViewUpdate): void {
+      if (update.startState.field(growing) !== update.state.field(growing)) this.schedule()
+      else if (update.state.field(growing).length > 0) this.requestAnimate()
+    }
+
+    private requestAnimate(): void {
+      this.view.requestMeasure({ key: this, read: () => null, write: () => this.animate() })
+    }
+
+    private schedule(): void {
+      const ranges = this.view.state.field(growing)
+      if (this.timer) clearTimeout(this.timer)
+      this.timer = null
+      if (ranges.length === 0) return
+      this.requestAnimate()
+      const end = Math.min(...ranges.map((r) => r.start + GROW_MS))
+      this.timer = setTimeout(
+        () => {
+          this.timer = null
+          this.view.dispatch({ effects: expireGrowing.of(now()) })
+        },
+        Math.max(0, end - now()) + 16,
+      )
+    }
+
+    private animate(): void {
+      const starts = new Map(this.view.state.field(growing).map((r) => [String(r.id), r.start]))
+      for (const span of this.view.contentDOM.querySelectorAll<HTMLElement>('[data-grow]')) {
+        if (this.started.has(span) || typeof span.animate !== 'function') continue
+        const start = starts.get(span.dataset.grow ?? '')
+        if (start === undefined) continue
+        this.started.add(span)
+        const animation = span.animate([{ letterSpacing: '-1ch' }, { letterSpacing: '0ch' }], {
+          duration: GROW_MS,
+          easing: GROW_EASING,
+          fill: 'backwards',
+        })
+        animation.startTime = start
+      }
+    }
+
+    destroy(): void {
+      if (this.timer) clearTimeout(this.timer)
+    }
+  },
+)
+
+/** The ranges that grow right now, for tests. */
+export function growingRanges(state: EditorView['state']): readonly { from: number; to: number }[] {
+  return state.field(growing, false)?.map(({ from, to }) => ({ from, to })) ?? []
 }
