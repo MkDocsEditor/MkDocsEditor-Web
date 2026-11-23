@@ -29,8 +29,8 @@ const authorModes: { value: AuthorHighlightMode; title: string }[] = [
       <v-switch
         v-model="fadeIn"
         color="primary"
-        label="Fade in text others write"
-        messages="New text by others and by AI agents fades in. Not when your system reduces motion."
+        label="Animate edits of others"
+        messages="Text that others and AI agents write fades in as it appears. Not when your system reduces motion."
         data-testid="setting-fade-in"
       />
       <v-select
