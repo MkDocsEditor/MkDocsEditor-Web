@@ -1,4 +1,4 @@
-import { Facet, Prec, StateEffect, StateField } from '@codemirror/state'
+import { Annotation, Facet, Prec, StateEffect, StateField } from '@codemirror/state'
 import type { ChangeSet, EditorState, Extension, Transaction } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
 import type { DecorationSet, PluginValue, ViewUpdate } from '@codemirror/view'
@@ -8,17 +8,35 @@ import type { DecorationSet, PluginValue, ViewUpdate } from '@codemirror/view'
  * newest characters of each writer fade, and only text the app marks with `animateText`: never
  * what the person types, pastes, undoes or redoes here. Off by default.
  */
+/** Marks transactions that come from the session: what others wrote, or a resync. */
+export const remoteChange = Annotation.define<boolean>()
+
+/**
+ * Whether the person here changed the text: not the session, and not text marked to fade or to be
+ * revealed (which only ever comes from others).
+ */
+export function isUserEdit(tr: Transaction): boolean {
+  return (
+    tr.docChanged &&
+    !tr.annotation(remoteChange) &&
+    !tr.effects.some((e) => e.is(animateText) || e.is(revealText))
+  )
+}
+
 export interface AppearanceConfig {
   enabled: boolean
   /** How long a character takes to fade in. */
   fadeMs: number
-  /** How many of the newest characters of a writer fade; older ones show at once. */
+  /**
+   * How many of the newest characters of a writer fade; older ones show at once. Not for the
+   * pieces of a reveal: they always fade in full.
+   */
   window: number
   /** At most this many ranges fade at the same time; the oldest show at once. */
   maxRanges: number
   /** How fast a live agent change is typed out, at least. */
   revealCharsPerSecond: number
-  /** A reveal takes at most this long: longer text is typed faster. */
+  /** No character of a reveal waits longer than this to show: a backlog is typed faster. */
   revealMaxMs: number
   /** Live agent changes with more text than this show at once. */
   revealMaxChars: number
@@ -45,10 +63,20 @@ interface Appearing extends TaggedRange {
   /** When the fade started, on the clock of `document.timeline`. */
   start: number
   id: number
+  /** A piece of a reveal: never cut by the window or the most ranges, only by a user edit. */
+  reveal?: boolean
 }
 
 /** Lets text fade in: add it in the transaction that inserts it. */
 export const animateText = StateEffect.define<readonly TaggedRange[]>({
+  map: (ranges, mapping) =>
+    ranges
+      .map((r) => ({ ...r, from: mapping.mapPos(r.from, 1), to: mapping.mapPos(r.to, -1) }))
+      .filter((r) => r.to > r.from),
+})
+
+/** Lets the pieces of a reveal fade in, each in full. */
+const revealPiece = StateEffect.define<readonly TaggedRange[]>({
   map: (ranges, mapping) =>
     ranges
       .map((r) => ({ ...r, from: mapping.mapPos(r.from, 1), to: mapping.mapPos(r.to, -1) }))
@@ -83,16 +111,26 @@ const now = () => performance.now()
 
 let nextId = 1
 
-/** Keeps the newest `window` characters of each writer, and the newest `maxRanges` ranges. */
+/**
+ * Keeps the newest `window` characters of each writer, and the newest `maxRanges` ranges; and all
+ * pieces of reveals.
+ */
 function trim(ranges: readonly Appearing[], config: AppearanceConfig): Appearing[] {
   const left = new Map<string, number>()
   const kept: Appearing[] = []
-  for (let i = ranges.length - 1; i >= 0 && kept.length < config.maxRanges; i--) {
+  let counted = 0
+  for (let i = ranges.length - 1; i >= 0; i--) {
     const range = ranges[i]!
+    if (range.reveal) {
+      kept.push(range)
+      continue
+    }
+    if (counted >= config.maxRanges) continue
     const room = left.get(range.tag) ?? config.window
     if (room <= 0) continue
     const from = Math.max(range.from, range.to - room)
     left.set(range.tag, room - (range.to - from))
+    counted++
     kept.push(from === range.from ? range : { ...range, from })
   }
   return kept.reverse()
@@ -126,15 +164,24 @@ function update(ranges: readonly Appearing[], tr: Transaction): readonly Appeari
   if (tr.docChanged && next.length > 0) next = mapRanges(next, tr.changes)
   const config = tr.state.facet(appearanceConfig)
   let added = false
+  // a reveal shown at once ends the fades of its writer; a change of the person, all of reveals
+  const finished = finishedReveals(tr)
+  if (finished === 'all' && next.some((r) => r.reveal)) next = next.filter((r) => !r.reveal)
+  else if (finished !== 'all' && finished.size > 0) next = next.filter((r) => !finished.has(r.tag))
   for (const effect of tr.effects) {
-    if (effect.is(animateText)) {
+    if (effect.is(animateText) || effect.is(revealPiece)) {
       if (!config.enabled || reducedMotion()) continue
       const start = now()
       const length = tr.state.doc.length
+      const reveal = effect.is(revealPiece)
       for (const range of effect.value) {
         const from = Math.max(0, Math.min(length, range.from))
         const to = Math.max(0, Math.min(length, range.to))
-        if (to > from) next = [...next, { tag: range.tag, from, to, start, id: nextId++ }]
+        if (to > from)
+          next = [
+            ...next,
+            { tag: range.tag, from, to, start, id: nextId++, ...(reveal ? { reveal } : {}) },
+          ]
       }
       added = true
     } else if (effect.is(finishAnimation)) {
@@ -244,9 +291,25 @@ export function appearance(config: Partial<AppearanceConfig> = {}): Extension {
 }
 
 /*
- * The typing reveal of live agent changes (agent-presence.md section 3, "Client animation"):
- * the text is in the document at once, and a decoration hides what is not typed yet, keeping
- * its space. The ranges of one agent are typed out in the order of its edits.
+ * The typing reveal of live agent changes (agent-presence.md section 3, "Client animation"), with
+ * the rules of KodeEditor (docs/reveal.md, R1 to R4), so that an agent looks the same on Android:
+ *
+ * - R1: the text is in the document at once, and a decoration hides what is not typed yet, keeping
+ *   its space. The chunks of an agent wait in a queue, in the order they come. A chunk right at the
+ *   end of the newest hidden chunk joins it, one inside hidden text joins that text; any other is
+ *   a new entry at the end, also one right at the start of hidden text. A new chunk never shows
+ *   what is hidden. Nobody types into hidden text: a change of the person here, anywhere, and a
+ *   change of anybody else inside the hidden text of a writer or right at its start or end, show
+ *   all hidden text of that writer at once and end its fades (so does a click into it). Other
+ *   changes move the hidden text.
+ * - R2: the head is the start of the hidden text of the first entry; it goes on to the next entry
+ *   in the same frame when there are characters left. The agent's cursor is drawn there.
+ * - R3: each frame reveals `rate × elapsed` characters and carries the fraction; the first frame
+ *   after a rest counts as 16 ms. When a chunk comes, `rate = max(rate, revealCharsPerSecond,
+ *   hidden / revealMaxMs)`: no character waits longer than `revealMaxMs`. The rate never drops
+ *   while text is hidden.
+ * - R4: what a frame reveals fades in as one piece, in full: neither a new chunk nor the window of
+ *   fades ends it.
  */
 
 interface Revealing {
@@ -255,7 +318,7 @@ interface Revealing {
   /** Where the hidden part starts: the head of the reveal. */
   hiddenFrom: number
   to: number
-  /** Characters per second, set when the reveal starts. */
+  /** Characters per second, the same for all ranges of a tag; it never drops while they last. */
   rate: number
 }
 
@@ -286,20 +349,72 @@ export function revealsText(state: EditorState, chars: number): boolean {
   )
 }
 
-/** Maps the reveals; one whose hidden text a change touches (inside or at an edge) is finished. */
+/**
+ * The writers whose reveals a transaction shows at once (R1): all of them for a change of the
+ * person here; else those whose hidden text a change of anybody else touches, inside or at an
+ * edge. A change that inserts a chunk of the writer's own is not one of anybody else.
+ */
+function finishedReveals(tr: Transaction): Set<string> | 'all' {
+  if (isUserEdit(tr)) return 'all'
+  const finished = new Set<string>()
+  const before = tr.startState.field(revealing, false) ?? []
+  if (!tr.docChanged || before.length === 0) return finished
+  const chunks = tr.effects.flatMap((e) => (e.is(revealText) ? e.value : []))
+  tr.changes.iterChanges((fromA, toA, fromB, toB) => {
+    const owners = new Set(
+      chunks.filter((c) => c.from >= fromB && c.to <= toB && toB > fromB).map((c) => c.tag),
+    )
+    for (const range of before)
+      if (fromA <= range.to && toA >= range.hiddenFrom && !owners.has(range.tag))
+        finished.add(range.tag)
+  })
+  return finished
+}
+
+/**
+ * Maps the reveals through changes that do not touch their hidden text (see `finishedReveals`),
+ * or that are their writer's own chunks: text inserted in front of hidden text moves it, text
+ * inserted inside becomes part of it, text inserted right at its start or end stays out of it.
+ */
 function mapReveals(ranges: readonly Revealing[], changes: ChangeSet): Revealing[] {
-  const touched: [number, number][] = []
-  changes.iterChangedRanges((fromA, toA) => touched.push([fromA, toA]))
   const mapped: Revealing[] = []
   for (const range of ranges) {
-    // nobody types into invisible text
-    if (touched.some(([from, to]) => from <= range.to && to >= range.hiddenFrom)) continue
-    const from = changes.mapPos(range.from, 1)
+    const hiddenFrom = changes.mapPos(range.hiddenFrom, 1)
     const to = changes.mapPos(range.to, -1)
-    const hiddenFrom = changes.mapPos(range.hiddenFrom, -1)
-    if (to > hiddenFrom) mapped.push({ ...range, from: Math.min(from, hiddenFrom), hiddenFrom, to })
+    const from = Math.min(changes.mapPos(range.from, 1), hiddenFrom)
+    if (to > hiddenFrom) mapped.push({ ...range, from, hiddenFrom, to })
   }
   return mapped
+}
+
+/** Adds the chunks of a live change to the queues (R1), and raises the rates (R3). */
+function enqueue(
+  ranges: readonly Revealing[],
+  chunks: readonly TaggedRange[],
+  config: AppearanceConfig,
+): Revealing[] {
+  let next = [...ranges]
+  for (const chunk of chunks) {
+    const own = next.filter((r) => r.tag === chunk.tag)
+    const newest = own.at(-1)
+    // inside hidden text: the mapping made it part of that text already
+    if (own.some((r) => r.hiddenFrom < chunk.from && chunk.to <= r.to)) continue
+    if (newest && chunk.from === newest.to)
+      next = next.map((r) => (r === newest ? { ...r, to: chunk.to } : r))
+    else
+      next.push({ tag: chunk.tag, from: chunk.from, hiddenFrom: chunk.from, to: chunk.to, rate: 0 })
+  }
+  for (const tag of new Set(chunks.map((c) => c.tag))) {
+    const own = next.filter((r) => r.tag === tag)
+    const hidden = own.reduce((sum, r) => sum + r.to - r.hiddenFrom, 0)
+    const rate = Math.max(
+      own[0]?.rate ?? 0,
+      config.revealCharsPerSecond,
+      (hidden * 1000) / config.revealMaxMs,
+    )
+    next = next.map((r) => (r.tag === tag ? { ...r, rate } : r))
+  }
+  return next
 }
 
 /** Uncovers `chars` characters of a tag's ranges, in their order. */
@@ -325,21 +440,17 @@ function advance(ranges: readonly Revealing[], tag: string, chars: number): Reve
 const revealing = StateField.define<readonly Revealing[]>({
   create: () => [],
   update(value, tr) {
-    let next = tr.docChanged && value.length > 0 ? mapReveals(value, tr.changes) : value
+    let next = value
+    if (tr.docChanged && next.length > 0) {
+      const finished = finishedReveals(tr)
+      if (finished === 'all') return []
+      if (finished.size > 0) next = next.filter((r) => !finished.has(r.tag))
+      next = mapReveals(next, tr.changes)
+    }
     const config = tr.state.facet(appearanceConfig)
     for (const effect of tr.effects) {
       if (effect.is(revealText)) {
-        if (!fadesText(tr.state)) continue
-        const tags = new Set(effect.value.map((r) => r.tag))
-        // a new change of the same agent finishes its running reveal first
-        next = next.filter((r) => !tags.has(r.tag))
-        for (const tag of tags) {
-          const ranges = effect.value.filter((r) => r.tag === tag)
-          const chars = ranges.reduce((sum, r) => sum + r.to - r.from, 0)
-          const rate = Math.max(config.revealCharsPerSecond, (chars * 1000) / config.revealMaxMs)
-          for (const r of ranges)
-            next = [...next, { tag, from: r.from, hiddenFrom: r.from, to: r.to, rate }]
-        }
+        if (fadesText(tr.state)) next = enqueue(next, effect.value, config)
       } else if (effect.is(finishReveal)) {
         next = next.filter((r) => r.tag !== effect.value)
       } else if (effect.is(advanceReveal)) {
@@ -380,13 +491,19 @@ export function hiddenRanges(state: EditorState): readonly TaggedRange[] {
   }))
 }
 
-/** How often the reveal moves on. */
-const REVEAL_STEP_MS = 30
+/** The first frame after a rest counts as this long, so that a chunk starts to show at once. */
+const FIRST_FRAME_MS = 16
 
-/** Types the reveals out, and lets a click on the text being revealed show it at once. */
+/**
+ * Types the reveals out, a step in each frame, and lets a click on the text being revealed show it
+ * at once. The step comes right after a frame, so that the next frame draws the text it uncovers
+ * and the cursor at its head together (CodeMirror measures the cursors in a frame of its own).
+ */
 const revealer = ViewPlugin.fromClass(
   class implements PluginValue {
+    private frame = 0
     private timer: ReturnType<typeof setTimeout> | null = null
+    /** When the step before was; 0 at rest. */
     private last = 0
     /** Fractions of characters carried over to the next step, by tag. */
     private readonly carry = new Map<string, number>()
@@ -401,21 +518,34 @@ const revealer = ViewPlugin.fromClass(
 
     private schedule(): void {
       const ranges = this.view.state.field(revealing)
+      const tags = new Set(ranges.map((r) => r.tag))
+      // a tag with nothing hidden starts anew
+      for (const tag of this.carry.keys()) if (!tags.has(tag)) this.carry.delete(tag)
       if (ranges.length === 0) {
-        if (this.timer) clearTimeout(this.timer)
-        this.timer = null
-        this.carry.clear()
+        this.cancel()
+        this.last = 0
         return
       }
-      if (this.timer) return
-      this.last = now()
-      this.timer = setTimeout(() => this.step(), REVEAL_STEP_MS)
+      if (this.frame || this.timer) return
+      this.frame = requestAnimationFrame(() => {
+        this.frame = 0
+        this.timer = setTimeout(() => this.step(), 0)
+      })
+    }
+
+    private cancel(): void {
+      cancelAnimationFrame(this.frame)
+      if (this.timer) clearTimeout(this.timer)
+      this.frame = 0
+      this.timer = null
     }
 
     private step(): void {
       this.timer = null
       const ranges = this.view.state.field(revealing)
-      const elapsed = now() - this.last
+      const time = now()
+      const elapsed = this.last ? time - this.last : FIRST_FRAME_MS
+      this.last = time
       const effects: StateEffect<unknown>[] = []
       for (const tag of new Set(ranges.map((r) => r.tag))) {
         const head = ranges.find((r) => r.tag === tag)!
@@ -424,15 +554,15 @@ const revealer = ViewPlugin.fromClass(
         this.carry.set(tag, exact - chars)
         if (chars === 0) continue
         effects.push(advanceReveal.of({ tag, chars }))
-        // what is uncovered fades in, like the text of others
-        effects.push(animateText.of(uncovered(ranges, tag, chars)))
+        // what is uncovered fades in, as one piece and in full
+        effects.push(revealPiece.of(uncovered(ranges, tag, chars)))
       }
       if (effects.length > 0) this.view.dispatch({ effects })
       this.schedule()
     }
 
     destroy(): void {
-      if (this.timer) clearTimeout(this.timer)
+      this.cancel()
     }
   },
   {

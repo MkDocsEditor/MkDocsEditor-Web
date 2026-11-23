@@ -5,6 +5,7 @@ import {
   MIN_CATCH_UP_MS,
   easeOut,
   glidePosition,
+  glideSpeed,
   glideTo,
   glides,
   retarget,
@@ -33,21 +34,14 @@ describe('cursorGlide', () => {
   })
 
   it('eases out from where it is drawn to the new place', () => {
-    const glide = {
-      fromX: 0,
-      fromY: 0,
-      toX: 100,
-      toY: 20,
-      start: 1000,
-      duration: GLIDE_MS,
-      set: 1000,
-    }
+    const glide = retarget(still({ x: 0, y: 0 }, 0), { x: 50, y: 20 }, 1000, true, LINE, WIDTH)
     expect(glidePosition(glide, 1000)).toEqual({ x: 0, y: 0 })
     const half = glidePosition(glide, 1000 + GLIDE_MS / 2)
-    expect(half.x).toBeCloseTo(100 * easeOut(0.5))
+    expect(half.x).toBeCloseTo(50 * easeOut(0.5))
+    expect(half.y).toBeCloseTo(20 * easeOut(0.5))
     // past the half way at half the time: fast start, gentle stop
-    expect(half.x).toBeGreaterThan(50)
-    expect(glidePosition(glide, 1000 + GLIDE_MS * 2)).toEqual({ x: 100, y: 20 })
+    expect(half.x).toBeGreaterThan(25)
+    expect(glidePosition(glide, 1000 + GLIDE_MS * 2)).toEqual({ x: 50, y: 20 })
   })
 })
 
@@ -68,79 +62,97 @@ describe('retarget', () => {
 })
 
 describe('catching up', () => {
-  /** The cursor drawn `after` ms after each of `steps` moves of `step` px every `every` ms. */
-  function lags(step: number, every: number, steps: number, after: number): number[] {
+  const FRAME = 1000 / 60
+  const glideFrom = (x: number, now: number) =>
+    retarget(still({ x: 0, y: 0 }, 0), { x, y: 0 }, now, true, LINE, WIDTH)
+
+  /** How far the cursor is drawn behind a head that moves `chars` 8 px characters a frame. */
+  function lags(chars: (frame: number) => number): number[] {
     let glide = still({ x: 0, y: 0 }, 0)
+    let x = 0
     const lag: number[] = []
-    for (let i = 1; i <= steps; i++) {
-      const to = { x: i * step, y: 0 }
-      glide = retarget(glide, to, i * every, true, LINE, WIDTH)
-      lag.push(to.x - glidePosition(glide, i * every + after).x)
+    for (let k = 1; k <= 120; k++) {
+      const time = k * FRAME
+      x += chars(k) * 8
+      glide = retarget(glide, { x, y: 0 }, time, true, LINE, WIDTH)
+      // drawn in the frame the head moved
+      if (k > 10) lag.push((x - glidePosition(glide, time).x) / 8)
     }
     return lag
   }
 
-  it('glides from rest as long as ever, from the next frame on', () => {
-    const glide = retarget(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000, true, LINE, WIDTH)
+  it('glides from rest with the ease-out, from the next frame on', () => {
+    const glide = glideFrom(30, 1000)
     expect(glide).toMatchObject({ start: 1000, duration: GLIDE_MS })
     expect(glidePosition(glide, 1000).x).toBe(0)
+    expect(glidePosition(glide, 1000 + GLIDE_MS / 4).x).toBeCloseTo(30 * easeOut(0.25))
   })
 
-  it('takes 1.5 times the time since the place before, from the frame it is drawn', () => {
-    const first = retarget(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000, true, LINE, WIDTH)
+  it('goes on from where it is drawn with its speed, and takes 1.5 times the time between', () => {
+    const first = glideFrom(30, 1000)
     const next = retarget(first, { x: 60, y: 0 }, 1030, true, LINE, WIDTH)
-    // ends 45 ms after the new place, and moves at once
-    expect(next.start + next.duration).toBeCloseTo(1030 + 45)
-    expect(glidePosition(next, 1030).x).toBeGreaterThan(glidePosition(first, 1030).x)
-    // never quicker than the minimum, never slower than a glide from rest
-    const quick = retarget(first, { x: 60, y: 0 }, 1005, true, LINE, WIDTH)
-    expect(quick.start + quick.duration).toBeCloseTo(1005 + MIN_CATCH_UP_MS)
-    const slow = retarget(first, { x: 60, y: 0 }, 1100, true, LINE, WIDTH)
-    expect(slow.start + slow.duration).toBeCloseTo(1100 + GLIDE_MS)
+    expect(next).toMatchObject({ start: 1030, duration: 45 })
+    // no jump, no change of speed
+    expect(glidePosition(next, 1030).x).toBeCloseTo(glidePosition(first, 1030).x)
+    expect(glideSpeed(next, 1030).x).toBeCloseTo(glideSpeed(first, 1030).x)
+    // never past its place
+    for (let t = 1030; t <= 1080; t += 2) expect(glidePosition(next, t).x).toBeLessThanOrEqual(60)
+    expect(glidePosition(next, 1075).x).toBe(60)
+    // never quicker than the minimum, never slower than from rest
+    expect(retarget(first, { x: 60, y: 0 }, 1005, true, LINE, WIDTH).duration).toBe(MIN_CATCH_UP_MS)
+    expect(retarget(first, { x: 60, y: 0 }, 1100, true, LINE, WIDTH).duration).toBe(GLIDE_MS)
   })
 
-  it('catches up also when the glide before just ended, within 90 ms of its place', () => {
-    const first = retarget(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000, true, LINE, WIDTH)
+  it('keeps only its speed toward the new place, at most that of the ease-out', () => {
+    const first = glideFrom(30, 1000)
+    // back the other way: it starts from standing
+    const back = retarget(first, { x: 0, y: 0 }, 1030, true, LINE, WIDTH)
+    expect(glideSpeed(back, 1030).x).toBeCloseTo(0)
+    // a tiny step ahead: no faster than the ease-out would start
+    const shown = glidePosition(first, 1010).x
+    const near = retarget(first, { x: shown + 1, y: 0 }, 1010, true, LINE, WIDTH)
+    expect(glideSpeed(near, 1010).x).toBeLessThanOrEqual((3 * 1) / near.duration + 1e-9)
+  })
+
+  it('catches up within 90 ms after a glide ended, from its last frame or a frame back', () => {
+    const first = glideFrom(30, 1000)
     const short = retarget(first, { x: 60, y: 0 }, 1030, true, LINE, WIDTH)
-    // ended at 1075; the next place at 1080
-    const late = retarget(short, { x: 90, y: 0 }, 1080, true, LINE, WIDTH)
-    // 1.5 × 50 ms since the place before
-    expect(late.start + late.duration).toBeCloseTo(1080 + 75)
-    // on from where the glide before ended, not a whole frame early
-    expect(late.start).toBeCloseTo(1075)
-    // longer than 90 ms: from rest
-    const rest = retarget(short, { x: 90, y: 0 }, 1125, true, LINE, WIDTH)
-    expect(rest).toMatchObject({ start: 1125, duration: GLIDE_MS })
-    // a snap is no glide to catch up with
-    const snap = retarget(still({ x: 0, y: 0 }, 1000), { x: 30, y: 0 }, 1030, true, LINE, WIDTH)
-    expect(snap).toMatchObject({ start: 1030, duration: GLIDE_MS })
+    // ended at 1075: 10 ms later it starts in this frame
+    const soon = retarget(short, { x: 90, y: 0 }, 1085, true, LINE, WIDTH)
+    expect(soon).toMatchObject({ start: 1085, duration: 82.5 })
+    // 40 ms later, a frame back, so that it moves in its first frame
+    const later = retarget(short, { x: 90, y: 0 }, 1115, true, LINE, WIDTH)
+    expect(later.start).toBe(1115 - 16)
+    expect(later.start + later.duration).toBeCloseTo(1115 + GLIDE_MS)
+    expect(glidePosition(later, 1115).x).toBeGreaterThan(60)
+    // more than 90 ms: from rest
+    expect(retarget(short, { x: 90, y: 0 }, 1125, true, LINE, WIDTH)).toMatchObject({
+      start: 1125,
+      duration: GLIDE_MS,
+    })
+    // a jump forgets the time of its place
+    const jump = retarget(still({ x: 0, y: 0 }, 1000), { x: 30, y: 0 }, 1030, true, LINE, WIDTH)
+    expect(jump).toMatchObject({ start: 1030, duration: GLIDE_MS })
   })
 
-  it('keeps a cursor typed out unevenly close', () => {
-    // 8 characters of 8 px after 32 or 64 ms in turn; one frame after each step
-    let glide = still({ x: 0, y: 0 }, 0)
-    let time = 0
-    const lag: number[] = []
-    for (let i = 1; i <= 40; i++) {
-      time += i % 2 ? 32 : 64
-      glide = retarget(glide, { x: i * 64, y: 0 }, time, true, LINE, WIDTH)
-      lag.push(i * 64 - glidePosition(glide, time + 1000 / 60).x)
-    }
-    expect(lag.slice(5).reduce((a, b) => a + b, 0) / 35).toBeLessThan(3 * 8)
+  it('stays 1 to 1.5 characters behind a reveal of a character a frame, never ahead', () => {
+    const lag = lags(() => 1)
+    expect(Math.max(...lag)).toBeLessThanOrEqual(1.5)
+    expect(Math.min(...lag)).toBeGreaterThanOrEqual(1)
   })
 
-  it('keeps a cursor typed out quickly within about a character', () => {
-    // a reveal: 8 characters of 8 px every 30 ms; one frame after each step
-    const lag = lags(64, 30, 40, 1000 / 60).slice(5)
-    expect(Math.max(...lag)).toBeLessThan(1.5 * 8)
-    expect(lag.reduce((a, b) => a + b, 0) / lag.length).toBeLessThan(8)
+  it('stays close behind an uneven reveal, never ahead', () => {
+    // 1, 1, 0, 2, … characters a frame: 60 a second on average
+    const lag = lags((k) => [1, 1, 0, 2][k % 4]!)
+    expect(Math.max(...lag)).toBeLessThanOrEqual(2.5)
+    expect(lag.reduce((a, b) => a + b, 0) / lag.length).toBeLessThanOrEqual(1.5)
+    expect(Math.min(...lag)).toBeGreaterThanOrEqual(0)
   })
 
   it('lets the other end of a selection catch up alike', () => {
     const first = glideTo(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000)
     expect(first.duration).toBe(GLIDE_MS)
-    const next = glideTo(first, { x: 60, y: 0 }, 1030)
-    expect(next.start + next.duration).toBeCloseTo(1030 + 45)
+    expect(glideTo(first, { x: 60, y: 0 }, 1030).duration).toBe(45)
   })
 })
 

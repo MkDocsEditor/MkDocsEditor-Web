@@ -1,14 +1,11 @@
-import { Annotation, ChangeSet, Transaction } from '@codemirror/state'
+import { ChangeSet, Transaction } from '@codemirror/state'
 import type { ChangeSpec, Extension } from '@codemirror/state'
 import { ViewPlugin } from '@codemirror/view'
 import type { EditorView, ViewUpdate } from '@codemirror/view'
 
 import type { DocumentSession, TextChange, TextSelection, WrittenRange } from '@/sync/session'
 
-import { animateText, fadesText, revealText, revealsText } from './appearance'
-
-/** Marks transactions that come from the session, so they are not sent back. */
-const remoteChange = Annotation.define<boolean>()
+import { animateText, fadesText, remoteChange, revealText, revealsText } from './appearance'
 
 /** Whether this user changed the text: not someone else, and not a resync. */
 export function isLocalEdit(tr: Transaction): boolean {
