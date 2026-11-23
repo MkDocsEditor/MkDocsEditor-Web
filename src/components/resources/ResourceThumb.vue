@@ -11,15 +11,17 @@ const props = withDefaults(defineProps<{ resource: ResourceModel; size?: number 
 })
 
 const url = ref<string | null>(null)
+const thumbKey = () => `${props.resource.id} ${props.resource.modtime} ${props.resource.filesize}`
 watch(
-  () => [props.resource.id, props.resource.modtime] as const,
+  () => [props.resource.id, props.resource.modtime, props.resource.filesize] as const,
   () => {
     url.value = null
     const pending = thumbnailUrl(props.resource, props.size > 128 ? 512 : 256)
-    const id = props.resource.id
+    const key = thumbKey()
     pending
       ?.then((u) => {
-        if (props.resource.id === id) url.value = u
+        // a newer request may have started while this one loaded
+        if (thumbKey() === key) url.value = u
       })
       .catch(() => undefined)
   },

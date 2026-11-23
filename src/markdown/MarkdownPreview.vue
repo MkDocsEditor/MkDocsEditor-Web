@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import type { ResourceModel } from '@/api'
+import CopySvgButton from '@/components/resources/CopySvgButton.vue'
 import { useDebounced } from '@/composables/useDebounced'
+import { isSvg } from '@/services/icons'
 import { isExternalUrl } from '@/services/linkPath'
 import { openFile } from '@/composables/useOpenFile'
 import { resourceObjectUrl } from '@/services/resourceUrls'
@@ -33,6 +36,7 @@ const tree = useTreeStore()
 const router = useRouter()
 const notify = useNotifyStore()
 const container = ref<HTMLElement | null>(null)
+const outerBox = ref<HTMLElement | null>(null)
 
 // Rendering is cheap, but not free: re-render at most every 150 ms while typing.
 const debounced = useDebounced(() => props.text, 150)
@@ -42,23 +46,80 @@ function resolve(href: string) {
   return props.sectionId ? tree.resolve(props.sectionId, href) : undefined
 }
 
+/**
+ * Points the images at their resources. Runs again when the tree changes, so that a replaced
+ * image shows its new content: the cached URL changes with the resource's modification time.
+ */
 async function loadImages(): Promise<void> {
   await nextTick()
-  const images = container.value?.querySelectorAll<HTMLImageElement>('img[src]') ?? []
+  const images =
+    container.value?.querySelectorAll<HTMLImageElement>('img[src], img[data-resource-src]') ?? []
   for (const img of images) {
-    const src = img.getAttribute('src') ?? ''
+    // the src of the text; the element's own src is an object URL once loaded
+    const src = img.dataset.resourceSrc ?? img.getAttribute('src') ?? ''
     const item = resolve(src)
     if (item?.type !== 'resource') continue
-    img.removeAttribute('src')
+    img.dataset.resourceSrc = src
+    const key = `${item.id} ${item.modtime} ${item.filesize}`
+    // a failed image is asked for again: the server may be back
+    if (img.dataset.resourceKey === key && !img.classList.contains('preview-image-missing'))
+      continue
+    img.dataset.resourceKey = key
+    // keep showing the old content until the new one is there
+    if (!img.dataset.resourceId) img.removeAttribute('src')
     img.dataset.resourceId = item.id
-    resourceObjectUrl(item.id)
+    resourceObjectUrl(item)
       .then((url) => {
-        if (img.dataset.resourceId === item.id) img.src = url
+        if (img.dataset.resourceKey !== key) return
+        img.classList.remove('preview-image-missing')
+        img.src = url
       })
-      .catch(() => img.classList.add('preview-image-missing'))
+      .catch(() => {
+        if (img.dataset.resourceKey === key) img.classList.add('preview-image-missing')
+      })
   }
 }
 watch([html, () => tree.root], loadImages, { immediate: true })
+
+/** The SVG image under the pointer, with a button to copy it as SVG at its top right corner. */
+const svgImage = shallowRef<{ resource: ResourceModel; top: number; right: number } | null>(null)
+let hoveredImage: HTMLImageElement | null = null
+/** Space between the corner of the image and the button. */
+const BUTTON_INSET = 8
+
+function hideCopySvg(): void {
+  hoveredImage = null
+  svgImage.value = null
+}
+
+function placeCopySvg(): void {
+  const img = hoveredImage
+  const item = img ? tree.get(img.dataset.resourceId ?? '') : undefined
+  if (!img?.isConnected || !outerBox.value || item?.type !== 'resource') return hideCopySvg()
+  const outer = outerBox.value.getBoundingClientRect()
+  const box = img.getBoundingClientRect()
+  if (box.bottom < outer.top || box.top > outer.bottom) return hideCopySvg()
+  svgImage.value = {
+    resource: item,
+    // stays in view while the top of a tall image is scrolled away
+    top: Math.max(box.top, outer.top) - outer.top + BUTTON_INSET,
+    right: outer.right - box.right + BUTTON_INSET,
+  }
+}
+
+function onPointerOver(event: PointerEvent): void {
+  const img = (event.target as HTMLElement).closest<HTMLImageElement>('img[data-resource-id]')
+  const item = img ? tree.get(img.dataset.resourceId ?? '') : undefined
+  if (!img || item?.type !== 'resource' || !isSvg(item)) return hideCopySvg()
+  if (img === hoveredImage) return
+  hoveredImage = img
+  placeCopySvg()
+}
+
+function onScroll(): void {
+  measure(true)
+  if (hoveredImage) placeCopySvg()
+}
 
 function openWithRetry(id: string, name: string): void {
   openFile(id, name).catch((e: unknown) =>
@@ -110,7 +171,10 @@ function measure(scrolled = false): void {
 let resizes: ResizeObserver | null = null
 onMounted(() => {
   // also when the pane appears: it grows from nothing
-  resizes = new ResizeObserver(() => measure())
+  resizes = new ResizeObserver(() => {
+    measure()
+    if (hoveredImage) placeCopySvg()
+  })
   if (container.value) resizes.observe(container.value)
 })
 onBeforeUnmount(() => {
@@ -126,6 +190,8 @@ function showAnchor(): void {
 
 watch(html, () =>
   nextTick(() => {
+    // the image under the pointer was rendered again: the next pointer move finds the new one
+    if (hoveredImage && !hoveredImage.isConnected) hideCopySvg()
     // the new text moved the blocks: the place of the editor is somewhere else now
     showAnchor()
     measure()
@@ -216,18 +282,35 @@ defineExpose({
 </script>
 
 <template>
-  <!-- eslint-disable vue/no-v-html -- the HTML is sanitized with DOMPurify in renderMarkdown -->
-  <article
-    ref="container"
-    class="markdown-preview"
-    data-testid="markdown-preview"
-    @click="onClick"
-    @scroll.passive="measure(true)"
-    v-html="html"
-  />
+  <div ref="outerBox" class="markdown-preview-frame" @mouseleave="hideCopySvg">
+    <!-- eslint-disable vue/no-v-html -- the HTML is sanitized with DOMPurify in renderMarkdown -->
+    <article
+      ref="container"
+      class="markdown-preview"
+      data-testid="markdown-preview"
+      @click="onClick"
+      @pointerover="onPointerOver"
+      @scroll.passive="onScroll"
+      v-html="html"
+    />
+    <CopySvgButton
+      v-if="svgImage"
+      :resource="svgImage.resource"
+      class="markdown-preview__copy-svg"
+      :style="{ top: `${svgImage.top}px`, right: `${svgImage.right}px` }"
+    />
+  </div>
 </template>
 
 <style>
+.markdown-preview-frame {
+  position: relative;
+  height: 100%;
+}
+.markdown-preview__copy-svg {
+  position: absolute;
+  z-index: 1;
+}
 /* stylelint-disable color-no-hex -- the highlight of ==marks==, which is not in the theme */
 .markdown-preview {
   position: relative;

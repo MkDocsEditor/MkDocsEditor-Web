@@ -11,12 +11,13 @@ import { computed, ref, watch } from 'vue'
 
 import PageHeader from '@/components/common/PageHeader.vue'
 import BacklinksList from '@/components/references/BacklinksList.vue'
+import CopySvgButton from '@/components/resources/CopySvgButton.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import { useApi } from '@/api'
 import { copyText, downloadUrl } from '@/services/clipboard'
-import { KIND_LABELS, colorFor, formatSize, iconFor, resourceKind } from '@/services/icons'
+import { KIND_LABELS, colorFor, formatSize, iconFor, isSvg, resourceKind } from '@/services/icons'
 import { openFile } from '@/composables/useOpenFile'
-import { resourceObjectUrl } from '@/services/resourceUrls'
+import { resourceObjectUrl, resourceVersion } from '@/services/resourceUrls'
 import { useMovedRedirect } from '@/composables/useMovedRedirect'
 import { formatDate } from '@/services/time'
 import { useItemActionsStore } from '@/stores/itemActions'
@@ -56,9 +57,16 @@ const previewText = ref<string | null>(null)
 const previewFailed = ref(false)
 const MAX_TEXT = 200_000
 
+/** Changes when the preview must load again: another resource, or the file was replaced. */
+const previewKey = () =>
+  resource.value ? `${resource.value.id} ${resourceVersion(resource.value)}` : ''
+
 watch(
-  () => [resource.value?.id, resource.value?.modtime] as const,
-  async ([id]) => {
+  previewKey,
+  async (key) => {
+    // only the latest request may show its result: an older one may finish last
+    const current = () => previewKey() === key
+    const id = resource.value?.id
     previewUrl.value = null
     previewText.value = null
     previewFailed.value = false
@@ -69,15 +77,16 @@ watch(
           useApi().getResourceContent(id, t.progress),
         )
         const text = await blob.slice(0, MAX_TEXT).text()
-        if (resource.value?.id === id) previewText.value = text
+        if (current()) previewText.value = text
       } else if (['image', 'pdf', 'video', 'audio'].includes(kind.value)) {
-        const url = await transfers.track(`Loading “${resource.value.name}”`, (t) =>
-          resourceObjectUrl(id, t.progress),
+        const item = resource.value
+        const url = await transfers.track(`Loading “${item.name}”`, (t) =>
+          resourceObjectUrl(item, t.progress),
         )
-        if (resource.value?.id === id) previewUrl.value = url
+        if (current()) previewUrl.value = url
       }
     } catch {
-      if (resource.value?.id === id) previewFailed.value = true
+      if (current()) previewFailed.value = true
     }
   },
   { immediate: true },
@@ -96,7 +105,7 @@ async function download(): Promise<void> {
   if (!item) return
   try {
     const url = await transfers.track(`Downloading “${item.name}”`, (t) =>
-      resourceObjectUrl(item.id, t.progress),
+      resourceObjectUrl(item, t.progress),
     )
     downloadUrl(item.name, url)
   } catch (error) {
@@ -169,7 +178,14 @@ async function copyPath(): Promise<void> {
       </v-card>
 
       <div class="resource-view__preview" data-testid="resource-preview">
-        <img v-if="previewUrl && kind === 'image'" :src="previewUrl" :alt="resource.name" />
+        <div v-if="previewUrl && kind === 'image'" class="resource-view__image">
+          <img :src="previewUrl" :alt="resource.name" />
+          <CopySvgButton
+            v-if="isSvg(resource)"
+            :resource="resource"
+            class="resource-view__copy-svg"
+          />
+        </div>
         <object
           v-else-if="previewUrl && kind === 'pdf'"
           :data="previewUrl"
@@ -200,6 +216,21 @@ async function copyPath(): Promise<void> {
 </template>
 
 <style scoped>
+.resource-view__image {
+  position: relative;
+  width: fit-content;
+}
+.resource-view__copy-svg {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.resource-view__image:hover .resource-view__copy-svg,
+.resource-view__copy-svg:focus-visible {
+  opacity: 1;
+}
 .resource-view__preview img,
 .resource-view__preview video {
   max-width: 100%;

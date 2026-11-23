@@ -39,6 +39,11 @@ export function resourceKind(resource: Pick<ResourceModel, 'name' | 'kind'>): Re
   return resource.kind ?? KIND_BY_EXTENSION[extensionOf(resource.name)] ?? 'other'
 }
 
+/** An SVG image, which can be copied as SVG instead of as a picture. */
+export function isSvg(resource: Pick<ResourceModel, 'name' | 'mimeType'>): boolean {
+  return resource.mimeType === 'image/svg+xml' || extensionOf(resource.name) === 'svg'
+}
+
 const KIND_ICONS: Record<ResourceKind, string> = {
   image: mdiImageOutline,
   video: mdiFileVideoOutline,

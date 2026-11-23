@@ -19,6 +19,8 @@ const WithDialogs = defineComponent({
   setup: (props) => () => [h(ResourceView, { id: props.id }), h(DeleteDialogs)],
 })
 
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+
 async function setup(id: string) {
   const tree = sampleTree()
   tree.resources.push({
@@ -28,10 +30,18 @@ async function setup(id: string) {
     filesize: 5,
     modtime: '',
   })
+  tree.resources.push({
+    type: 'resource',
+    id: 'r-diagram',
+    name: 'diagram.svg',
+    filesize: 41,
+    modtime: '',
+  })
   const mock = createFetchMock({
     'GET /section/': () => json(tree),
     'GET /resource/r-text/content/': () => new Response('Hallo Welt'),
     'GET /resource/r-apfel/content/': () => new Response('png'),
+    'GET /resource/r-diagram/content/': () => new Response(SVG),
     'DELETE /resource/r-text/': () => new Response(null, { status: 204 }),
   })
   setApiClient(new ApiClient({ baseUrl: 'http://b', fetchFn: mock.fetchFn }))
@@ -70,6 +80,19 @@ describe('ResourceView', () => {
         'blob:apfel',
       ),
     )
+    // a picture copies fine with the browser's own "Copy image"
+    expect(wrapper.find('[data-testid="copy-svg"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('copies an SVG as SVG, not as a picture', async () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const { wrapper } = await setup('r-diagram')
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="copy-svg"]').exists()).toBe(true))
+    await wrapper.find('[data-testid="copy-svg"]').trigger('click')
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(SVG))
+    expect(useNotifyStore().queue.at(-1)?.text).toBe('SVG copied')
     wrapper.unmount()
   })
 
