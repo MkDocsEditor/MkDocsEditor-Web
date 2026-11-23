@@ -759,7 +759,7 @@ const revealTheme = EditorView.baseTheme({
   },
   '.cm-unrevealed *': { visibility: 'hidden' },
   // the closing gap of removed text (`GapWidget`)
-  '.cm-gap': { display: 'inline-block', height: '1px', verticalAlign: 'baseline' },
+  '.cm-closing-gap': { display: 'inline-block', height: '1px', verticalAlign: 'baseline' },
 })
 
 /** The ranges that fade right now, with the ids of their spans (`data-appear`). */
@@ -998,7 +998,7 @@ class GapWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const gap = document.createElement('span')
-    gap.className = 'cm-gap'
+    gap.className = 'cm-closing-gap'
     gap.dataset.grow = String(this.range.id)
     gap.setAttribute('aria-hidden', 'true')
     const width = this.range.spacing * (1 - growProgress(this.range, now()))
