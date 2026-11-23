@@ -7,6 +7,8 @@ import { SURFACE, contrastRatio } from '@/plugins/codeColors'
 import { avatarUrl, loadedAvatarUrl } from '@/services/avatars'
 import type { AvatarOwner } from '@/services/avatars'
 import { instanceName } from '@/sync/session'
+
+import { cursorGlide } from './cursorGlide'
 import type { Peer } from '@/sync/session'
 
 /** Replaces the shown peers (their selections are indices of the current document). */
@@ -51,6 +53,8 @@ export function faintOn(color: string): ('light' | 'dark')[] {
 
 class CursorWidget extends WidgetType {
   constructor(
+    /** Which cursor of whom this is, so that it can glide from where it was. */
+    readonly key: string,
     readonly name: string,
     readonly color: string,
     readonly ghost: boolean,
@@ -61,6 +65,7 @@ class CursorWidget extends WidgetType {
 
   override eq(other: CursorWidget): boolean {
     return (
+      other.key === this.key &&
       other.name === this.name &&
       other.color === this.color &&
       other.ghost === this.ghost &&
@@ -78,6 +83,7 @@ class CursorWidget extends WidgetType {
     ].join(' ')
     caret.style.borderColor = this.color
     caret.setAttribute('aria-hidden', 'true')
+    caret.dataset.peer = this.key
     const label = document.createElement('span')
     label.className = 'cm-remote-caret-label'
     label.style.backgroundColor = this.color
@@ -121,7 +127,7 @@ export function peerDecorations(peers: readonly ShownPeer[], docLength: number):
   const clamp = (n: number) => Math.max(0, Math.min(docLength, n))
   for (const peer of peers) {
     const name = instanceName(peer)
-    for (const selection of peer.selections) {
+    for (const [index, selection] of peer.selections.entries()) {
       const anchor = clamp(selection.anchor)
       const head = clamp(selection.head)
       const from = Math.min(anchor, head)
@@ -138,10 +144,16 @@ export function peerDecorations(peers: readonly ShownPeer[], docLength: number):
       }
       ranges.push(
         Decoration.widget({
-          widget: new CursorWidget(name, peer.color, !!peer.ghost, {
-            accountId: peer.accountId,
-            avatar: peer.avatar,
-          }),
+          widget: new CursorWidget(
+            `${peer.ghost ? 'ghost' : 'peer'} ${index} ${name}`,
+            name,
+            peer.color,
+            !!peer.ghost,
+            {
+              accountId: peer.accountId,
+              avatar: peer.avatar,
+            },
+          ),
           side: 1,
         }).range(head),
       )
@@ -163,8 +175,14 @@ const peersField = StateField.define<DecorationSet>({
 })
 
 const theme = EditorView.baseTheme({
+  // a box of its own, not inline: only boxes can be moved with a transform (gliding)
   '.cm-remote-caret': {
     position: 'relative',
+    display: 'inline-block',
+    // the height an inline caret had: the content area of the font
+    height: 'calc(4em / 3)',
+    verticalAlign: 'text-bottom',
+    willChange: 'transform',
     borderLeft: '2px solid',
     marginLeft: '-1px',
     marginRight: '-1px',
@@ -213,7 +231,7 @@ const theme = EditorView.baseTheme({
   },
 })
 
-/** Shows the cursors and selections of other users, labelled with their names. */
+/** Shows the cursors and selections of other users, labelled with their names; cursors glide. */
 export function remoteCursors() {
-  return [peersField, theme]
+  return [peersField, theme, cursorGlide]
 }
