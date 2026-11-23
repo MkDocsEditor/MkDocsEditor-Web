@@ -13,11 +13,26 @@ export interface ViewportInfo {
   bottom: string
 }
 
+/**
+ * Where an agent is (agent-presence.md section 3, "Agent focus"): indexes in Unicode code points
+ * of the text at `revision` (heads, sorted, joined with '.').
+ */
+export interface AgentFocus {
+  revision: string
+  from: number
+  /** After the last selected character; `from` for a cursor. */
+  to: number
+  /** The first and the last visible character, both inclusive. */
+  viewport?: { top: number; bottom: number }
+}
+
 /** Marks a connection or actor of an AI agent or script: it acts for its account with this app token. */
 export interface AgentInfo {
   tokenId: string
   /** The name of the app token, e.g. "Claude Code on Linux". */
   name: string
+  /** Where the agent is, on servers with the feature `agent-focus`. */
+  focus?: AgentFocus
 }
 
 export interface PresenceInfo {
@@ -103,6 +118,17 @@ export type ServerMessage =
     }
   | ({ type: 'presence-leave' } & PresenceLeave)
   | ({ type: 'actor' } & ActorInfo)
+  | {
+      /** A live change of an agent, before the sync that carries it (agent-presence.md). */
+      type: 'agent-change'
+      clientId?: string
+      instanceId?: string
+      agent?: AgentInfo
+      /** The heads before the change (its dependencies), as a revision. */
+      base?: string
+      /** The hash of the change. */
+      change?: string
+    }
   | { type: 'document-renamed'; newDocumentId?: string }
   | { type: 'document-deleted' }
   | { type: 'error'; code?: string }

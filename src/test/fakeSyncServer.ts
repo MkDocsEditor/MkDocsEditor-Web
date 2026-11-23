@@ -321,6 +321,31 @@ export class FakeSyncServer {
     }
   }
 
+  /**
+   * A live edit of an agent (agent-presence.md): `agent-change` first, then the sync with the
+   * change. Returns the hash of the change.
+   */
+  agentEdit(at: number, text: string, actor = 'ab'.repeat(16)): string {
+    const base = this.A.getHeads(this.doc)
+    const fork = this.A.change(this.A.clone(this.doc, { actor }), (d) => {
+      this.A.splice(d, ['content'], at, 0, text)
+    })
+    const [change] = this.A.getHeads(fork)
+    this.doc = this.A.merge(this.doc, fork)
+    for (const connection of this.connections) {
+      connection.socket.deliver({
+        type: 'agent-change',
+        documentId: this.documentId,
+        clientId: 'agent-1',
+        agent: { tokenId: 't1', name: 'claude' },
+        base: [...base].sort().join('.'),
+        change,
+      })
+    }
+    this.syncAll()
+    return change!
+  }
+
   /** An edit by the server itself (like an external change on disk). */
   externalEdit(fn: (text: string) => string): void {
     const next = fn(this.doc.content)

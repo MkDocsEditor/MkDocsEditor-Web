@@ -13,8 +13,10 @@ export interface OnlineInstance {
   color: string
   accountId?: string
   avatar?: string | null
-  /** The name of the app token when this is an AI agent: shown with a robot, not to follow. */
+  /** The name of the app token when this is an AI agent: shown with a robot. */
   agent?: string
+  /** An agent can be followed once it has a focus (servers with `agent-focus`). */
+  followable: boolean
 }
 
 /**
@@ -87,6 +89,7 @@ export function useDocumentSession(id: () => string, onRenamed: (newId: string) 
           accountId: peer.accountId,
           avatar: peer.avatar,
           ...(peer.agent ? { agent: peer.agent.name } : {}),
+          followable: !peer.agent || !!peer.agent.focus,
         })
     }
     return [...seen.values()].sort(

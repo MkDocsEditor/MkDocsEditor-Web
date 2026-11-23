@@ -18,6 +18,7 @@ import type { SocketLike } from './socket'
 import { diffText } from './session'
 import type { DocumentSession, SessionMe, SessionStatus, TextChange, WrittenRange } from './session'
 import { createStoredCopy } from './storedCopy'
+import { WAIT_LIMIT_MS, headsOf } from './agentFocus'
 import { patchesToChanges, writtenRanges } from './writtenRanges'
 
 /**
@@ -91,6 +92,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
   const me = shallowRef<SessionMe | null>(null)
+  /** Announced live agent changes (`agent-change`) until their change arrives: hash to base. */
+  const agentChanges = new Map<string, { base: string[]; at: number }>()
   const listeners = new Set<
     (changes: readonly TextChange[], written: () => readonly WrittenRange[]) => void
   >()
@@ -336,6 +339,10 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         authors.rememberUser(message)
         authors.publish()
         break
+      case 'agent-change':
+        if (message.change && message.base !== undefined)
+          agentChanges.set(message.change, { base: headsOf(message.base), at: Date.now() })
+        break
       case 'document-renamed': {
         const next = message.newDocumentId ?? ''
         if (next) {
@@ -468,6 +475,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       doc = next
       epoch = serverEpoch
       authors.reset()
+      // a new lineage: announced changes and their hashes mean nothing here
+      agentChanges.clear()
       discardLocalEdits = false
       emit(diffText(before, text()))
     }
@@ -491,6 +500,25 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     presence.sendCurrent()
   }
 
+  /**
+   * The announced agent changes among the ones that just arrived (hash to base), taken out of the
+   * queue. Announcements whose change is here already, or did not come within the wait limit,
+   * are dropped: that text was shown without a reveal.
+   */
+  function announcedChanges(arrived: readonly string[]): Map<string, readonly string[]> {
+    const found = new Map<string, readonly string[]>()
+    const now = Date.now()
+    for (const hash of arrived) {
+      const queued = agentChanges.get(hash)
+      if (queued) found.set(hash, queued.base)
+    }
+    for (const [hash, queued] of agentChanges) {
+      if (found.has(hash) || now - queued.at > WAIT_LIMIT_MS || (doc && A.hasHeads(doc, [hash])))
+        agentChanges.delete(hash)
+    }
+    return found
+  }
+
   function onSyncMessage(encoded: string): void {
     if (!doc || !syncState) return
     const before = doc
@@ -508,10 +536,11 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
         patchesToChanges(A.diff(doc, beforeHeads, afterHeads)) ??
         diffText(before.content, doc.content)
       const newChanges = A.getChanges(before, doc).map((change) => A.decodeChange(change))
+      const reveals = announcedChanges(newChanges.map((change) => change.hash))
       // colored at once when the new changes are all of one person; the server's answer follows
       authors.follow(changes, authors.authorOf(newChanges.map((change) => change.actor)))
       const after = doc
-      emit(changes, () => writtenRanges(A, after, newChanges, changes))
+      emit(changes, () => writtenRanges(A, after, newChanges, changes, reveals))
       authors.publish()
       authors.scheduleRefetch()
       presence.resolve()

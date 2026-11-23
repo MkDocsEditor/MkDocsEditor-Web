@@ -1,7 +1,19 @@
 import { EditorState } from '@codemirror/state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { animateText, appearance, appearingRanges, finishAnimation } from './appearance'
+import { EditorView } from '@codemirror/view'
+
+import {
+  animateText,
+  appearance,
+  appearingRanges,
+  finishAnimation,
+  finishReveal,
+  hiddenRanges,
+  revealHeads,
+  revealText,
+  revealsText,
+} from './appearance'
 import type { AppearanceConfig } from './appearance'
 
 function state(doc: string, config: Partial<AppearanceConfig> = { enabled: true }) {
@@ -69,5 +81,125 @@ describe('appearance', () => {
   it('fades nothing when the system reduces motion', () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduce') }))
     expect(appearingRanges(written(state('Hallo'), 'ben', 5, ' Welt'))).toEqual([])
+  })
+})
+
+describe('typing reveal', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  function editor(doc: string, config: Partial<AppearanceConfig> = { enabled: true }) {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+    return new EditorView({
+      state: EditorState.create({ doc, extensions: appearance(config) }),
+      parent: document.body,
+    })
+  }
+
+  /** An agent's live change inserts `text` at `at`, to be typed out. */
+  function agentWrites(view: EditorView, at: number, text: string, tag = 'agent') {
+    view.dispatch({
+      changes: { from: at, insert: text },
+      effects: revealText.of([{ tag, from: at, to: at + text.length }]),
+    })
+  }
+
+  it('hides the text in the transaction that inserts it, then types it out', () => {
+    const view = editor('Hallo ')
+    agentWrites(view, 6, 'Welt, wie geht es?')
+    expect(view.state.doc.toString()).toBe('Hallo Welt, wie geht es?')
+    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 6, to: 24 }])
+    expect(revealHeads(view.state)).toEqual(new Map([['agent', 6]]))
+
+    vi.advanceTimersByTime(100)
+    const [range] = hiddenRanges(view.state)
+    expect(range!.from).toBeGreaterThan(6)
+    // what is uncovered fades in
+    expect(appearingRanges(view.state).at(-1)).toMatchObject({ tag: 'agent', to: range!.from })
+
+    vi.advanceTimersByTime(5_000)
+    expect(hiddenRanges(view.state)).toEqual([])
+    expect(revealHeads(view.state).size).toBe(0)
+    view.destroy()
+  })
+
+  it('types the ranges of one change in their order', () => {
+    const view = editor('a b')
+    view.dispatch({
+      changes: [
+        { from: 1, insert: 'XX' },
+        { from: 3, insert: 'YY' },
+      ],
+      effects: revealText.of([
+        { tag: 'agent', from: 1, to: 3 },
+        { tag: 'agent', from: 4, to: 6 },
+      ]),
+    })
+    vi.advanceTimersByTime(40)
+    expect(hiddenRanges(view.state)).toEqual([
+      { tag: 'agent', from: 2, to: 3 },
+      { tag: 'agent', from: 4, to: 6 },
+    ])
+    view.destroy()
+  })
+
+  it('finishes a range when someone edits inside it or at its edge', () => {
+    const view = editor('Hallo ')
+    agentWrites(view, 6, 'Welt')
+    view.dispatch({ changes: { from: 10, insert: '!' } })
+    expect(hiddenRanges(view.state)).toEqual([])
+    view.destroy()
+  })
+
+  it('does not finish it for edits elsewhere', () => {
+    const view = editor('Hallo ')
+    agentWrites(view, 6, 'Welt')
+    view.dispatch({ changes: { from: 0, insert: 'Oh, ' } })
+    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 10, to: 14 }])
+    view.destroy()
+  })
+
+  it('finishes the running reveal of an agent when its next change comes', () => {
+    const view = editor('')
+    agentWrites(view, 0, 'eins ')
+    agentWrites(view, 5, 'zwei')
+    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 5, to: 9 }])
+    // another agent's reveal runs at the same time
+    agentWrites(view, 0, 'drei ', 'other')
+    expect(
+      hiddenRanges(view.state)
+        .map((r) => r.tag)
+        .sort(),
+    ).toEqual(['agent', 'other'])
+    view.dispatch({ effects: finishReveal.of('agent') })
+    expect(hiddenRanges(view.state)).toEqual([{ tag: 'other', from: 0, to: 5 }])
+    view.destroy()
+  })
+
+  it('shows the text at once when the setting is off or motion is reduced', () => {
+    let view = editor('', { enabled: false })
+    agentWrites(view, 0, 'Text')
+    expect(hiddenRanges(view.state)).toEqual([])
+    view.destroy()
+
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      addListener: () => undefined,
+      removeListener: () => undefined,
+    }))
+    view = editor('')
+    expect(revealsText(view.state, 10)).toBe(false)
+    agentWrites(view, 0, 'Text')
+    expect(hiddenRanges(view.state)).toEqual([])
+    view.destroy()
+  })
+
+  it('does not type out long text', () => {
+    const view = editor('', { enabled: true, revealMaxChars: 100 })
+    expect(revealsText(view.state, 100)).toBe(true)
+    expect(revealsText(view.state, 101)).toBe(false)
+    view.destroy()
   })
 })

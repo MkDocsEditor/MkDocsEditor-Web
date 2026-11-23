@@ -1,8 +1,11 @@
 import { ref, shallowRef } from 'vue'
 
+import { WAIT_LIMIT_MS, clampedFocus, focusAnchors, resolveAnchors } from './agentFocus'
+import type { FocusAnchors } from './agentFocus'
 import { UNKNOWN_USER_COLOR } from './authors'
 import type { AmDoc, AutomergeApi } from './automerge'
 import type {
+  AgentFocus,
   AgentInfo,
   GhostInfo,
   LastPosition,
@@ -18,6 +21,17 @@ const VIEWPORT_MS = 500
 
 type WireSelections = PresenceInfo['selections']
 
+function sameFocus(a: AgentFocus, b: AgentFocus | undefined): boolean {
+  return (
+    !!b &&
+    a.revision === b.revision &&
+    a.from === b.from &&
+    a.to === b.to &&
+    a.viewport?.top === b.viewport?.top &&
+    a.viewport?.bottom === b.viewport?.bottom
+  )
+}
+
 /** Older servers have no instances: there, one account counts as one instance. */
 function instanceOf(info: PresenceInfo): string {
   return info.instanceId ?? info.accountId ?? info.clientId
@@ -31,6 +45,8 @@ interface Resolved {
 interface PeerState {
   info: PresenceInfo
   resolved: Resolved
+  /** The cursors of the agent's focus, once its revision is here; by the focus they belong to. */
+  focus?: { of: AgentFocus; anchors: FocusAnchors | null; since: number }
 }
 
 interface GhostState {
@@ -82,6 +98,8 @@ export function createPresence(options: PresenceOptions) {
   let lastViewportAt = 0
   let timer: ReturnType<typeof setTimeout> | null = null
   let viewportTimer: ReturnType<typeof setTimeout> | null = null
+  /** Resolves again when an agent's focus stops waiting for its revision. */
+  let focusTimer: ReturnType<typeof setTimeout> | null = null
 
   const text = () => options.doc()?.content ?? ''
 
@@ -127,17 +145,49 @@ export function createPresence(options: PresenceOptions) {
     return { selections: nextSelections, viewport: nextView }
   }
 
+  /**
+   * Where an agent's focus is in the current text (agent-presence.md section 3): cursors made at
+   * its revision, waiting for that revision for up to the wait limit, then its indexes clamped.
+   * Undefined while it waits.
+   */
+  function resolvedFocus(state: PeerState, focus: AgentFocus): Resolved | undefined {
+    const A = options.automerge()
+    const doc = options.doc()!
+    if (state.focus?.of !== focus) state.focus = { of: focus, anchors: null, since: Date.now() }
+    state.focus.anchors ??= focusAnchors(A, doc, focus)
+    if (state.focus.anchors) {
+      try {
+        return resolveAnchors(A, doc, state.focus.anchors)
+      } catch {
+        return clampedFocus(text(), focus)
+      }
+    }
+    const waited = Date.now() - state.focus.since
+    if (waited >= WAIT_LIMIT_MS) return clampedFocus(text(), focus)
+    if (!focusTimer) {
+      focusTimer = setTimeout(() => {
+        focusTimer = null
+        resolve()
+      }, WAIT_LIMIT_MS - waited)
+    }
+    return undefined
+  }
+
   /** Publishes the peers and ghosts, at their positions in the current text. */
   function resolve(): void {
     if (!options.doc()) return
     const list: Peer[] = []
     for (const state of states.values()) {
       if (instanceOf(state.info) === options.ownInstance()) continue
-      state.resolved = resolved(state.info.selections, state.info.viewport, state.resolved)
+      const focus = state.info.agent?.focus
+      state.resolved = focus
+        ? (resolvedFocus(state, focus) ?? state.resolved)
+        : resolved(state.info.selections, state.info.viewport, state.resolved)
       list.push({
         clientId: state.info.clientId,
         instanceId: instanceOf(state.info),
         accountId: state.info.accountId,
+        actorId: state.info.actorId,
         deviceName: state.info.deviceName,
         lastActiveAt: state.info.lastActiveAt,
         username: state.info.username,
@@ -237,9 +287,14 @@ export function createPresence(options: PresenceOptions) {
     /** A peer's presence changed. */
     update(info: PresenceInfo): void {
       endGhost(instanceOf(info))
+      const previous = states.get(info.clientId)
       states.set(info.clientId, {
         info,
-        resolved: states.get(info.clientId)?.resolved ?? { selections: [] },
+        resolved: previous?.resolved ?? { selections: [] },
+        // the cursors of a focus stay with it: presence of an agent repeats the same focus
+        ...(previous?.focus && sameFocus(previous.focus.of, info.agent?.focus)
+          ? { focus: { ...previous.focus, of: info.agent!.focus! } }
+          : {}),
       })
       resolve()
     },
@@ -349,6 +404,7 @@ export function createPresence(options: PresenceOptions) {
     stop(): void {
       if (timer) clearTimeout(timer)
       if (viewportTimer) clearTimeout(viewportTimer)
+      if (focusTimer) clearTimeout(focusTimer)
       endAllGhosts()
     },
   }
