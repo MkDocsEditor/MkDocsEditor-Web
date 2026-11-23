@@ -53,12 +53,74 @@ interface NewChange {
 }
 
 /**
+ * The text one change inserted (the diff from `base` to the change), carried into `doc` with
+ * cursors made at the change. A range whose first or last character was deleted since is left
+ * out: its cursor would resolve to the next character, which is older text.
+ */
+export function rangesOfChange(
+  A: AutomergeApi,
+  doc: AmDoc,
+  base: readonly string[],
+  hash: string,
+  writer: string,
+): WrittenRange[] {
+  const own = patchesToChanges(A.diff(doc, [...base], [hash]))
+  if (!own) return []
+  const inserted = insertedRanges(own)
+  if (inserted.length === 0) return []
+  const at = A.view(doc, [hash])
+  const kept = (cursor: string, index: number) =>
+    index >= 0 && index < doc.content.length && A.getCursor(doc, ['content'], index) === cursor
+  const ranges: WrittenRange[] = []
+  for (const { from, to } of inserted) {
+    // cursors on the first and the last character: the end of the text has no character
+    const first = A.getCursor(at, ['content'], from)
+    const last = A.getCursor(at, ['content'], to - 1)
+    const start = A.getCursorPosition(doc, ['content'], first)
+    const end = A.getCursorPosition(doc, ['content'], last) + 1
+    if (end > start && kept(first, start) && kept(last, end - 1))
+      ranges.push({ writer, from: start, to: end })
+  }
+  return ranges
+}
+
+/**
  * The text each writer inserted with the changes that turned `before` into `doc`. `changes` are
  * those changes as sequential TextChanges. One writer: their ranges come from `changes` directly.
- * Several: each change is compared with its dependencies and its ranges are carried into `doc`
- * with cursors, because the sequential changes do not say whose they are. Empty for a catch-up.
+ * Several: each change is compared with its dependencies, because the sequential changes do not
+ * say whose they are. Empty for a catch-up.
+ *
+ * `reveals` are the changes announced by `agent-change` (hash to `base`): their text comes from
+ * the diff of the announcement, marked `reveal`, and in place of the other ranges of their writer.
  */
 export function writtenRanges(
+  A: AutomergeApi,
+  doc: AmDoc,
+  newChanges: readonly NewChange[],
+  changes: readonly TextChange[],
+  reveals: ReadonlyMap<string, readonly string[]> = new Map(),
+): WrittenRange[] {
+  // a catch-up is never typed out, announced or not
+  if (newChanges.length > MAX_LIVE_CHANGES) return []
+  const revealed: WrittenRange[] = []
+  for (const change of newChanges) {
+    const announced = reveals.get(change.hash)
+    if (!announced) continue
+    // the base of the announcement should be the change's dependencies; never trust it blindly
+    const base = A.hasHeads(doc, [...announced]) ? announced : change.deps
+    try {
+      for (const range of rangesOfChange(A, doc, base, change.hash, change.actor))
+        revealed.push({ ...range, reveal: true })
+    } catch {
+      // no reveal: its text fades like any other
+    }
+  }
+  const overlaps = (r: WrittenRange) =>
+    revealed.some((v) => v.writer === r.writer && v.from < r.to && r.from < v.to)
+  return [...revealed, ...plainRanges(A, doc, newChanges, changes).filter((r) => !overlaps(r))]
+}
+
+function plainRanges(
   A: AutomergeApi,
   doc: AmDoc,
   newChanges: readonly NewChange[],
@@ -71,25 +133,7 @@ export function writtenRanges(
     return insertedRanges(changes).map((r) => ({ writer: writer!, ...r }))
   }
   if (newChanges.length > MAX_MIXED_CHANGES) return []
-  const ranges: WrittenRange[] = []
-  for (const change of newChanges) {
-    const own = patchesToChanges(A.diff(doc, change.deps, [change.hash]))
-    if (!own) continue
-    const inserted = insertedRanges(own)
-    if (inserted.length === 0) continue
-    const at = A.view(doc, [change.hash])
-    for (const { from, to } of inserted) {
-      // cursors on the first and the last character: the end of the text has no character
-      const first = A.getCursor(at, ['content'], from)
-      const last = A.getCursor(at, ['content'], to - 1)
-      const start = A.getCursorPosition(doc, ['content'], first)
-      const end = A.getCursorPosition(doc, ['content'], last) + 1
-      // a deleted end resolves to the next character, which is older text: leave the range out
-      const kept = (cursor: string, at: number) =>
-        at >= 0 && at < doc.content.length && A.getCursor(doc, ['content'], at) === cursor
-      if (end > start && kept(first, start) && kept(last, end - 1))
-        ranges.push({ writer: change.actor, from: start, to: end })
-    }
-  }
-  return ranges
+  return newChanges.flatMap((change) =>
+    rangesOfChange(A, doc, change.deps, change.hash, change.actor),
+  )
 }

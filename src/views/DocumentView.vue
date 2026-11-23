@@ -13,7 +13,7 @@ import {
   mdiTune,
   mdiViewSplitVertical,
 } from '@mdi/js'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
@@ -33,6 +33,7 @@ import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import { flashLines } from '@/editor/flashLines'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
+import { withRevealHeads } from '@/editor/revealHeads'
 import { placeRanges, textHash } from '@/markdown/changeRanges'
 import type { ChangeRange, ChangeTarget } from '@/markdown/changeRanges'
 import { sectionOf } from '@/markdown/headings'
@@ -405,9 +406,11 @@ watch(
 )
 
 const auth = useAuthStore()
+/** Where the editor types out live changes of agents: their cursors are there meanwhile. */
+const revealHeads = shallowRef<ReadonlyMap<string, number>>(new Map())
 const follow = useFollow({
   view: editorView,
-  peers: () => peers.value,
+  peers: () => withRevealHeads(peers.value, revealHeads.value),
   ghosts: () => ghosts.value,
   presenceKnown: () => presenceKnown.value,
   onEnded: (name) => notify.push(`${name} has left, no longer following.`),
@@ -507,19 +510,24 @@ async function share(): Promise<void> {
           <v-tooltip
             v-for="user in onlineUsers"
             :key="user.instanceId"
-            :text="user.agent ? `${user.name} is here` : followLabel(user)"
+            :text="user.followable ? followLabel(user) : `${user.name} is here`"
             location="bottom"
           >
             <template #activator="{ props: tip }">
-              <!-- an agent has no cursor and nothing to follow -->
+              <!-- an agent can be followed once it says where it is (its focus) -->
               <v-avatar
                 v-if="user.agent"
                 v-bind="tip"
+                :tag="user.followable ? 'button' : 'div'"
                 :color="user.color"
                 size="30"
-                role="img"
-                :aria-label="`${user.name} is here`"
+                :role="user.followable ? undefined : 'img'"
+                :aria-label="user.followable ? followLabel(user) : `${user.name} is here`"
+                :class="{
+                  'document-view__avatar--followed': following?.instanceId === user.instanceId,
+                }"
                 data-testid="online-agent"
+                @click="user.followable && toggleFollowing(user.instanceId)"
               >
                 <v-icon :icon="mdiRobotOutline" size="20" />
               </v-avatar>
@@ -707,6 +715,7 @@ async function share(): Promise<void> {
           :load-blame="mobile ? undefined : loadBlame"
           @change="(t: string) => (text = t)"
           @local-edit="follow.stop()"
+          @reveal-heads="(heads: ReadonlyMap<string, number>) => (revealHeads = heads)"
           @anchor="onEditorAnchor"
         />
       </div>

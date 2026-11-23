@@ -25,6 +25,8 @@ export interface WrittenRange {
   writer: string
   from: number
   to: number
+  /** Text of a live agent change (`agent-change`): revealed bit by bit, as if typed. */
+  reveal?: boolean
 }
 
 export interface TextSelection {
@@ -80,6 +82,8 @@ export function instanceName(who: {
 
 export interface Peer extends SessionUser {
   clientId: string
+  /** The Automerge actor of its edits; absent on older servers. */
+  actorId?: string
   /** The client instance. Following and ghosts go by this: a reconnect has a new `clientId`. */
   instanceId: string
   deviceName?: string
@@ -88,7 +92,10 @@ export interface Peer extends SessionUser {
   selections: TextSelection[]
   /** The text this connection is looking at; absent while its editor is not visible. */
   viewport?: TextRange
-  /** An AI agent or script with an app token of the account: no cursor, not to follow. */
+  /**
+   * An AI agent or script with an app token of the account. It has a cursor and can be followed
+   * once it has a focus (servers with `agent-focus`).
+   */
   agent?: AgentInfo
 }
 

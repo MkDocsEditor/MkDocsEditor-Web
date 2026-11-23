@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { applyChanges, diffText } from '@/sync/session'
 import { createFakeSession } from '@/test/fakeSession'
 
-import { appearance, appearingRanges } from './appearance'
+import { appearance, appearingRanges, hiddenRanges } from './appearance'
 import { authorship, authorshipDecorations, lineShares, setAuthorship } from './authorship'
 import { fromChangeSet, sessionBinding, toChangeSet } from './binding'
 import { peerDecorations, remoteCursors, setPeers, withAlpha } from './remoteCursors'
@@ -88,6 +88,18 @@ describe('sessionBinding', () => {
     // what the person types never fades
     view.dispatch({ changes: { from: 0, insert: 'Ich' } })
     expect(appearingRanges(view.state)).toEqual([{ tag: 'ben', from: 9, to: 14 }])
+    view.destroy()
+  })
+
+  it('hides the text of a live agent change from the transaction that inserts it', () => {
+    const { fake, view } = editor('Hallo')
+    fake.remote(
+      [{ from: 5, to: 5, insert: ' Welt' }],
+      [{ writer: 'agent', from: 5, to: 10, reveal: true }],
+    )
+    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 5, to: 10 }])
+    // it fades as it is typed, not all at once
+    expect(appearingRanges(view.state)).toEqual([])
     view.destroy()
   })
 

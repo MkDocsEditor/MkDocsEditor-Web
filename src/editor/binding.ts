@@ -5,7 +5,7 @@ import type { EditorView, ViewUpdate } from '@codemirror/view'
 
 import type { DocumentSession, TextChange, TextSelection, WrittenRange } from '@/sync/session'
 
-import { animateText, fadesText } from './appearance'
+import { animateText, fadesText, revealText, revealsText } from './appearance'
 
 /** Marks transactions that come from the session, so they are not sent back. */
 const remoteChange = Annotation.define<boolean>()
@@ -64,14 +64,24 @@ export function sessionBinding(session: DocumentSession): Extension {
         written: () => readonly WrittenRange[],
       ): void {
         if (changes.length === 0) return
-        // what others wrote fades in from the transaction that inserts it, never a frame later
-        const tagged = fadesText(this.view.state)
-          ? written().map(({ writer, from, to }) => ({ tag: writer, from, to }))
-          : []
+        // what others wrote fades in, and live agent changes are typed out, from the transaction
+        // that inserts the text: never a frame later, or it would show in full first
+        const ranges = fadesText(this.view.state) ? written() : []
+        const toReveal = ranges.filter((r) => r.reveal)
+        const revealed = revealsText(
+          this.view.state,
+          toReveal.reduce((sum, r) => sum + r.to - r.from, 0),
+        )
+        const tag = ({ writer, from, to }: WrittenRange) => ({ tag: writer, from, to })
+        const fading = ranges.filter((r) => !(r.reveal && revealed)).map(tag)
+        const effects = [
+          ...(fading.length > 0 ? [animateText.of(fading)] : []),
+          ...(revealed && toReveal.length > 0 ? [revealText.of(toReveal.map(tag))] : []),
+        ]
         const apply = () =>
           this.view.dispatch({
             changes: toChangeSet(changes, this.view.state.doc.length),
-            effects: tagged.length > 0 ? animateText.of(tagged) : [],
+            effects,
             annotations: [remoteChange.of(true), Transaction.addToHistory.of(false)],
           })
         // Sessions must not call listeners from inside applyLocalChanges, but if a remote change

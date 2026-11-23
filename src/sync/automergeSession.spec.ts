@@ -163,6 +163,27 @@ describe('Automerge session', () => {
     expect(seen[0]!.writer).toMatch(/^[0-9a-f]{32}$/)
   })
 
+  it('marks the text of an announced agent change to be typed out', async () => {
+    const server = new FakeSyncServer(A, 'Hallo')
+    const anna = client(server, 'anna')
+    await online(anna)
+    const seen: { text: string; reveal?: boolean }[] = []
+    anna.session.onRemoteChanges((_, written) =>
+      seen.push(
+        ...written().map((w) => ({
+          text: anna.session.getText().slice(w.from, w.to),
+          reveal: w.reveal,
+        })),
+      ),
+    )
+    server.agentEdit(5, ' Welt')
+    await vi.waitFor(() => expect(seen).toEqual([{ text: ' Welt', reveal: true }]))
+    // without an announcement, the same agent's text only fades
+    server.externalEdit((t) => `${t}!`)
+    await vi.waitFor(() => expect(anna.session.getText()).toBe('Hallo Welt!'))
+    expect(seen.at(-1)?.reveal).toBeUndefined()
+  })
+
   it('emits precise changes for edits in different places', async () => {
     const server = new FakeSyncServer(A, 'eins zwei drei')
     const anna = client(server, 'anna')

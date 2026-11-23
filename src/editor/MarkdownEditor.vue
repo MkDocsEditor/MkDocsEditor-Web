@@ -22,7 +22,7 @@ import type { DocumentSession } from '@/sync/session'
 import { authorship, setAuthorship } from './authorship'
 import type { AuthorHighlightMode } from './authorship'
 import { isLocalEdit, sessionBinding } from './binding'
-import { appearance } from './appearance'
+import { appearance, revealHeads } from './appearance'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { formattingKeymap } from './formatting'
 import type { FormatName } from './formatting'
@@ -30,6 +30,7 @@ import { lineHistory } from './lineHistory'
 import { remoteCursors, setPeers } from './remoteCursors'
 import { fileUpload } from './upload'
 import type { UploadFiles } from './upload'
+import { withRevealHeads } from './revealHeads'
 import { createViewportPublisher } from './viewportPublisher'
 
 const props = defineProps<{
@@ -55,6 +56,8 @@ const emit = defineEmits<{
   change: [text: string]
   /** This user changed the text. */
   localEdit: []
+  /** Where each agent's reveal is (by actor), while the editor types out a live change. */
+  revealHeads: [heads: ReadonlyMap<string, number>]
 }>()
 
 const host = ref<HTMLElement | null>(null)
@@ -139,6 +142,13 @@ onMounted(() => {
           update.view.requestMeasure({ read: emitAnchor })
         }
         if (update.docChanged || update.geometryChanged) viewportPublisher?.publish()
+        const heads = revealHeads(update.state)
+        if (!sameHeads(heads, shownHeads)) {
+          shownHeads = heads
+          emit('revealHeads', heads)
+          // not during the update: CodeMirror refuses dispatches then
+          queueMicrotask(pushPeers)
+        }
       }),
     ],
   })
@@ -150,9 +160,17 @@ onMounted(() => {
   pushAuthorship()
 })
 
+/** The heads of the reveals that the cursors of agents show. */
+let shownHeads: ReadonlyMap<string, number> = new Map()
+
+function sameHeads(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): boolean {
+  return a.size === b.size && [...a].every(([tag, head]) => b.get(tag) === head)
+}
+
 function pushPeers(): void {
   const ghosts = props.session.ghosts.value.map((ghost) => ({ ...ghost, ghost: true }))
-  view?.dispatch({ effects: setPeers.of([...props.session.peers.value, ...ghosts]) })
+  const peers = withRevealHeads(props.session.peers.value, shownHeads)
+  view?.dispatch({ effects: setPeers.of([...peers, ...ghosts]) })
 }
 
 function pushAuthorship(): void {
@@ -186,6 +204,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  // the next editor starts without reveals: nothing may stay on the cursors of agents
+  if (shownHeads.size > 0) emit('revealHeads', new Map())
   viewportPublisher?.destroy()
   viewportPublisher = null
   view?.destroy()
