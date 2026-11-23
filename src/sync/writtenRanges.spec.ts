@@ -106,6 +106,21 @@ describe('writtenRanges', () => {
     ])
   })
 
+  it('types out an announced change, from the dependencies when the base is unknown', () => {
+    const base = A.from({ content: 'Hallo' }, { actor: ANNA })
+    const agent = A.change(A.clone(base, { actor: BEN }), (d) =>
+      A.splice(d, ['content'], 5, 0, ' Welt'),
+    )
+    const doc = A.merge(A.clone(base), agent)
+    const { changes, newChanges } = arrived(base, doc)
+    const hash = A.getHeads(agent)[0]!
+    for (const announced of [A.getHeads(base), ['ff'.repeat(32)]]) {
+      expect(writtenRanges(A, doc, newChanges, changes, new Map([[hash, announced]]))).toEqual([
+        { writer: BEN, from: 5, to: 10, reveal: true },
+      ])
+    }
+  })
+
   it('marks nothing for a catch-up of many changes', () => {
     const base = A.from({ content: '' }, { actor: ANNA })
     let ben = A.clone(base, { actor: BEN })

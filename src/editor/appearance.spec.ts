@@ -196,6 +196,19 @@ describe('typing reveal', () => {
     view.destroy()
   })
 
+  it('shows the rest at once when the system starts to reduce motion', () => {
+    const view = editor('')
+    agentWrites(view, 0, 'Text')
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      addListener: () => undefined,
+      removeListener: () => undefined,
+    }))
+    vi.advanceTimersByTime(30)
+    expect(hiddenRanges(view.state)).toEqual([])
+    view.destroy()
+  })
+
   it('does not type out long text', () => {
     const view = editor('', { enabled: true, revealMaxChars: 100 })
     expect(revealsText(view.state, 100)).toBe(true)

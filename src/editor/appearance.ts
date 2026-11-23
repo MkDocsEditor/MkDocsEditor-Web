@@ -337,7 +337,8 @@ const revealing = StateField.define<readonly Revealing[]>({
         next = advance(next, effect.value.tag, effect.value.chars)
       }
     }
-    if (!config.enabled && next.length > 0) return []
+    // the setting went off, or the system now reduces motion: show it all
+    if (next.length > 0 && !fadesText(tr.state)) return []
     return next
   },
   provide: (field) =>
@@ -429,12 +430,14 @@ const revealer = ViewPlugin.fromClass(
     eventHandlers: {
       mousedown(event, view) {
         const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false)
-        // the range being revealed right now, of each agent
-        const heads = new Map<string, Revealing>()
-        for (const r of view.state.field(revealing)) if (!heads.has(r.tag)) heads.set(r.tag, r)
-        for (const [tag, range] of heads) {
-          if (pos >= range.from && pos <= range.to) view.dispatch({ effects: finishReveal.of(tag) })
-        }
+        // any text of an agent's reveal, also its later ranges: nobody clicks into hidden text
+        const tags = new Set(
+          view.state
+            .field(revealing)
+            .filter((r) => pos >= r.from && pos <= r.to)
+            .map((r) => r.tag),
+        )
+        for (const tag of tags) view.dispatch({ effects: finishReveal.of(tag) })
         return false
       },
     },

@@ -49,6 +49,18 @@ describe('agent focus', () => {
     })
   })
 
+  it('takes no heads as the empty document, without waiting', () => {
+    const doc = A.change(A.from({ content: '' }), (d) => A.splice(d, ['content'], 0, 0, 'neu'))
+    const anchors = focusAnchors(A, doc, { revision: '', from: 0, to: 0 })
+    expect(anchors && resolveAnchors(A, doc, anchors).selections).toEqual([{ anchor: 0, head: 0 }])
+  })
+
+  it('does not go past the text when the last character is deleted', () => {
+    const doc = A.from({ content: 'abc xyz' })
+    const later = A.change(A.clone(doc), (d) => A.splice(d, ['content'], 6, 1))
+    expect(resolvedIn(doc, later, { from: 7, to: 7 })?.selections).toEqual([{ anchor: 6, head: 6 }])
+  })
+
   it('waits for a revision the document does not have', () => {
     const doc = A.from({ content: 'eins' })
     const ahead = A.change(A.clone(doc), (d) => A.splice(d, ['content'], 4, 0, ' zwei'))
@@ -85,6 +97,27 @@ describe('presence of an agent with a focus', () => {
       presenceMs: 100,
     })
   }
+
+  it('clamps a revision that makes no sense here, and the others stay listed', () => {
+    const doc = A.from({ content: 'hello world' })
+    const presence = setup(() => doc)
+    presence.update(agentOf({ revision: 'not-a-hash', from: 1, to: 2 }))
+    expect(presence.peers.value[0]!.selections).toEqual([{ anchor: 1, head: 2 }])
+  })
+
+  it('keeps the ghost of an agent where its focus was', () => {
+    const doc = A.from({ content: 'hello world' })
+    const presence = setup(() => doc)
+    presence.update(agentOf({ revision: revisionOf(doc), from: 6, to: 11 }))
+    presence.remove({
+      clientId: 'agent-1',
+      instanceId: 'agent-1',
+      accountId: 'anna',
+      ghostMs: 1000,
+    })
+    expect(presence.ghosts.value[0]!.selections).toEqual([{ anchor: 6, head: 11 }])
+    presence.stop()
+  })
 
   it('shows the agent at its focus, like the cursor of a person', () => {
     const doc = A.from({ content: 'hello world' })

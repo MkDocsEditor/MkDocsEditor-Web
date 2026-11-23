@@ -35,8 +35,10 @@ export interface FocusAnchors {
  */
 export function focusAnchors(A: AutomergeApi, doc: AmDoc, focus: AgentFocus): FocusAnchors | null {
   const heads = headsOf(focus.revision)
+  // no heads: the empty document, which every document has
+  if (heads.length === 0) return { from: 'start', to: 'start' }
   // view() at heads the document lacks does not fail: it gives no text and end cursors
-  if (heads.length === 0 || !A.hasHeads(doc, heads)) return null
+  if (!A.hasHeads(doc, heads)) return null
   const at = A.view(doc, heads)
   const text = at.content ?? ''
   const anchor = (codePoints: number): Anchor => {
@@ -66,8 +68,10 @@ export function resolveAnchors(A: AutomergeApi, doc: AmDoc, anchors: FocusAnchor
   const length = doc.content.length
   const position = (anchor: Anchor): number => {
     if (anchor === 'start') return 0
-    const index = A.getCursorPosition(doc, ['content'], anchor.cursor) + (anchor.after ? 1 : 0)
-    return Math.min(length, Math.max(0, index))
+    const index = A.getCursorPosition(doc, ['content'], anchor.cursor)
+    // after a character that is still there; a deleted one resolves to the next character
+    const still = index < length && A.getCursor(doc, ['content'], index) === anchor.cursor
+    return Math.min(length, Math.max(0, index + (anchor.after && still ? 1 : 0)))
   }
   return {
     selections: [{ anchor: position(anchors.from), head: position(anchors.to) }],

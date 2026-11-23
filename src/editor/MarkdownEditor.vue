@@ -204,6 +204,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  // the next editor starts without reveals: nothing may stay on the cursors of agents
+  if (shownHeads.size > 0) emit('revealHeads', new Map())
   viewportPublisher?.destroy()
   viewportPublisher = null
   view?.destroy()

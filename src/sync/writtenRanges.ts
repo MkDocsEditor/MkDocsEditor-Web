@@ -100,18 +100,24 @@ export function writtenRanges(
   changes: readonly TextChange[],
   reveals: ReadonlyMap<string, readonly string[]> = new Map(),
 ): WrittenRange[] {
+  // a catch-up is never typed out, announced or not
+  if (newChanges.length > MAX_LIVE_CHANGES) return []
   const revealed: WrittenRange[] = []
   for (const change of newChanges) {
-    const base = reveals.get(change.hash)
-    if (!base) continue
-    for (const range of rangesOfChange(A, doc, base, change.hash, change.actor))
-      revealed.push({ ...range, reveal: true })
+    const announced = reveals.get(change.hash)
+    if (!announced) continue
+    // the base of the announcement should be the change's dependencies; never trust it blindly
+    const base = A.hasHeads(doc, [...announced]) ? announced : change.deps
+    try {
+      for (const range of rangesOfChange(A, doc, base, change.hash, change.actor))
+        revealed.push({ ...range, reveal: true })
+    } catch {
+      // no reveal: its text fades like any other
+    }
   }
-  const revealing = new Set(revealed.map((r) => r.writer))
-  return [
-    ...revealed,
-    ...plainRanges(A, doc, newChanges, changes).filter((r) => !revealing.has(r.writer)),
-  ]
+  const overlaps = (r: WrittenRange) =>
+    revealed.some((v) => v.writer === r.writer && v.from < r.to && r.from < v.to)
+  return [...revealed, ...plainRanges(A, doc, newChanges, changes).filter((r) => !overlaps(r))]
 }
 
 function plainRanges(

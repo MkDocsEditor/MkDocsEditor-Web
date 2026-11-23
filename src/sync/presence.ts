@@ -154,7 +154,12 @@ export function createPresence(options: PresenceOptions) {
     const A = options.automerge()
     const doc = options.doc()!
     if (state.focus?.of !== focus) state.focus = { of: focus, anchors: null, since: Date.now() }
-    state.focus.anchors ??= focusAnchors(A, doc, focus)
+    try {
+      state.focus.anchors ??= focusAnchors(A, doc, focus)
+    } catch {
+      // a revision that makes no sense here: as if it never came
+      return clampedFocus(text(), focus)
+    }
     if (state.focus.anchors) {
       try {
         return resolveAnchors(A, doc, state.focus.anchors)
@@ -331,8 +336,17 @@ export function createPresence(options: PresenceOptions) {
       resolve()
     },
     remove(leave: PresenceLeave): void {
-      const info = states.get(leave.clientId)?.info
+      const state = states.get(leave.clientId)
+      const info = state?.info
       states.delete(leave.clientId)
+      // an agent has no cursors on the wire: its ghost stays where its focus was
+      const agentPlace =
+        info?.agent?.focus && state && options.doc()
+          ? state.resolved.selections.map((s) => ({
+              anchor: cursorAt(s.anchor),
+              head: cursorAt(s.head),
+            }))
+          : undefined
       if (leave.accountId && leave.ghostMs !== undefined) {
         addGhost(
           {
@@ -343,8 +357,8 @@ export function createPresence(options: PresenceOptions) {
             displayName: info?.displayName,
             color: leave.instanceColor ?? info?.instanceColor ?? info?.color,
             avatar: leave.avatar !== undefined ? leave.avatar : info?.avatar,
-            selections: leave.selections,
-            viewport: leave.viewport,
+            selections: agentPlace ?? leave.selections,
+            viewport: agentPlace ? undefined : leave.viewport,
             agent: info?.agent,
           },
           leave.ghostMs,
