@@ -31,7 +31,8 @@ function random(seed: number): () => number {
   }
 }
 
-export function humanKeystrokes(text: string, seed = 6): Keystroke[] {
+/** `median`: the gap between keys around which they spread, 150 ms for a person, 70 for a fast one. */
+export function humanKeystrokes(text: string, seed = 6, median = 150): Keystroke[] {
   const rand = random(seed)
   const uniform = (from: number, to: number) => from + rand() * (to - from)
   const normal = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand())
@@ -39,13 +40,13 @@ export function humanKeystrokes(text: string, seed = 6): Keystroke[] {
 
   /** The time before `char`, typed after `before`: steps 1, 2, 3 and 4. */
   function gap(before: string, char: string): number {
-    let time = Math.exp(Math.log(150) + 0.4 * normal())
+    let time = Math.exp(Math.log(median) + 0.4 * normal())
     if (PAIRS.has((before + char).toLowerCase())) time *= 0.7
     if (burst > 0) {
       time *= 0.5
       burst--
     } else if (rand() < 0.04) burst = 3 + Math.floor(rand() * 4)
-    return Math.min(400, Math.max(60, time))
+    return Math.min(400, Math.max(Math.min(60, median / 2), time))
   }
 
   /** Step 5: what comes on top after `char`. */

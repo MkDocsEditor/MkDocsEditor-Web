@@ -1,7 +1,16 @@
 import { Annotation, Facet, Prec, StateEffect, StateField } from '@codemirror/state'
 import type { ChangeSet, EditorState, Extension, Transaction } from '@codemirror/state'
-import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
+import { Decoration, EditorView, ViewPlugin, WidgetType } from '@codemirror/view'
 import type { DecorationSet, PluginValue, ViewUpdate } from '@codemirror/view'
+
+import {
+  TYPING_CHARS,
+  TYPING_WITHIN_MS,
+  smoothInterval,
+  typingEasing,
+  typingStep,
+  typingWay,
+} from './typingTiming'
 
 /**
  * Text that others write fades in (agent-presence.md, section 3 "Client animation"). Only the
@@ -25,14 +34,10 @@ export function isUserEdit(tr: Transaction): boolean {
 
 export interface AppearanceConfig {
   enabled: boolean
-  /** How long a character takes to fade in. */
-  fadeMs: number
   /**
-   * How many of the newest characters of a writer fade; older ones show at once. Not for the
-   * pieces of a reveal: they always fade in full.
+   * At most this many pieces fade at the same time: with more, the two pieces one behind the
+   * other of a writer whose alphas are the closest become one (R4).
    */
-  window: number
-  /** At most this many ranges fade at the same time; the oldest show at once. */
   maxRanges: number
   /** How fast a live agent change is typed out, at least. */
   revealCharsPerSecond: number
@@ -44,9 +49,7 @@ export interface AppearanceConfig {
 
 export const DEFAULT_APPEARANCE: AppearanceConfig = {
   enabled: false,
-  fadeMs: 250,
-  window: 16,
-  maxRanges: 24,
+  maxRanges: 256,
   revealCharsPerSecond: 60,
   revealMaxMs: 4_000,
   revealMaxChars: 2_048,
@@ -63,9 +66,15 @@ interface Appearing extends TaggedRange {
   /** When the fade started, on the clock of `document.timeline`. */
   start: number
   id: number
-  /** A piece of a reveal: never cut by the window or the most ranges, only by a user edit. */
+  /** How long it fades in, from the rate of its writer when it came (R4). */
+  duration: number
+  /** A piece of a reveal: only a change of the person here ends its fade. */
   reveal?: boolean
 }
+
+const HIDDEN = 'mask-image: linear-gradient(transparent, transparent)'
+/** Typed inserts up to this long fade a character each, like keys one after the other. */
+const TYPED_CHARS = 3
 
 /** Lets text fade in: add it in the transaction that inserts it. */
 export const animateText = StateEffect.define<readonly TaggedRange[]>({
@@ -111,29 +120,61 @@ const now = () => performance.now()
 
 let nextId = 1
 
+/** How visible a piece is at `time`: the ease-out quadratic, fast at first (R4). */
+export function pieceAlpha(start: number, time: number, duration: number): number {
+  const p = Math.min(1, Math.max(0, (time - start) / duration))
+  return 1 - (1 - p) ** 2
+}
+
+/** The fade of a piece is longer the faster its writer writes: typing short, a reveal longer. */
+export const FADE_MIN_MS = 320
+export const FADE_MAX_MS = 1_000
+const SLOW_RATE = 10
+const FAST_RATE = 120
+/** How fast the rate of a writer forgets: characters per second, decaying with e^(-t / 1 s). */
+const RATE_MEMORY_MS = 1_000
+
+/** How long a piece fades in, for a writer at `rate` characters per second. */
+export function fadeDuration(rate: number): number {
+  const k = Math.min(1, Math.max(0, (rate - SLOW_RATE) / (FAST_RATE - SLOW_RATE)))
+  return FADE_MIN_MS + (FADE_MAX_MS - FADE_MIN_MS) * k
+}
+
 /**
- * Keeps the newest `window` characters of each writer, and the newest `maxRanges` ranges; and all
- * pieces of reveals.
+ * Keeps at most `maxRanges` pieces (R4): the two pieces one behind the other of the same writer
+ * whose alphas are the closest become one, with the start of the more visible one; without such
+ * neighbours, the most visible piece shows at once.
  */
-function trim(ranges: readonly Appearing[], config: AppearanceConfig): Appearing[] {
-  const left = new Map<string, number>()
-  const kept: Appearing[] = []
-  let counted = 0
-  for (let i = ranges.length - 1; i >= 0; i--) {
-    const range = ranges[i]!
-    if (range.reveal) {
-      kept.push(range)
-      continue
+function cap(ranges: readonly Appearing[], config: AppearanceConfig, time: number): Appearing[] {
+  let next = [...ranges]
+  const alpha = (r: Appearing) => pieceAlpha(r.start, time, r.duration)
+  while (next.length > config.maxRanges) {
+    let best: [number, number] | null = null
+    let closest = Infinity
+    for (let i = 0; i < next.length; i++) {
+      const a = next[i]!
+      for (let j = 0; j < next.length; j++) {
+        const b = next[j]!
+        if (i === j || a.tag !== b.tag || a.to !== b.from) continue
+        const difference = Math.abs(alpha(a) - alpha(b))
+        if (difference < closest) {
+          closest = difference
+          best = [i, j]
+        }
+      }
     }
-    if (counted >= config.maxRanges) continue
-    const room = left.get(range.tag) ?? config.window
-    if (room <= 0) continue
-    const from = Math.max(range.from, range.to - room)
-    left.set(range.tag, room - (range.to - from))
-    counted++
-    kept.push(from === range.from ? range : { ...range, from })
+    if (best) {
+      const [a, b] = [next[best[0]]!, next[best[1]]!]
+      const shown = alpha(a) >= alpha(b) ? a : b
+      const merged = { ...shown, from: a.from, to: b.to, reveal: a.reveal || b.reveal }
+      next = next.filter((_, k) => k !== best[0] && k !== best[1])
+      next.push(merged)
+    } else {
+      const most = next.reduce((m, r) => (alpha(r) > alpha(m) ? r : m))
+      next = next.filter((r) => r !== most)
+    }
   }
-  return kept.reverse()
+  return next
 }
 
 /**
@@ -159,7 +200,15 @@ function mapRanges(ranges: readonly Appearing[], changes: ChangeSet): Appearing[
   return mapped
 }
 
-function update(ranges: readonly Appearing[], tr: Transaction): readonly Appearing[] {
+interface AppearState {
+  ranges: readonly Appearing[]
+  /** The rate of each writer, characters per second, and when it was taken. */
+  rates: ReadonlyMap<string, { rate: number; at: number }>
+}
+
+function update(value: AppearState, tr: Transaction): AppearState {
+  const ranges = value.ranges
+  let rates = value.rates
   let next = ranges
   if (tr.docChanged && next.length > 0) next = mapRanges(next, tr.changes)
   const config = tr.state.facet(appearanceConfig)
@@ -178,36 +227,66 @@ function update(ranges: readonly Appearing[], tr: Transaction): readonly Appeari
       const start = now()
       const length = tr.state.doc.length
       const reveal = effect.is(revealPiece)
+      // the rate of each writer with these characters, and the fade it gives them
+      const durations = new Map<string, number>()
+      for (const tag of new Set(effect.value.map((r) => r.tag))) {
+        const chars = effect.value
+          .filter((r) => r.tag === tag)
+          .reduce((sum, r) => sum + Math.max(0, r.to - r.from), 0)
+        const before = rates.get(tag)
+        const rate =
+          (before ? before.rate * Math.exp(-(start - before.at) / RATE_MEMORY_MS) : 0) + chars
+        rates = new Map(rates).set(tag, { rate, at: start })
+        durations.set(tag, fadeDuration(rate))
+      }
       for (const range of effect.value) {
         const from = Math.max(0, Math.min(length, range.from))
         const to = Math.max(0, Math.min(length, range.to))
-        if (to > from)
+        // keys that came together are a piece each, as if one after the other: no edge inside
+        const pieces =
+          !reveal && to - from <= TYPED_CHARS
+            ? Array.from({ length: to - from }, (_, k) => [from + k, from + k + 1] as const)
+            : to > from
+              ? [[from, to] as const]
+              : []
+        for (const [a, b] of pieces)
           next = [
             ...next,
-            { tag: range.tag, from, to, start, id: nextId++, ...(reveal ? { reveal } : {}) },
+            {
+              tag: range.tag,
+              from: a,
+              to: b,
+              start,
+              duration: durations.get(range.tag)!,
+              id: nextId++,
+              ...(reveal ? { reveal } : {}),
+            },
           ]
       }
       added = true
     } else if (effect.is(finishAnimation)) {
       next = next.filter((r) => r.tag !== effect.value)
     } else if (effect.is(expireAnimations)) {
-      next = next.filter((r) => r.start + config.fadeMs > effect.value)
+      next = next.filter((r) => r.start + r.duration > effect.value)
     }
   }
-  if (!config.enabled && next.length > 0) return []
-  return added ? trim(next, config) : next
+  if (!config.enabled)
+    return next.length > 0 || rates.size > 0 ? { ranges: [], rates: new Map() } : value
+  if (added && next.length > config.maxRanges) next = cap(next, config, now())
+  return next === ranges && rates === value.rates ? value : { ranges: next, rates }
 }
 
-const appearing = StateField.define<readonly Appearing[]>({
-  create: () => [],
+const appearing = StateField.define<AppearState>({
+  create: () => ({ ranges: [], rates: new Map() }),
   update,
   provide: (field) =>
-    EditorView.decorations.from(field, (ranges): DecorationSet =>
+    EditorView.decorations.from(field, ({ ranges }): DecorationSet =>
       Decoration.set(
         ranges.map((r) =>
           Decoration.mark({
             class: 'cm-appear',
-            attributes: { 'data-appear': String(r.id) },
+            // invisible until the fade draws it, also when CodeMirror draws the span anew
+            attributes: { 'data-appear': String(r.id), style: HIDDEN },
           }).range(r.from, r.to),
         ),
         true,
@@ -216,37 +295,42 @@ const appearing = StateField.define<readonly Appearing[]>({
 })
 
 /**
- * Runs the fades as Web Animations. CodeMirror draws a line again when its decorations change,
- * which would restart a CSS animation; a new span gets an animation with the start time of its
- * range instead, so it goes on where the old one was. Only the drawn lines are looked at.
+ * Draws the fades (R4), in each frame while text fades: per character, not per piece. The alpha of
+ * a character goes in a straight line from the middle of its piece to the middle of the piece one
+ * behind or before it, so pieces one behind the other have no edges; the outer ends of a run keep
+ * the alpha of their piece. Done with a mask over each span, one step per character.
  */
 const animator = ViewPlugin.fromClass(
   class implements PluginValue {
-    private readonly started = new WeakSet<Element>()
     private timer: ReturnType<typeof setTimeout> | null = null
+    private frame = 0
 
     constructor(private readonly view: EditorView) {
       this.schedule()
     }
 
     update(update: ViewUpdate): void {
-      if (update.startState.field(appearing) !== update.state.field(appearing)) this.schedule()
+      if (update.startState.field(appearing).ranges !== update.state.field(appearing).ranges)
+        this.schedule()
       // any update can draw a line again (other decorations too): its new spans need the fade
-      else if (update.state.field(appearing).length > 0) this.requestAnimate()
+      else if (update.state.field(appearing).ranges.length > 0) this.requestDraw()
     }
 
-    private requestAnimate(): void {
-      this.view.requestMeasure({ key: this, read: () => null, write: () => this.animate() })
+    private requestDraw(): void {
+      this.view.requestMeasure({ key: this, read: () => null, write: () => this.draw() })
     }
 
     private schedule(): void {
-      const ranges = this.view.state.field(appearing)
+      const { ranges } = this.view.state.field(appearing)
       if (this.timer) clearTimeout(this.timer)
       this.timer = null
-      if (ranges.length === 0) return
-      this.requestAnimate()
-      const { fadeMs } = this.view.state.facet(appearanceConfig)
-      const end = Math.min(...ranges.map((r) => r.start + fadeMs))
+      if (ranges.length === 0) {
+        cancelAnimationFrame(this.frame)
+        this.frame = 0
+        return
+      }
+      this.requestDraw()
+      const end = Math.min(...ranges.map((r) => r.start + r.duration))
       this.timer = setTimeout(
         () => {
           this.timer = null
@@ -256,29 +340,70 @@ const animator = ViewPlugin.fromClass(
       )
     }
 
-    private animate(): void {
-      const ranges = this.view.state.field(appearing)
-      const starts = new Map(ranges.map((r) => [String(r.id), r.start]))
-      const { fadeMs } = this.view.state.facet(appearanceConfig)
-      for (const span of this.view.contentDOM.querySelectorAll<HTMLElement>('[data-appear]')) {
-        if (this.started.has(span) || typeof span.animate !== 'function') continue
-        const start = starts.get(span.dataset.appear ?? '')
-        if (start === undefined) continue
-        this.started.add(span)
-        const animation = span.animate([{ opacity: 0 }, { opacity: 1 }], {
-          duration: fadeMs,
-          easing: 'ease-out',
-          fill: 'backwards',
-        })
-        animation.startTime = start
+    /** Draws in every frame while text fades; draws asked for in between come on top. */
+    private loop = (): void => {
+      this.frame = 0
+      this.draw()
+    }
+
+    private draw(): void {
+      const { ranges } = this.view.state.field(appearing)
+      if (ranges.length === 0) return
+      const time = now()
+      const pieces = ranges.map((r) => ({
+        from: r.from,
+        to: r.to,
+        middle: (r.from + r.to) / 2,
+        alpha: pieceAlpha(r.start, time, r.duration),
+      }))
+      const byId = new Map(ranges.map((r, i) => [String(r.id), pieces[i]!]))
+      const before = new Map(pieces.map((p) => [p.from, p]))
+      const after = new Map(pieces.map((p) => [p.to, p]))
+      /** The alpha of the character whose middle is at `at`, in `piece`. */
+      const alphaAt = (piece: (typeof pieces)[number], at: number) => {
+        const other = at < piece.middle ? after.get(piece.from) : before.get(piece.to)
+        if (!other || other === piece) return piece.alpha
+        const k = (at - piece.middle) / (other.middle - piece.middle)
+        return piece.alpha + (other.alpha - piece.alpha) * Math.min(1, Math.max(0, k))
       }
+      for (const span of this.view.contentDOM.querySelectorAll<HTMLElement>('[data-appear]')) {
+        const piece = byId.get(span.dataset.appear ?? '')
+        if (!piece) continue
+        const length = span.textContent?.length ?? 0
+        // a span with all of its piece starts where the piece does; one split by other marks, ask
+        let from = piece.from
+        if (length !== piece.to - piece.from)
+          try {
+            from = this.view.posAtDOM(span, 0)
+          } catch {
+            continue
+          }
+        span.style.maskImage = mask(length, (k) => alphaAt(piece, from + k + 0.5))
+      }
+      if (!this.frame && ranges.some((r) => r.start + r.duration > time))
+        this.frame = requestAnimationFrame(this.loop)
     }
 
     destroy(): void {
       if (this.timer) clearTimeout(this.timer)
+      cancelAnimationFrame(this.frame)
     }
   },
 )
+
+/** A mask from left to right with the alpha of each of `length` characters, at most 64 steps. */
+function mask(length: number, alpha: (k: number) => number): string {
+  const steps = Math.max(1, Math.min(64, length))
+  const stops: string[] = []
+  for (let i = 0; i < steps; i++) {
+    const a = alpha(((i + 0.5) * length) / steps - 0.5).toFixed(3)
+    stops.push(
+      `rgba(0,0,0,${a}) ${(i / steps) * 100}%`,
+      `rgba(0,0,0,${a}) ${((i + 1) / steps) * 100}%`,
+    )
+  }
+  return `linear-gradient(to right, ${stops.join(', ')})`
+}
 
 /** Fading in text others write; `animateText` marks what fades. */
 export function appearance(config: Partial<AppearanceConfig> = {}): Extension {
@@ -313,8 +438,7 @@ export function appearance(config: Partial<AppearanceConfig> = {}): Extension {
  *   after a rest counts as 16 ms. When a chunk comes, `rate = max(rate, revealCharsPerSecond,
  *   hidden / revealMaxMs)`: no character waits longer than `revealMaxMs`. The rate never drops
  *   while text is hidden.
- * - R4: what a frame reveals fades in as one piece, in full: neither a new chunk nor the window of
- *   fades ends it.
+ * - R4: what a frame reveals fades in as one piece, in full: a new chunk does not end it.
  */
 
 interface Revealing {
@@ -634,20 +758,25 @@ const revealTheme = EditorView.baseTheme({
     textDecorationColor: 'transparent !important',
   },
   '.cm-unrevealed *': { visibility: 'hidden' },
+  // the closing gap of removed text (`GapWidget`)
+  '.cm-gap': { display: 'inline-block', height: '1px', verticalAlign: 'baseline' },
 })
 
 /** The ranges that fade right now, with the ids of their spans (`data-appear`). */
 export function appearingSpans(
   state: EditorState,
-): readonly { id: string; from: number; to: number }[] {
+): readonly { id: string; from: number; to: number; duration: number }[] {
   return (
-    state.field(appearing, false)?.map((r) => ({ id: String(r.id), from: r.from, to: r.to })) ?? []
+    state
+      .field(appearing, false)
+      ?.ranges.map((r) => ({ id: String(r.id), from: r.from, to: r.to, duration: r.duration })) ??
+    []
   )
 }
 
 /** The ranges that fade right now, for tests. */
 export function appearingRanges(state: EditorView['state']): readonly TaggedRange[] {
-  return state.field(appearing, false)?.map(({ tag, from, to }) => ({ tag, from, to })) ?? []
+  return state.field(appearing, false)?.ranges.map(({ tag, from, to }) => ({ tag, from, to })) ?? []
 }
 
 /*
@@ -660,22 +789,41 @@ export function appearingRanges(state: EditorView['state']): readonly TaggedRang
  * - An insert grows over `GROW_MS` with the ease-out of the carets; a chunk of an agent once, when
  *   it arrives (nothing moves while it is revealed).
  * - Typing: an insert of at most `TYPING_CHARS` characters right behind the one before of the same
- *   writer, at most `TYPING_WITHIN_MS` after it began, grows at an even speed for the time since
- *   then (between 32 ms and `TYPING_WITHIN_MS`).
+ *   writer, at most `TYPING_WITHIN_MS` after it, grows with the timing of the caret's typing steps
+ *   (`typingTiming`, R5b and R5c): for fast keys at an even speed for 1.5 times the time between
+ *   them, from a frame early, so that the text does not stand still for a frame at each key; for
+ *   slow keys in short ease-out steps; in between a blend.
  * - A growth that starts while others of the same writer run takes them along: they stop where they
  *   are and go on from there, with the new one's time and curve. So the edge moves on evenly.
  * - The caret of the writer, right behind its insert, is carried by the layout: it is drawn at the
  *   moving edge (`cursorGlide`), so the text behind it moves exactly with it.
  *
- * Never for local typing (only `animateText` and `revealText` mark text), nor for removals, and
- * under the settings of the fade.
+ * Removed text of others slides (R6): the characters go at once, and a gap of their width in their
+ * place closes over `GROW_MS` with the same ease-out, so the text after it moves on smoothly too.
+ * A backspace, a removal of at most `TYPING_CHARS` characters that ends where the writer typed
+ * last, within `TYPING_WITHIN_MS`, is typing backwards: it closes with the timing of typing and
+ * takes the growths and gaps of the writer along, as typing does, and an
+ * insert there right after it goes on typing. The writer's caret is right behind the gap and moves
+ * with it. Not for removals across lines (the lines below would jump anyway), nor long ones.
+ *
+ * Never for local changes (only `animateText`, `revealText` and `remoteChange` mark changes of
+ * others), and under the settings of the fade.
  */
 export const GROW_MS = 120
-/** Ease-out cubic, as the carets glide (`cursorGlide`). */
+/** Ease-out cubic, as the carets glide (`cursorGlide`), for browsers without CSS `linear()`. */
 const GROW_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)'
-const TYPING_CHARS = 3
-const TYPING_WITHIN_MS = 250
-const MIN_TYPING_MS = 32
+
+/** The easing of a growth: the way of `growProgress`. */
+function growEasing(crisp: number): string {
+  if (crisp <= 0) return 'linear'
+  const supported =
+    typeof CSS !== 'undefined' && CSS.supports?.('transition-timing-function', 'linear(0, 1)')
+  return supported ? typingEasing(crisp) : GROW_EASING
+}
+/** How long after its end a growth still carries the caret at its end (`growsUpTo`). */
+const CARRY_MS = 250
+/** Longer removals go at once: a gap wider than a line would wrap. */
+const MAX_GAP_CHARS = 80
 
 interface Growing {
   tag: string
@@ -683,23 +831,35 @@ interface Growing {
   to: number
   start: number
   duration: number
-  /** At an even speed (typing), else the ease-out. */
-  linear: boolean
-  /** The letter-spacing it starts from, in ch: -1 for new text, more for one taken along. */
+  /** Its way: `typingWay` with this, 0 for an even speed (fast typing), 1 for the ease-out. */
+  crisp: number
+  /**
+   * The letter-spacing it starts from, in ch: -1 for new text, more for one taken along. For a gap
+   * the width it starts from, in ch.
+   */
   spacing: number
+  /** The gap of removed text, at `from` (= `to`). */
+  gap?: boolean
   id: number
+}
+
+/** The newest key of a writer: where it ends, when it came, and the time between keys. */
+interface LastKey {
+  to: number
+  began: number
+  interval?: number
 }
 
 interface GrowState {
   ranges: readonly Growing[]
-  /** The newest insert of each writer: where it ends, and when it began to grow. */
-  last: ReadonlyMap<string, { to: number; began: number }>
+  /** The newest insert or backspace of each writer. */
+  last: ReadonlyMap<string, LastKey>
 }
 
 /** How far a growth is at `time`, from 0 to 1. */
 function growProgress(range: Growing, time: number): number {
   const t = Math.min(1, Math.max(0, (time - range.start) / range.duration))
-  return range.linear ? t : 1 - (1 - t) ** 3
+  return typingWay(t, range.crisp)
 }
 
 const expireGrowing = StateEffect.define<number>()
@@ -711,8 +871,13 @@ const growing = StateField.define<GrowState>({
     let last = value.last
     if (tr.docChanged && (ranges.length > 0 || last.size > 0)) {
       ranges = ranges
-        .map((r) => ({ ...r, from: tr.changes.mapPos(r.from, 1), to: tr.changes.mapPos(r.to, -1) }))
-        .filter((r) => r.to > r.from)
+        .map((r) => ({
+          ...r,
+          // a gap stays in front of what comes in at its place, as its widget
+          from: tr.changes.mapPos(r.from, r.gap ? -1 : 1),
+          to: tr.changes.mapPos(r.to, -1),
+        }))
+        .filter((r) => r.gap || r.to > r.from)
       last = new Map(
         [...last].map(([tag, l]) => [tag, { ...l, to: tr.changes.mapPos(l.to, -1) }] as const),
       )
@@ -724,53 +889,85 @@ const growing = StateField.define<GrowState>({
       (typeof document === 'undefined' || document.visibilityState !== 'hidden')
     if (!grows)
       return ranges.length === 0 && last.size === 0 ? value : { ranges: [], last: new Map() }
+    const time = now()
+    /** Starts a growth or gap; the running ones of its writer go on with it. */
+    const start = (range: Omit<Growing, 'id' | 'start'>, early: number) => {
+      // typed fast: a frame early, so that the text does not stand still for a frame at each key
+      const begin = time - early
+      // a removal of nobody known ('') takes nothing along
+      ranges = ranges.map((g) =>
+        range.tag !== '' && g.tag === range.tag && time < g.start + g.duration
+          ? {
+              ...g,
+              spacing: g.spacing * (1 - growProgress(g, time)),
+              start: begin,
+              duration: range.duration,
+              crisp: range.crisp,
+              id: nextId++,
+            }
+          : g,
+      )
+      ranges = [...ranges, { ...range, start: begin, id: nextId++ }]
+    }
+    /** Whether a change at `from` is typing on from the writer's last key `before`, and its timing. */
+    const typed = (before: LastKey | undefined, from: number, chars: number) => {
+      const typing =
+        chars <= TYPING_CHARS &&
+        !!before &&
+        before.to === from &&
+        time - before.began <= TYPING_WITHIN_MS
+      if (!typing) return { typing, interval: undefined, duration: GROW_MS, crisp: 1, early: 0 }
+      // the time between the keys, smoothed as the cursor's (cursorGlide, R5b)
+      const interval = smoothInterval(before!.interval, time - before!.began)
+      return { typing, interval, ...typingStep(interval) }
+    }
+    // removals of others slide; backspace by the old place of the writer's last key
+    if (tr.docChanged && tr.annotation(remoteChange)) {
+      const removals: { fromA: number; toA: number; at: number }[] = []
+      tr.changes.iterChanges((fromA, toA, fromB) => {
+        if (toA > fromA) removals.push({ fromA, toA, at: fromB })
+      })
+      for (const { fromA, toA, at } of removals) {
+        const chars = toA - fromA
+        if (chars > MAX_GAP_CHARS || tr.startState.doc.sliceString(fromA, toA).includes('\n'))
+          continue
+        // where the writer typed last, before this change
+        const writer = [...value.last].find(([, l]) => l.to === toA)?.[0]
+        const { typing, interval, duration, crisp, early } = typed(
+          writer === undefined ? undefined : value.last.get(writer),
+          toA,
+          chars,
+        )
+        const tag = typing ? writer! : ''
+        start({ tag, from: at, to: at, duration, crisp, spacing: chars, gap: true }, early)
+        if (typing)
+          last = new Map(last).set(tag, {
+            to: at,
+            began: time,
+            ...(interval === undefined ? {} : { interval }),
+          })
+      }
+    }
     for (const effect of tr.effects) {
       if (effect.is(expireGrowing))
-        ranges = ranges.filter((r) => r.start + r.duration > effect.value)
+        ranges = ranges.filter((r) => r.start + r.duration + CARRY_MS > effect.value)
       if (!tr.docChanged) continue
       const revealed = effect.is(revealText)
       if (!revealed && !effect.is(animateText)) continue
       const added = effect.value as readonly TaggedRange[]
       if (added.reduce((sum, r) => sum + r.to - r.from, 0) > config.revealMaxChars) continue
-      const time = now()
       for (const r of added) {
-        const before = last.get(r.tag)
-        const typing =
-          !revealed &&
-          r.to - r.from <= TYPING_CHARS &&
-          !!before &&
-          before.to === r.from &&
-          time - before.began <= TYPING_WITHIN_MS
-        const duration = typing
-          ? Math.min(TYPING_WITHIN_MS, Math.max(MIN_TYPING_MS, time - before!.began))
-          : GROW_MS
-        // the growths of this writer under way: on from where they are, with this one
-        ranges = ranges.map((g) =>
-          g.tag === r.tag && time < g.start + g.duration
-            ? {
-                ...g,
-                spacing: g.spacing * (1 - growProgress(g, time)),
-                start: time,
-                duration,
-                linear: typing,
-                id: nextId++,
-              }
-            : g,
-        )
-        ranges = [
-          ...ranges,
-          {
-            tag: r.tag,
-            from: r.from,
-            to: r.to,
-            start: time,
-            duration,
-            linear: typing,
-            spacing: -1,
-            id: nextId++,
-          },
-        ]
-        last = new Map(last).set(r.tag, { to: r.to, began: time })
+        // mapped through this change: a backspace in it moved it
+        const timing = revealed
+          ? typed(undefined, r.from, 0)
+          : typed(last.get(r.tag), r.from, r.to - r.from)
+        const { interval, duration, crisp, early } = timing
+        start({ tag: r.tag, from: r.from, to: r.to, duration, crisp, spacing: -1 }, early)
+        last = new Map(last).set(r.tag, {
+          to: r.to,
+          began: time,
+          ...(interval === undefined ? {} : { interval }),
+        })
       }
     }
     return ranges === value.ranges && last === value.last ? value : { ranges, last }
@@ -779,22 +976,50 @@ const growing = StateField.define<GrowState>({
     EditorView.decorations.from(field, ({ ranges }): DecorationSet =>
       Decoration.set(
         ranges.map((r) =>
-          Decoration.mark({ attributes: { 'data-grow': String(r.id) } }).range(r.from, r.to),
+          r.gap
+            ? // before the caret of the writer (`side: 1`), which it then carries along
+              Decoration.widget({ widget: new GapWidget(r), side: -1 }).range(r.from)
+            : Decoration.mark({ attributes: { 'data-grow': String(r.id) } }).range(r.from, r.to),
         ),
         true,
       ),
     ),
 })
 
+/** The closing gap of removed text, as wide as it is right now; the grower runs it. */
+class GapWidget extends WidgetType {
+  constructor(private readonly range: Growing) {
+    super()
+  }
+
+  override eq(other: GapWidget): boolean {
+    return other.range.id === this.range.id
+  }
+
+  toDOM(): HTMLElement {
+    const gap = document.createElement('span')
+    gap.className = 'cm-gap'
+    gap.dataset.grow = String(this.range.id)
+    gap.setAttribute('aria-hidden', 'true')
+    const width = this.range.spacing * (1 - growProgress(this.range, now()))
+    gap.style.width = `${Math.max(0, width)}ch`
+    return gap
+  }
+}
+
 /** The growths under way, for tests. */
 export function growthsForTests(state: EditorState): readonly Growing[] {
   return state.field(growing, false)?.ranges ?? []
 }
 
-/** Whether text that grows right now ends at `pos`: a caret there is carried by the layout. */
+/**
+ * Whether text that grows right now ends at `pos`: a caret there is carried by the layout. Also a
+ * while after: a browser under load may draw its next frame only once the growth is over, and the
+ * caret is then where the layout put it, not to glide there from where it was.
+ */
 export function growsUpTo(state: EditorState, pos: number, time = now()): boolean {
   return (state.field(growing, false)?.ranges ?? []).some(
-    (r) => r.to === pos && time < r.start + r.duration,
+    (r) => r.to === pos && time < r.start + r.duration + CARRY_MS,
   )
 }
 
@@ -824,7 +1049,7 @@ const grower = ViewPlugin.fromClass(
       this.timer = null
       if (ranges.length === 0) return
       this.requestAnimate()
-      const end = Math.min(...ranges.map((r) => r.start + r.duration))
+      const end = Math.min(...ranges.map((r) => r.start + r.duration + CARRY_MS))
       this.timer = setTimeout(
         () => {
           this.timer = null
@@ -843,11 +1068,12 @@ const grower = ViewPlugin.fromClass(
         const range = byId.get(id)
         if (!range) continue
         before?.animation.cancel()
+        const property = range.gap ? 'width' : 'letterSpacing'
         const animation = span.animate(
-          [{ letterSpacing: `${range.spacing}ch` }, { letterSpacing: '0ch' }],
+          [{ [property]: `${range.spacing}ch` }, { [property]: '0ch' }],
           {
             duration: range.duration,
-            easing: range.linear ? 'linear' : GROW_EASING,
+            easing: growEasing(range.crisp),
             fill: 'backwards',
           },
         )

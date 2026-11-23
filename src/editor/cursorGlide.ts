@@ -2,6 +2,14 @@ import { EditorView, ViewPlugin } from '@codemirror/view'
 import type { ViewUpdate } from '@codemirror/view'
 
 import { appearingSpans, fadesText, growsUpTo } from './appearance'
+import {
+  TYPING_CHARS,
+  TYPING_WITHIN_MS,
+  smoothInterval,
+  typingSpeed,
+  typingStep,
+  typingWay,
+} from './typingTiming'
 import { GONE, remoteSelections } from './remoteCursors'
 
 /**
@@ -25,11 +33,13 @@ import { GONE, remoteSelections } from './remoteCursors'
  * from a glide that ended at most `CONTINUE_MS` ago it starts in this frame, else one frame back,
  * so that it moves in its first frame. One move alone still takes `GLIDE_MS`.
  *
- * Typing (R5b): a step of at most `TYPING_CHARS` characters in its row, at most `TYPING_WITHIN_MS`
- * after the place before, glides at an even speed from where the cursor is drawn, for the time
- * since the place before (between `MIN_CATCH_UP_MS` and `TYPING_WITHIN_MS`). So the cursor of
- * somebody who types keeps moving between their keys instead of starting fast and stopping at
- * each ("pumping"); it ends about one key behind. At the head of a reveal it is a short glide.
+ * Typing (R5b, R5c): a step of at most `TYPING_CHARS` characters in its row, at most
+ * `TYPING_WITHIN_MS` after the place before, glides from where the cursor is drawn with the timing
+ * of `typingTiming`: for fast keys at an even speed, for 1.5 times the time between the steps
+ * (smoothed), and a frame early, so it moves in the frame it is drawn first; for slow keys a short
+ * ease-out step; in between a blend. So the cursor of somebody who types fast keeps moving between
+ * their keys instead of starting fast and stopping at each ("pumping"). At the head of a reveal it
+ * is a short glide.
  *
  * A caret right behind text of others that grows its space (`appearance`, R6b) does not glide: the
  * layout carries it at the moving edge, so the text behind it moves exactly with it.
@@ -51,8 +61,6 @@ export const MAX_SIDEWAYS = 3
 export const MIN_CATCH_UP_MS = 32
 export const CATCH_UP_WITHIN_MS = 90
 export const CONTINUE_MS = 20
-export const TYPING_CHARS = 3
-export const TYPING_WITHIN_MS = 250
 /** One frame, by which a catching-up glide from rest starts earlier: it moves in its first frame. */
 const FRAME_MS = 16
 
@@ -71,8 +79,12 @@ export interface Glide {
   /** Its speed at the start, in px per ms; that of the ease-out for a glide from rest. */
   vx: number
   vy: number
-  /** At an even speed, for typing; its start speed then does not count. */
-  linear?: boolean
+  /** A typing step: its way is `typingWay` with `crisp`; its start speed then does not count. */
+  typing?: boolean
+  /** Typing: 0 for an even step, 1 for the ease-out. */
+  crisp?: number
+  /** Typing: the time between the steps, smoothed. */
+  interval?: number
   /** Carried by the layout, behind growing text: drawn where it is, and on from there after. */
   riding?: boolean
 }
@@ -154,11 +166,10 @@ function glideFrom(
 export function glideSpeed(glide: Glide, time: number): { x: number; y: number } {
   const t = (time - glide.start) / glide.duration
   if (t < 0 || t >= 1) return { x: 0, y: 0 }
-  if (glide.linear)
-    return {
-      x: (glide.toX - glide.fromX) / glide.duration,
-      y: (glide.toY - glide.fromY) / glide.duration,
-    }
+  if (glide.typing) {
+    const v = typingSpeed(t, glide.crisp ?? 0) / glide.duration
+    return { x: (glide.toX - glide.fromX) * v, y: (glide.toY - glide.fromY) * v }
+  }
   // the derivatives of h00 and h10 by t
   const d00 = (6 * t ** 2 - 6 * t) / glide.duration
   const d10 = 3 * t ** 2 - 4 * t + 1
@@ -171,11 +182,13 @@ export function glideSpeed(glide: Glide, time: number): { x: number; y: number }
 /** Where a glide draws the cursor at `time`. */
 export function glidePosition(glide: Glide, time: number): { x: number; y: number } {
   const t = Math.min(1, Math.max(0, (time - glide.start) / glide.duration))
-  if (glide.linear)
+  if (glide.typing) {
+    const way = typingWay(t, glide.crisp ?? 0)
     return {
-      x: glide.fromX + (glide.toX - glide.fromX) * t,
-      y: glide.fromY + (glide.toY - glide.fromY) * t,
+      x: glide.fromX + (glide.toX - glide.fromX) * way,
+      y: glide.fromY + (glide.toY - glide.fromY) * way,
     }
+  }
   // how far it is from its place: d0 and the start speed, as Hermite says
   const a = h00(t)
   const b = h10(t) * glide.duration
@@ -238,18 +251,23 @@ function typingGlide(
   if (!glided || since > TYPING_WITHIN_MS || charWidth <= 0) return undefined
   if (Math.abs(to.y - before.toY) >= lineHeight / 2) return undefined
   if (Math.abs(to.x - before.toX) > TYPING_CHARS * charWidth + 0.5) return undefined
-  const duration = Math.min(TYPING_WITHIN_MS, Math.max(MIN_CATCH_UP_MS, since))
+  // the time between the steps, smoothed; the first step of a run takes it as it is
+  const interval = smoothInterval(before.typing ? before.interval : undefined, since)
+  const { duration, crisp, early } = typingStep(interval)
   return {
     fromX: shown.x,
     fromY: shown.y,
     toX: to.x,
     toY: to.y,
-    start: now,
+    // an even one a frame early: it moves in the frame it is drawn first
+    start: now - early,
     duration,
     set: now,
     vx: 0,
     vy: 0,
-    linear: true,
+    typing: true,
+    crisp,
+    interval,
   }
 }
 

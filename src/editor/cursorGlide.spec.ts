@@ -162,29 +162,47 @@ describe('typing', () => {
   const step = (before: Glide, x: number, time: number, y = 0) =>
     retarget(before, { x, y }, time, true, LINE, WIDTH, CHAR)
 
-  it('glides a step of up to 3 characters evenly, for the time since the place before', () => {
+  it('glides a step of up to 3 characters evenly, for 1.5 times the smoothed time between', () => {
     const first = step(still({ x: 0, y: 0 }, 0), 8, 1000)
     // the first step after a rest: the ease-out
     expect(first).toMatchObject({ duration: GLIDE_MS })
-    expect(first.linear).toBeUndefined()
-    const second = step(first, 16, 1150)
-    expect(second).toMatchObject({ linear: true, start: 1150, duration: 150 })
-    // from where it is drawn, at an even speed
-    expect(glidePosition(second, 1150).x).toBeCloseTo(glidePosition(first, 1150).x)
-    const from = glidePosition(second, 1150).x
-    expect(glidePosition(second, 1225).x).toBeCloseTo(from + (16 - from) / 2)
-    expect(glideSpeed(second, 1200).x).toBeCloseTo((16 - from) / 150)
-    // at least 32 ms, at most 250
-    expect(step(second, 24, 1160).duration).toBe(32)
+    expect(first.typing).toBeUndefined()
+    // the first typing step takes the time since the place before: 1.5 × 90 ms, a frame early
+    const second = step(first, 16, 1090)
+    expect(second).toMatchObject({ typing: true, crisp: 0, start: 1090 - 16, duration: 135 })
+    // from where it was drawn, on at an even speed
+    const from = glidePosition(first, 1090).x
+    expect(second.fromX).toBeCloseTo(from)
+    expect(glidePosition(second, 1090).x).toBeCloseTo(from + ((16 - from) * 16) / 135)
+    expect(glideSpeed(second, 1120).x).toBeCloseTo((16 - from) / 135)
+    // the next 60 ms later: the time between smoothed, 90 + 0.3 × (60 - 90)
+    const third = step(second, 24, 1150)
+    expect(third).toMatchObject({ interval: 81, duration: 121.5 })
+    // at least 32 ms
+    expect(step(first, 16, 1010).duration).toBe(32)
+  })
+
+  it('takes short ease-out steps for slow keys, and blends in between (R5c)', () => {
+    const first = step(still({ x: 0, y: 0 }, 0), 8, 1000)
+    // 240 ms between: 100 ms of the ease-out, from now
+    const slow = step(first, 16, 1240)
+    expect(slow).toMatchObject({ typing: true, crisp: 1, start: 1240, duration: 100 })
+    expect(glidePosition(slow, 1290).x).toBeCloseTo(slow.fromX + (16 - slow.fromX) * 0.875)
+    // 150 ms between: half of each, lerp(225, 100, 0.5) ms, half a frame early
+    const between = step(first, 16, 1150)
+    expect(between).toMatchObject({ crisp: 0.5, start: 1150 - 8, duration: 162.5 })
+    const t = 0.4
+    const way = (glidePosition(between, 1142 + t * 162.5).x - between.fromX) / (16 - between.fromX)
+    expect(way).toBeCloseTo(0.5 * t + 0.5 * (1 - (1 - t) ** 3))
   })
 
   it('keeps the rules of gliding for larger steps, other rows, and after a pause', () => {
     const first = step(still({ x: 0, y: 0 }, 0), 8, 1000)
-    expect(step(first, 8 + 4 * CHAR, 1100).linear).toBeUndefined()
-    expect(step(first, 8, 1100, LINE).linear).toBeUndefined()
-    expect(step(first, 16, 1300).linear).toBeUndefined()
+    expect(step(first, 8 + 4 * CHAR, 1100).typing).toBeUndefined()
+    expect(step(first, 8, 1100, LINE).typing).toBeUndefined()
+    expect(step(first, 16, 1300).typing).toBeUndefined()
     // without the width of a character: never
-    expect(retarget(first, { x: 16, y: 0 }, 1100, true, LINE, WIDTH).linear).toBeUndefined()
+    expect(retarget(first, { x: 16, y: 0 }, 1100, true, LINE, WIDTH).typing).toBeUndefined()
   })
 })
 
