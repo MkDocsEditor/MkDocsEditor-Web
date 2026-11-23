@@ -16,6 +16,12 @@ import { mountWithPlugins } from '@/test/mount'
 
 import SettingsView from './SettingsView.vue'
 
+const changelog = vi.hoisted(() => ({
+  commit: 'abc1234' as string | null,
+  changes: [{ number: 134, title: 'Follow agents', date: '2026-11-23' }],
+}))
+vi.mock('virtual:changelog', () => ({ default: changelog }))
+
 async function mount(section: string | undefined, role: 'admin' | 'reader' = 'admin') {
   const mock = createFetchMock({
     'GET /auth/status/': () => json(authStatus()),
@@ -136,9 +142,38 @@ describe('SettingsView', () => {
 
   it('shows the versions of the app and the server', async () => {
     const { wrapper } = await mount('about')
-    expect(el('about-version')!.textContent).toContain('dev')
+    expect(el('about-version')!.textContent).toContain('dev (abc1234)')
     expect(el('about-server-version')!.textContent).toContain('1.2.3 (protocol 6)')
     wrapper.unmount()
+  })
+
+  it('shows what is new in this build', async () => {
+    const { wrapper } = await mount('about')
+    el('about-version')!.click()
+    await flushPromises()
+    expect(el('changelog-version')!.textContent).toContain('Version dev (abc1234)')
+    const change = el('changelog-change')!
+    expect(change.textContent).toContain('Follow agents')
+    expect(change.textContent).toContain('#134 · 2026-11-23')
+    expect(change.getAttribute('href')).toBe(
+      'https://github.com/MkDocsEditor/MkDocsEditor-Web/pull/134',
+    )
+    wrapper.unmount()
+  })
+
+  it('says when nothing is known of the build', async () => {
+    const known = { ...changelog }
+    Object.assign(changelog, { commit: null, changes: [] })
+    try {
+      const { wrapper } = await mount('about')
+      expect(el('about-version')!.textContent).not.toContain('(')
+      el('about-version')!.click()
+      await flushPromises()
+      expect(el('changelog-dialog')!.textContent).toContain('No changes are known for this build.')
+      wrapper.unmount()
+    } finally {
+      Object.assign(changelog, known)
+    }
   })
 
   it('locks everything but the security until a second factor is set up', async () => {

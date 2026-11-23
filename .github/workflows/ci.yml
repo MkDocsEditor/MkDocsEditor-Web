@@ -69,6 +69,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # the changelog in the About screen lists the pull requests merged before this commit
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      # the image has no .git: the build bundles this file instead
+      - run: node scripts/changelog.ts > changelog.json
       - uses: docker/setup-buildx-action@v4
       - name: Build the image (no push)
         uses: docker/build-push-action@v7
@@ -92,6 +100,8 @@ jobs:
           # without MKDOCSEDITOR_ASSETLINKS_JSON there is no assetlinks.json
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/.well-known/assetlinks.json)" = "404"
           test "$(docker inspect --format '{{.Config.User}}' mkdocseditor-web:ci)" = "101"
+          # the changelog of the About screen names the built commit
+          docker exec web grep -rqF "$(git rev-parse --short=7 HEAD)" /usr/share/nginx/html/assets
           docker rm -f web
       - name: Smoke-test assetlinks.json
         run: |
