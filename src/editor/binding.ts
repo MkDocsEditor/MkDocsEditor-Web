@@ -3,7 +3,9 @@ import type { ChangeSpec, Extension } from '@codemirror/state'
 import { ViewPlugin } from '@codemirror/view'
 import type { EditorView, ViewUpdate } from '@codemirror/view'
 
-import type { DocumentSession, TextChange, TextSelection } from '@/sync/session'
+import type { DocumentSession, TextChange, TextSelection, WrittenRange } from '@/sync/session'
+
+import { animateText, fadesText } from './appearance'
 
 /** Marks transactions that come from the session, so they are not sent back. */
 const remoteChange = Annotation.define<boolean>()
@@ -52,14 +54,24 @@ export function sessionBinding(session: DocumentSession): Extension {
       private readonly unsubscribe: () => void
 
       constructor(private readonly view: EditorView) {
-        this.unsubscribe = session.onRemoteChanges((changes) => this.applyRemote(changes))
+        this.unsubscribe = session.onRemoteChanges((changes, written) =>
+          this.applyRemote(changes, written),
+        )
       }
 
-      private applyRemote(changes: readonly TextChange[]): void {
+      private applyRemote(
+        changes: readonly TextChange[],
+        written: () => readonly WrittenRange[],
+      ): void {
         if (changes.length === 0) return
+        // what others wrote fades in from the transaction that inserts it, never a frame later
+        const tagged = fadesText(this.view.state)
+          ? written().map(({ writer, from, to }) => ({ tag: writer, from, to }))
+          : []
         const apply = () =>
           this.view.dispatch({
             changes: toChangeSet(changes, this.view.state.doc.length),
+            effects: tagged.length > 0 ? animateText.of(tagged) : [],
             annotations: [remoteChange.of(true), Transaction.addToHistory.of(false)],
           })
         // Sessions must not call listeners from inside applyLocalChanges, but if a remote change

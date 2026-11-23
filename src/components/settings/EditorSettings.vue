@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { authorHighlight, lineNumbers, syncScroll } from '@/composables/preferences'
+import { authorHighlight, fadeIn, lineNumbers, syncScroll } from '@/composables/preferences'
 import type { AuthorHighlightMode } from '@/editor/authorship'
 
 const authorModes: { value: AuthorHighlightMode; title: string }[] = [
@@ -25,6 +25,13 @@ const authorModes: { value: AuthorHighlightMode; title: string }[] = [
         label="Sync scrolling in split view"
         messages="Scrolling the text or the preview scrolls the other one along."
         data-testid="setting-sync-scroll"
+      />
+      <v-switch
+        v-model="fadeIn"
+        color="primary"
+        label="Animate edits of others"
+        messages="Text that others and AI agents write fades in as it appears. Not when your system reduces motion."
+        data-testid="setting-fade-in"
       />
       <v-select
         v-model="authorHighlight"

@@ -49,6 +49,41 @@ test.describe('live collaboration', () => {
     })
   })
 
+  test('text of someone else fades in, own text does not', async ({ browser }, testInfo) => {
+    const id = await createDocument(testName('Einblenden', testInfo))
+    const alice = await userPage(browser, USERS.alice, testInfo.project.use)
+    const bob = await userPage(browser, USERS.bob, testInfo.project.use)
+    await openEditor(alice, id)
+    await openEditor(bob, id)
+    // every frame, the fading text on the page of Alice, for the next seconds
+    const watch = (page: typeof alice) =>
+      page.evaluate(
+        () =>
+          new Promise<string[]>((resolve) => {
+            const seen = new Set<string>()
+            const end = performance.now() + 4_000
+            const frame = () => {
+              for (const span of document.querySelectorAll<HTMLElement>('.cm-appear')) {
+                if (span.getAnimations().length > 0) seen.add(span.textContent ?? '')
+              }
+              if (performance.now() < end) requestAnimationFrame(frame)
+              else resolve([...seen])
+            }
+            requestAnimationFrame(frame)
+          }),
+      )
+    const fadedForAlice = watch(alice)
+    await typeAt(bob, 'end', 'Bob')
+    // both at the start of an empty page would be concurrent: their order is not fixed
+    await expect.poll(() => editorText(alice)).toBe('Bob')
+    await typeAt(alice, 'start', 'Alice ')
+    // typed key by key, so each letter fades on its own: all of Bob's, none of Alice's
+    const faded = (await fadedForAlice).join('')
+    for (const letter of 'Bob') expect(faded).toContain(letter)
+    expect(faded).toMatch(/^[Bob]+$/)
+    await expect.poll(() => editorText(alice)).toBe('Alice Bob')
+  })
+
   test('readers can watch but not edit', async ({ browser }, testInfo) => {
     const id = await createDocument(testName('Lesen', testInfo))
     const alice = await userPage(browser, USERS.alice, testInfo.project.use)

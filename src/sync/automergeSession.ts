@@ -16,8 +16,9 @@ import { rebaseChanges } from './rebase'
 import { CLOSE_DELETED, CLOSE_PROTOCOL_ERROR, CLOSE_REFUSED, CLOSE_RENAMED } from './socket'
 import type { SocketLike } from './socket'
 import { diffText } from './session'
-import type { DocumentSession, SessionMe, SessionStatus, TextChange } from './session'
+import type { DocumentSession, SessionMe, SessionStatus, TextChange, WrittenRange } from './session'
 import { createStoredCopy } from './storedCopy'
+import { patchesToChanges, writtenRanges } from './writtenRanges'
 
 /**
  * Live collaborative editing over the backend's document websocket, as specified in
@@ -82,21 +83,6 @@ const DELETED_MESSAGE =
 /** 16 random bytes as lower-case hex, the format of Automerge actor ids. */
 const randomActorId = randomHexId
 
-/** Converts Automerge patches on `content` to sequential TextChanges, or null if unexpected. */
-function patchesToChanges(patches: readonly Automerge.Patch[]): TextChange[] | null {
-  const changes: TextChange[] = []
-  for (const patch of patches) {
-    if (patch.path[0] !== 'content') continue
-    const index = patch.path[1]
-    if (patch.path.length !== 2 || typeof index !== 'number') return null
-    if (patch.action === 'splice') changes.push({ from: index, to: index, insert: patch.value })
-    else if (patch.action === 'del')
-      changes.push({ from: index, to: index + (patch.length ?? 1), insert: '' })
-    else return null
-  }
-  return changes
-}
-
 export function createAutomergeSession(options: AutomergeSessionOptions): DocumentSession {
   // Assigned in start(); every use happens after a document exists.
   let A!: AutomergeApi
@@ -105,7 +91,9 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
 
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
   const me = shallowRef<SessionMe | null>(null)
-  const listeners = new Set<(changes: readonly TextChange[]) => void>()
+  const listeners = new Set<
+    (changes: readonly TextChange[], written: () => readonly WrittenRange[]) => void
+  >()
 
   let doc: AmDoc | null = null
   let actorId = randomActorId()
@@ -205,9 +193,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (unsynced !== status.value.unsynced) setStatus({ unsynced })
   }
 
-  function emit(changes: readonly TextChange[]): void {
+  function emit(
+    changes: readonly TextChange[],
+    written: () => readonly WrittenRange[] = () => [],
+  ): void {
     if (changes.length === 0) return
-    for (const listener of listeners) listener(changes)
+    let known: readonly WrittenRange[] | null = null
+    const once = () => (known ??= written())
+    for (const listener of listeners) listener(changes, once)
   }
 
   function markReady(): void {
@@ -514,10 +507,11 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       const changes =
         patchesToChanges(A.diff(doc, beforeHeads, afterHeads)) ??
         diffText(before.content, doc.content)
+      const newChanges = A.getChanges(before, doc).map((change) => A.decodeChange(change))
       // colored at once when the new changes are all of one person; the server's answer follows
-      const actorIds = A.getChanges(before, doc).map((change) => A.decodeChange(change).actor)
-      authors.follow(changes, authors.authorOf(actorIds))
-      emit(changes)
+      authors.follow(changes, authors.authorOf(newChanges.map((change) => change.actor)))
+      const after = doc
+      emit(changes, () => writtenRanges(A, after, newChanges, changes))
       authors.publish()
       authors.scheduleRefetch()
       presence.resolve()

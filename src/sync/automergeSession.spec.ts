@@ -144,6 +144,25 @@ describe('Automerge session', () => {
     )
   })
 
+  it('says which text another writer inserted', async () => {
+    const server = new FakeSyncServer(A, 'Hallo')
+    const anna = client(server, 'anna')
+    const ben = client(server, 'ben')
+    await Promise.all([online(anna), online(ben)])
+    const seen: { text: string; writer: string }[] = []
+    anna.session.onRemoteChanges((_, written) =>
+      seen.push(
+        ...written().map((w) => ({
+          text: anna.session.getText().slice(w.from, w.to),
+          writer: w.writer,
+        })),
+      ),
+    )
+    ben.insert('end', ' Welt')
+    await vi.waitFor(() => expect(seen.map((s) => s.text)).toEqual([' Welt']))
+    expect(seen[0]!.writer).toMatch(/^[0-9a-f]{32}$/)
+  })
+
   it('emits precise changes for edits in different places', async () => {
     const server = new FakeSyncServer(A, 'eins zwei drei')
     const anna = client(server, 'anna')
