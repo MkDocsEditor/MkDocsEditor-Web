@@ -92,7 +92,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
   const status = ref<SessionStatus>({ connection: 'connecting', readOnly: true, unsynced: false })
   const me = shallowRef<SessionMe | null>(null)
   const listeners = new Set<
-    (changes: readonly TextChange[], written: readonly WrittenRange[]) => void
+    (changes: readonly TextChange[], written: () => readonly WrittenRange[]) => void
   >()
 
   let doc: AmDoc | null = null
@@ -193,9 +193,14 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     if (unsynced !== status.value.unsynced) setStatus({ unsynced })
   }
 
-  function emit(changes: readonly TextChange[], written: readonly WrittenRange[] = []): void {
+  function emit(
+    changes: readonly TextChange[],
+    written: () => readonly WrittenRange[] = () => [],
+  ): void {
     if (changes.length === 0) return
-    for (const listener of listeners) listener(changes, written)
+    let known: readonly WrittenRange[] | null = null
+    const once = () => (known ??= written())
+    for (const listener of listeners) listener(changes, once)
   }
 
   function markReady(): void {
@@ -505,7 +510,8 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
       const newChanges = A.getChanges(before, doc).map((change) => A.decodeChange(change))
       // colored at once when the new changes are all of one person; the server's answer follows
       authors.follow(changes, authors.authorOf(newChanges.map((change) => change.actor)))
-      emit(changes, writtenRanges(A, doc, newChanges, changes))
+      const after = doc
+      emit(changes, () => writtenRanges(A, after, newChanges, changes))
       authors.publish()
       authors.scheduleRefetch()
       presence.resolve()

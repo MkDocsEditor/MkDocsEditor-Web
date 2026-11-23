@@ -27,6 +27,15 @@ describe('appearance', () => {
     expect(appearingRanges(s)).toEqual([{ tag: 'ben', from: 9, to: 14 }])
   })
 
+  it('never fades what the person types into text that still fades', () => {
+    let s = written(state('Hallo'), 'ben', 5, ' Welt')
+    s = s.update({ changes: { from: 7, insert: 'x' } }).state
+    expect(appearingRanges(s)).toEqual([
+      { tag: 'ben', from: 5, to: 7 },
+      { tag: 'ben', from: 8, to: 11 },
+    ])
+  })
+
   it('is off by default', () => {
     const s = written(state('Hallo', {}), 'ben', 5, ' Welt')
     expect(appearingRanges(s)).toEqual([])

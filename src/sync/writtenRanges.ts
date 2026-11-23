@@ -3,6 +3,8 @@ import type { TextChange, WrittenRange } from './session'
 
 /** More new changes than this at once are a catch-up (after a reconnect), not live writing. */
 export const MAX_LIVE_CHANGES = 20
+/** With several writers each change costs a diff of its own: fewer of them. */
+export const MAX_MIXED_CHANGES = 8
 
 /** Where a position of the text before `change` is after it. */
 function mapPos(pos: number, change: TextChange, assoc: -1 | 1): number {
@@ -68,6 +70,7 @@ export function writtenRanges(
     const [writer] = writers
     return insertedRanges(changes).map((r) => ({ writer: writer!, ...r }))
   }
+  if (newChanges.length > MAX_MIXED_CHANGES) return []
   const ranges: WrittenRange[] = []
   for (const change of newChanges) {
     const own = patchesToChanges(A.diff(doc, change.deps, [change.hash]))
@@ -81,7 +84,11 @@ export function writtenRanges(
       const last = A.getCursor(at, ['content'], to - 1)
       const start = A.getCursorPosition(doc, ['content'], first)
       const end = A.getCursorPosition(doc, ['content'], last) + 1
-      if (end > start) ranges.push({ writer: change.actor, from: start, to: end })
+      // a deleted end resolves to the next character, which is older text: leave the range out
+      const kept = (cursor: string, at: number) =>
+        at >= 0 && at < doc.content.length && A.getCursor(doc, ['content'], at) === cursor
+      if (end > start && kept(first, start) && kept(last, end - 1))
+        ranges.push({ writer: change.actor, from: start, to: end })
     }
   }
   return ranges

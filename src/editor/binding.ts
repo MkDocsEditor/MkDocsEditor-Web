@@ -5,7 +5,7 @@ import type { EditorView, ViewUpdate } from '@codemirror/view'
 
 import type { DocumentSession, TextChange, TextSelection, WrittenRange } from '@/sync/session'
 
-import { animateText } from './appearance'
+import { animateText, fadesText } from './appearance'
 
 /** Marks transactions that come from the session, so they are not sent back. */
 const remoteChange = Annotation.define<boolean>()
@@ -59,10 +59,15 @@ export function sessionBinding(session: DocumentSession): Extension {
         )
       }
 
-      private applyRemote(changes: readonly TextChange[], written: readonly WrittenRange[]): void {
+      private applyRemote(
+        changes: readonly TextChange[],
+        written: () => readonly WrittenRange[],
+      ): void {
         if (changes.length === 0) return
         // what others wrote fades in from the transaction that inserts it, never a frame later
-        const tagged = written.map(({ writer, from, to }) => ({ tag: writer, from, to }))
+        const tagged = fadesText(this.view.state)
+          ? written().map(({ writer, from, to }) => ({ tag: writer, from, to }))
+          : []
         const apply = () =>
           this.view.dispatch({
             changes: toChangeSet(changes, this.view.state.doc.length),

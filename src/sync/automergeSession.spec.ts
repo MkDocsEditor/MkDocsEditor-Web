@@ -152,7 +152,7 @@ describe('Automerge session', () => {
     const seen: { text: string; writer: string }[] = []
     anna.session.onRemoteChanges((_, written) =>
       seen.push(
-        ...written.map((w) => ({
+        ...written().map((w) => ({
           text: anna.session.getText().slice(w.from, w.to),
           writer: w.writer,
         })),

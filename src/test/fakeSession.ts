@@ -18,7 +18,7 @@ import { applyChanges } from '@/sync/session'
 export function createFakeSession(initial = '', options: { readOnly?: boolean } = {}) {
   let text = initial
   const listeners = new Set<
-    (changes: readonly TextChange[], written: readonly WrittenRange[]) => void
+    (changes: readonly TextChange[], written: () => readonly WrittenRange[]) => void
   >()
   const localChanges: TextChange[][] = []
   const selections: TextSelection[][] = []
@@ -80,7 +80,7 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     /** Simulates an edit by another user; `written` is the text they inserted, by writer. */
     remote(changes: TextChange[], written: WrittenRange[] = []) {
       text = applyChanges(text, changes)
-      for (const listener of listeners) listener(changes, written)
+      for (const listener of listeners) listener(changes, () => written)
     },
   }
 }

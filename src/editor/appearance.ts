@@ -1,5 +1,5 @@
 import { Facet, StateEffect, StateField } from '@codemirror/state'
-import type { Extension, Transaction } from '@codemirror/state'
+import type { ChangeSet, EditorState, Extension, Transaction } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
 import type { DecorationSet, PluginValue, ViewUpdate } from '@codemirror/view'
 
@@ -64,6 +64,11 @@ export function reducedMotion(): boolean {
   )
 }
 
+/** Whether text that others write fades in this editor now: worth finding out what they wrote. */
+export function fadesText(state: EditorState): boolean {
+  return state.facet(appearanceConfig).enabled && !reducedMotion()
+}
+
 /** The clock of `document.timeline`, which Web Animations start times use. */
 const now = () => performance.now()
 
@@ -84,13 +89,32 @@ function trim(ranges: readonly Appearing[], config: AppearanceConfig): Appearing
   return kept.reverse()
 }
 
+/**
+ * Maps ranges through changes. Text inserted inside a range is not part of it: the range is
+ * split around it (else what the person types into fading text would fade too).
+ */
+function mapRanges(ranges: readonly Appearing[], changes: ChangeSet): Appearing[] {
+  const inserted: [number, number][] = []
+  changes.iterChanges((_fromA, _toA, fromB, toB) => {
+    if (toB > fromB) inserted.push([fromB, toB])
+  })
+  const mapped: Appearing[] = []
+  for (const range of ranges) {
+    let from = changes.mapPos(range.from, 1)
+    const to = changes.mapPos(range.to, -1)
+    for (const [insFrom, insTo] of inserted) {
+      if (insTo <= from || insFrom >= to) continue
+      if (insFrom > from) mapped.push({ ...range, from, to: insFrom })
+      from = Math.max(from, insTo)
+    }
+    if (to > from) mapped.push({ ...range, from, to })
+  }
+  return mapped
+}
+
 function update(ranges: readonly Appearing[], tr: Transaction): readonly Appearing[] {
   let next = ranges
-  if (tr.docChanged && next.length > 0) {
-    next = next
-      .map((r) => ({ ...r, from: tr.changes.mapPos(r.from, 1), to: tr.changes.mapPos(r.to, -1) }))
-      .filter((r) => r.to > r.from)
-  }
+  if (tr.docChanged && next.length > 0) next = mapRanges(next, tr.changes)
   const config = tr.state.facet(appearanceConfig)
   let added = false
   for (const effect of tr.effects) {
@@ -146,8 +170,13 @@ const animator = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate): void {
-      const changed = update.startState.field(appearing) !== update.state.field(appearing)
-      if (changed || update.docChanged || update.viewportChanged) this.schedule()
+      if (update.startState.field(appearing) !== update.state.field(appearing)) this.schedule()
+      // any update can draw a line again (other decorations too): its new spans need the fade
+      else if (update.state.field(appearing).length > 0) this.requestAnimate()
+    }
+
+    private requestAnimate(): void {
+      this.view.requestMeasure({ key: this, read: () => null, write: () => this.animate() })
     }
 
     private schedule(): void {
@@ -155,7 +184,7 @@ const animator = ViewPlugin.fromClass(
       if (this.timer) clearTimeout(this.timer)
       this.timer = null
       if (ranges.length === 0) return
-      this.view.requestMeasure({ read: () => null, write: () => this.animate() })
+      this.requestAnimate()
       const { fadeMs } = this.view.state.facet(appearanceConfig)
       const end = Math.min(...ranges.map((r) => r.start + fadeMs))
       this.timer = setTimeout(

@@ -90,6 +90,22 @@ describe('writtenRanges', () => {
     expect(byWriter).toEqual({ ['cc'.repeat(16)]: '😀 Anna ', [BEN]: ' Ben' })
   })
 
+  it('leaves out text a writer inserted and deleted again in the same sync', () => {
+    const base = A.from({ content: 'Hallo Welt' }, { actor: ANNA })
+    let ben = A.change(A.clone(base, { actor: BEN }), (d) => A.splice(d, ['content'], 5, 0, 'XY'))
+    ben = A.change(ben, (d) => A.splice(d, ['content'], 5, 2))
+    const cc = A.change(A.clone(base, { actor: 'cc'.repeat(16) }), (d) =>
+      A.splice(d, ['content'], 0, 0, 'Z'),
+    )
+    const doc = A.merge(A.merge(A.clone(base), ben), cc)
+    const { changes, newChanges } = arrived(base, doc)
+    const written = writtenRanges(A, doc, newChanges, changes)
+    // never the old space between the words
+    expect(written.map((w) => [w.writer, doc.content.slice(w.from, w.to)])).toEqual([
+      ['cc'.repeat(16), 'Z'],
+    ])
+  })
+
   it('marks nothing for a catch-up of many changes', () => {
     const base = A.from({ content: '' }, { actor: ANNA })
     let ben = A.clone(base, { actor: BEN })

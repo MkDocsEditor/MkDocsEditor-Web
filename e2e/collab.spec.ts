@@ -74,9 +74,13 @@ test.describe('live collaboration', () => {
       )
     const fadedForAlice = watch(alice)
     await typeAt(bob, 'end', 'Bob')
+    // both at the start of an empty page would be concurrent: their order is not fixed
+    await expect.poll(() => editorText(alice)).toBe('Bob')
     await typeAt(alice, 'start', 'Alice ')
-    expect((await fadedForAlice).join('')).toMatch(/[Bob]/)
-    expect((await fadedForAlice).join('')).not.toMatch(/[Alice]/)
+    // typed key by key, so each letter fades on its own: all of Bob's, none of Alice's
+    const faded = (await fadedForAlice).join('')
+    for (const letter of 'Bob') expect(faded).toContain(letter)
+    expect(faded).toMatch(/^[Bob]+$/)
     await expect.poll(() => editorText(alice)).toBe('Alice Bob')
   })
 

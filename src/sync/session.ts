@@ -156,12 +156,13 @@ export interface DocumentSession {
   /** Publishes the color of this instance; null goes back to the one of the account. */
   setLocalColor(color: string | null): void
   /**
-   * Subscribes to text changes made by others (or by a resync). `written` is the text the
-   * changes inserted, by writer, when it is known (live edits, not a resync or a catch-up).
-   * Returns an unsubscribe function.
+   * Subscribes to text changes made by others (or by a resync). `written` gives the text the
+   * changes inserted, by writer, when it is known (live edits, not a resync or a catch-up). It
+   * costs work with several writers, so it is a function: call it only when needed, and only
+   * inside the listener. Returns an unsubscribe function.
    */
   onRemoteChanges(
-    listener: (changes: readonly TextChange[], written: readonly WrittenRange[]) => void,
+    listener: (changes: readonly TextChange[], written: () => readonly WrittenRange[]) => void,
   ): () => void
   /** Closes the connection. Unsynced edits stay persisted by implementations that support it. */
   close(): void
