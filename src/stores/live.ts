@@ -7,6 +7,7 @@ import { connectEvents } from '@/sync/events'
 import type { EventsConnection, OnlineUser } from '@/sync/events'
 import { followMoves, rescueStoredCopies } from '@/sync/moves'
 import type { SocketLike } from '@/sync/socket'
+import { forgetViews, moveView } from '@/sync/viewMemory'
 
 import { useTreeStore } from './tree'
 
@@ -35,6 +36,7 @@ export const useLiveStore = defineStore('live', () => {
   }
 
   function itemsMoved(moves: MovedItem[]): void {
+    for (const move of moves) if (move.type === 'document') moveView(move.oldId, move.newId)
     void followMoves(moves)
     for (const listener of moveListeners) listener(moves)
   }
@@ -52,7 +54,11 @@ export const useLiveStore = defineStore('live', () => {
         reloadAgain = false
         await tree.load().catch(() => undefined)
       } while (reloadAgain)
-      if (tree.root) void rescueStoredCopies((id) => tree.get(id) !== undefined)
+      if (tree.root) {
+        void rescueStoredCopies((id) => tree.get(id) !== undefined)
+        // deleted documents; a move this client missed loses the view of its document
+        forgetViews((id) => tree.get(id) !== undefined)
+      }
     } finally {
       reloadRunning = false
     }

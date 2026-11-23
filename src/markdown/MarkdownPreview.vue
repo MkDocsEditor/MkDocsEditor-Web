@@ -188,12 +188,24 @@ function showAnchor(): void {
   if (top !== null) root.scrollTo({ top })
 }
 
+/** A place to scroll to once, when the whole text is rendered (`scrollToAnchor`). */
+let pendingAnchor: ScrollAnchor | null = null
+function applyPendingAnchor(): void {
+  const root = container.value
+  if (!pendingAnchor || !root || debounced.value !== props.text) return
+  const top = previewScrollTop(root, lastLine(), pendingAnchor)
+  if (top === null) return
+  pendingAnchor = null
+  root.scrollTo({ top })
+}
+
 watch(html, () =>
   nextTick(() => {
     // the image under the pointer was rendered again: the next pointer move finds the new one
     if (hoveredImage && !hoveredImage.isConnected) hideCopySvg()
     // the new text moved the blocks: the place of the editor is somewhere else now
     showAnchor()
+    applyPendingAnchor()
     measure()
   }),
 )
@@ -272,6 +284,11 @@ function applyFlash(): void {
 watch(html, () => nextTick(applyFlash))
 
 defineExpose({
+  /** Scrolls to a reading place, once the text is rendered. */
+  scrollToAnchor(anchor: ScrollAnchor): void {
+    pendingAnchor = anchor
+    void nextTick(applyPendingAnchor)
+  },
   /** Scrolls the first target to the top and highlights all for a moment, once rendered. */
   flashLines(targets: readonly ChangeTarget[]): void {
     if (targets.length === 0) return
