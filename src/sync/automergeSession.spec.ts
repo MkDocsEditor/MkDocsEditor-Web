@@ -48,11 +48,13 @@ function client(
     documentId?: string
     onRenamed?: (id: string) => void
     timing?: Partial<typeof timing>
+    features?: readonly string[]
   } = {},
 ) {
   const session = createAutomergeSession({
     documentId: options.documentId ?? server.documentId,
     onRenamed: options.onRenamed,
+    features: Promise.resolve(options.features ?? []),
     automerge: A,
     api: server.api(username),
     store,
@@ -322,6 +324,55 @@ describe('Automerge session', () => {
     )
     anna.session.close()
     await vi.waitFor(() => expect(ben.session.peers.value).toEqual([]))
+  })
+
+  it('tells a server with presence-indexes the position as code points at its heads', async () => {
+    const server = new FakeSyncServer(A, 'Grüße 😀 Welt')
+    const anna = client(server, 'anna', memoryStore(), { features: ['presence-indexes'] })
+    await online(anna)
+    const sent = () =>
+      server.connections
+        .find((c) => c.user.username === 'anna')!
+        .socket.sent.filter((m) => m.type === 'presence')
+        .at(-1)
+    // "Welt" selected, after the emoji of two UTF-16 units; the whole text on screen
+    anna.session.setLocalViewport({ top: 0, bottom: 12 })
+    anna.session.setLocalSelections([{ anchor: 9, head: 13 }])
+    await vi.waitFor(() =>
+      expect(sent()).toMatchObject({
+        at: {
+          revision: anna.session.sharedRevision(),
+          selections: [{ anchor: 8, head: 12 }],
+          viewport: { top: 0, bottom: 11 },
+        },
+      }),
+    )
+    // the whole position every time: the viewport is in it although only the cursor moved
+    anna.session.setLocalSelections([{ anchor: 13, head: 13 }])
+    await vi.waitFor(() =>
+      expect(sent()).toMatchObject({
+        at: { selections: [{ anchor: 12, head: 12 }], viewport: { top: 0, bottom: 11 } },
+      }),
+    )
+    // nothing of the page shown: no viewport, still the cursor
+    anna.session.setLocalViewport(null)
+    anna.session.setLocalSelections([])
+    await vi.waitFor(() =>
+      expect(sent()?.at).toEqual({ revision: expect.any(String), selections: [] }),
+    )
+  })
+
+  it('sends no indexes to a server without presence-indexes', async () => {
+    const server = new FakeSyncServer(A, 'Hallo')
+    const anna = client(server, 'anna')
+    await online(anna)
+    anna.session.setLocalSelections([{ anchor: 2, head: 2 }])
+    const sent = () =>
+      server.connections
+        .find((c) => c.user.username === 'anna')!
+        .socket.sent.filter((m) => m.type === 'presence')
+    await vi.waitFor(() => expect(sent().length).toBeGreaterThan(0))
+    expect(sent().every((m) => !('at' in m))).toBe(true)
   })
 
   it('is read-only for readers and never sends their text to others', async () => {
