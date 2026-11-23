@@ -194,8 +194,9 @@ describe('typing reveal', () => {
       effects: revealText.of([{ tag: 'agent', from: 7, to: 8 }]),
       annotations: remoteChange.of(true),
     })
-    // the rest of "Welt" shows; the new text is a chunk of its own
-    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 7, to: 8 }])
+    // all of it shows: the rest of "Welt", and the new text of the replace, which fades in
+    expect(hiddenRanges(view.state)).toEqual([])
+    expect(appearingRanges(view.state)).toContainEqual({ tag: 'agent', from: 7, to: 8 })
     view.destroy()
 
     // a chunk at the end plus a delete inside, in one transaction: the delete shows it

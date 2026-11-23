@@ -168,7 +168,11 @@ function update(ranges: readonly Appearing[], tr: Transaction): readonly Appeari
   const finished = finishedReveals(tr)
   if (finished === 'all' && next.some((r) => r.reveal)) next = next.filter((r) => !r.reveal)
   else if (finished !== 'all' && finished.size > 0) next = next.filter((r) => !finished.has(r.tag))
-  for (const effect of tr.effects) {
+  const replaced = config.enabled && !reducedMotion() ? splitChunks(tr).replaces : []
+  for (const effect of [
+    ...tr.effects,
+    ...(replaced.length > 0 ? [animateText.of(replaced)] : []),
+  ]) {
     if (effect.is(animateText) || effect.is(revealPiece)) {
       if (!config.enabled || reducedMotion()) continue
       const start = now()
@@ -298,7 +302,8 @@ export function appearance(config: Partial<AppearanceConfig> = {}): Extension {
  *   its space. The chunks of an agent wait in a queue, in the order they come. A chunk right at the
  *   end of the newest hidden chunk joins it, one inside hidden text joins that text; any other is
  *   a new entry at the end, also one right at the start of hidden text. A new chunk never shows
- *   what is hidden. Nobody types into hidden text: a change of the person here, anywhere, and a
+ *   what is hidden. Only inserts are typed out: the new text of a replace shows at once, and
+ *   fades in like the text of others. Nobody types into hidden text: a change of the person here, anywhere, and a
  *   change of anybody else inside the hidden text of a writer or right at its start or end, show
  *   all hidden text of that writer at once and end its fades (so does a click into it). Other
  *   changes move the hidden text.
@@ -347,6 +352,26 @@ export function revealsText(state: EditorState, chars: number): boolean {
     chars <= config.revealMaxChars &&
     (typeof document === 'undefined' || document.visibilityState !== 'hidden')
   )
+}
+
+/**
+ * The chunks of a live change split by the change they come from: only inserts are typed out, the
+ * new text of a replace shows at once (and fades in), as on Android.
+ */
+function splitChunks(tr: Transaction): { inserts: TaggedRange[]; replaces: TaggedRange[] } {
+  const inserts: TaggedRange[] = []
+  const replaces: TaggedRange[] = []
+  for (const effect of tr.effects) {
+    if (!effect.is(revealText)) continue
+    for (const chunk of effect.value) {
+      let replace = false
+      tr.changes.iterChanges((fromA, toA, fromB, toB) => {
+        if (fromA < toA && chunk.from >= fromB && chunk.to <= toB) replace = true
+      })
+      ;(replace ? replaces : inserts).push(chunk)
+    }
+  }
+  return { inserts, replaces }
 }
 
 /**
@@ -451,9 +476,11 @@ const revealing = StateField.define<readonly Revealing[]>({
       next = mapReveals(next, tr.changes)
     }
     const config = tr.state.facet(appearanceConfig)
+    if (fadesText(tr.state) && tr.effects.some((e) => e.is(revealText)))
+      next = enqueue(next, splitChunks(tr).inserts, config)
     for (const effect of tr.effects) {
       if (effect.is(revealText)) {
-        if (fadesText(tr.state)) next = enqueue(next, effect.value, config)
+        // queued above
       } else if (effect.is(finishReveal)) {
         next = next.filter((r) => r.tag !== effect.value)
       } else if (effect.is(advanceReveal)) {
