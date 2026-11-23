@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { GLIDE_MS, easeOut, glidePosition, glides, retarget } from './cursorGlide'
+import {
+  GLIDE_MS,
+  MIN_CATCH_UP_MS,
+  easeOut,
+  glidePosition,
+  glideTo,
+  glides,
+  retarget,
+  still,
+} from './cursorGlide'
 import { selectionRects } from './selectionGlide'
 
 const LINE = 20
@@ -24,7 +33,15 @@ describe('cursorGlide', () => {
   })
 
   it('eases out from where it is drawn to the new place', () => {
-    const glide = { fromX: 0, fromY: 0, toX: 100, toY: 20, start: 1000 }
+    const glide = {
+      fromX: 0,
+      fromY: 0,
+      toX: 100,
+      toY: 20,
+      start: 1000,
+      duration: GLIDE_MS,
+      set: 1000,
+    }
     expect(glidePosition(glide, 1000)).toEqual({ x: 0, y: 0 })
     const half = glidePosition(glide, 1000 + GLIDE_MS / 2)
     expect(half.x).toBeCloseTo(100 * easeOut(0.5))
@@ -36,15 +53,8 @@ describe('cursorGlide', () => {
 
 describe('retarget', () => {
   it('keeps a glide to the same place, and goes on from where it is drawn to a new one', () => {
-    const glide = retarget(
-      { fromX: 0, fromY: 0, toX: 0, toY: 0, start: 0 },
-      { x: 30, y: 0 },
-      1000,
-      true,
-      LINE,
-      WIDTH,
-    )
-    expect(glide).toMatchObject({ fromX: 0, toX: 30, start: 1000 })
+    const glide = retarget(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000, true, LINE, WIDTH)
+    expect(glide).toMatchObject({ fromX: 0, toX: 30, start: 1000, duration: GLIDE_MS })
     expect(retarget(glide, { x: 30.2, y: 0 }, 1050, true, LINE, WIDTH)).toBe(glide)
     const on = retarget(glide, { x: 60, y: 0 }, 1000 + GLIDE_MS / 2, true, LINE, WIDTH)
     expect(on.fromX).toBeCloseTo(30 * easeOut(0.5))
@@ -54,6 +64,53 @@ describe('retarget', () => {
       fromX: 60,
       toX: 60,
     })
+  })
+})
+
+describe('catching up', () => {
+  /** The cursor drawn `after` ms after each of `steps` moves of `step` px every `every` ms. */
+  function lags(step: number, every: number, steps: number, after: number): number[] {
+    let glide = still({ x: 0, y: 0 }, 0)
+    const lag: number[] = []
+    for (let i = 1; i <= steps; i++) {
+      const to = { x: i * step, y: 0 }
+      glide = retarget(glide, to, i * every, true, LINE, WIDTH)
+      lag.push(to.x - glidePosition(glide, i * every + after).x)
+    }
+    return lag
+  }
+
+  it('glides from rest as long as ever, from the next frame on', () => {
+    const glide = retarget(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000, true, LINE, WIDTH)
+    expect(glide).toMatchObject({ start: 1000, duration: GLIDE_MS })
+    expect(glidePosition(glide, 1000).x).toBe(0)
+  })
+
+  it('takes 1.5 times the time since the place before, from the frame it is drawn', () => {
+    const first = retarget(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000, true, LINE, WIDTH)
+    const next = retarget(first, { x: 60, y: 0 }, 1030, true, LINE, WIDTH)
+    // ends 45 ms after the new place, and moves at once
+    expect(next.start + next.duration).toBeCloseTo(1030 + 45)
+    expect(glidePosition(next, 1030).x).toBeGreaterThan(glidePosition(first, 1030).x)
+    // never quicker than the minimum, never slower than a glide from rest
+    const quick = retarget(first, { x: 60, y: 0 }, 1005, true, LINE, WIDTH)
+    expect(quick.start + quick.duration).toBeCloseTo(1005 + MIN_CATCH_UP_MS)
+    const slow = retarget(first, { x: 60, y: 0 }, 1100, true, LINE, WIDTH)
+    expect(slow.start + slow.duration).toBeCloseTo(1100 + GLIDE_MS)
+  })
+
+  it('keeps a cursor typed out quickly within about a character', () => {
+    // a reveal: 8 characters of 8 px every 30 ms; one frame after each step
+    const lag = lags(64, 30, 40, 1000 / 60).slice(5)
+    expect(Math.max(...lag)).toBeLessThan(1.5 * 8)
+    expect(lag.reduce((a, b) => a + b, 0) / lag.length).toBeLessThan(8)
+  })
+
+  it('lets the other end of a selection catch up alike', () => {
+    const first = glideTo(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000)
+    expect(first.duration).toBe(GLIDE_MS)
+    const next = glideTo(first, { x: 60, y: 0 }, 1030)
+    expect(next.start + next.duration).toBeCloseTo(1030 + 45)
   })
 })
 

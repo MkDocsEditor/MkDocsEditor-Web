@@ -15,6 +15,11 @@ import { GONE, remoteSelections } from './remoteCursors'
  * when only the layout changed (resize, fonts), when it moved less than half a pixel, when
  * "Animate edits of others" is off, when the system reduces motion and while the page is hidden.
  *
+ * A new place while it still glides (a reveal typing out, fast typing) catches up: that glide
+ * takes 1.5 times the time since the place before, between `MIN_CATCH_UP_MS` and `GLIDE_MS`, and
+ * starts in the frame it is drawn first, not one frame later. So a cursor moved in quick small
+ * steps stays within about a character of its place; one move alone still takes `GLIDE_MS`.
+ *
  * A cursor that appears just appears. One that goes away (its user left, or an agent took its
  * pointer away) fades out over `FADE_OUT_MS`, linearly, under the same settings; if it comes
  * back meanwhile it shows in full at once. The own cursor is CodeMirror's and never glides.
@@ -23,6 +28,9 @@ export const GLIDE_MS = 120
 export const FADE_OUT_MS = 200
 export const MAX_WIDTH = 0.4
 export const MAX_SIDEWAYS = 3
+export const MIN_CATCH_UP_MS = 32
+/** One frame, by which a catching-up glide starts earlier: it moves in the frame it is drawn. */
+const FRAME_MS = 1000 / 60
 
 /** Ease-out cubic: fast start, gentle stop. */
 export const easeOut = (t: number) => 1 - (1 - t) ** 3
@@ -33,11 +41,40 @@ export interface Glide {
   toX: number
   toY: number
   start: number
+  duration: number
+  /** When it got its place `to`. */
+  set: number
+}
+
+/** A cursor drawn at `to`, not moving. */
+export function still(to: { x: number; y: number }, now: number): Glide {
+  return {
+    fromX: to.x,
+    fromY: to.y,
+    toX: to.x,
+    toY: to.y,
+    start: now,
+    duration: GLIDE_MS,
+    set: now,
+  }
+}
+
+/** A glide from where `before` draws it now to `to`: a catch-up if `before` still moves. */
+function glideFrom(
+  before: Glide | undefined,
+  shown: { x: number; y: number },
+  to: { x: number; y: number },
+  now: number,
+): Glide {
+  const glide = { fromX: shown.x, fromY: shown.y, toX: to.x, toY: to.y, set: now }
+  if (!before || !moving(before, now)) return { ...glide, start: now, duration: GLIDE_MS }
+  const duration = Math.min(GLIDE_MS, Math.max(MIN_CATCH_UP_MS, 1.5 * (now - before.set)))
+  return { ...glide, start: now - FRAME_MS, duration: duration + FRAME_MS }
 }
 
 /** Where a glide draws the cursor at `time`. */
 export function glidePosition(glide: Glide, time: number): { x: number; y: number } {
-  const t = Math.min(1, Math.max(0, (time - glide.start) / GLIDE_MS))
+  const t = Math.min(1, Math.max(0, (time - glide.start) / glide.duration))
   const k = easeOut(t)
   return {
     x: glide.fromX + (glide.toX - glide.fromX) * k,
@@ -75,8 +112,8 @@ export function retarget(
     return before
   const shown = before && glidePosition(before, now)
   if (animate && shown && glides(shown, to, lineHeight, width))
-    return { fromX: shown.x, fromY: shown.y, toX: to.x, toY: to.y, start: now }
-  return { fromX: to.x, fromY: to.y, toX: to.x, toY: to.y, start: now }
+    return glideFrom(before, shown, to, now)
+  return still(to, now)
 }
 
 /** A glide to `to` from where `before` draws it now, however far; a snap without `before`. */
@@ -87,13 +124,14 @@ export function glideTo(
 ): Glide {
   if (before && Math.abs(before.toX - to.x) < 0.5 && Math.abs(before.toY - to.y) < 0.5)
     return before
-  const shown = before ? glidePosition(before, now) : to
-  return { fromX: shown.x, fromY: shown.y, toX: to.x, toY: to.y, start: now }
+  return before ? glideFrom(before, glidePosition(before, now), to, now) : still(to, now)
 }
 
 /** Whether a glide still moves at `time`. */
 export function moving(glide: Glide, time: number): boolean {
-  return (glide.fromX !== glide.toX || glide.fromY !== glide.toY) && time - glide.start < GLIDE_MS
+  return (
+    (glide.fromX !== glide.toX || glide.fromY !== glide.toY) && time - glide.start < glide.duration
+  )
 }
 
 /** Whether "Animate edits of others" applies now: on, no reduced motion, the page visible. */
