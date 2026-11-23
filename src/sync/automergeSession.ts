@@ -53,6 +53,8 @@ export interface AutomergeSessionOptions {
   onRenamed?: (newDocumentId: string) => void
   timing?: Partial<typeof DEFAULT_TIMING>
   clientName?: string
+  /** The features of the server, for `presence-indexes`; none without. */
+  features?: Promise<readonly string[]>
 }
 
 const DEFAULT_TIMING = {
@@ -170,7 +172,13 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     onUpgradeRefused: () => void checkDocumentExists(),
   })
   const send = connection.send
+  // the server takes positions as indexes too: until it is known, presence goes without them
+  let indexes = false
+  void options.features
+    ?.then((features) => (indexes = features.includes('presence-indexes')))
+    .catch(() => undefined)
   const presence = createPresence({
+    indexes: () => indexes,
     ownInstance: () => me.value?.instanceId,
     automerge: () => A,
     doc: () => doc,

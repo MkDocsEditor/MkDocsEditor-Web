@@ -35,6 +35,17 @@ export interface AgentInfo {
   focus?: AgentFocus
 }
 
+/**
+ * The own position as code point indexes at a revision (`at`, sync-protocol.md "Indexes"), for
+ * servers with `presence-indexes`: they cannot resolve cursors. Never relayed to other clients.
+ */
+export interface PresenceIndexes {
+  revision: string
+  selections: { anchor: number; head: number }[]
+  /** Inclusive; 0 and 0 for an empty text. Absent when the document is not shown. */
+  viewport?: { top: number; bottom: number }
+}
+
 export interface PresenceInfo {
   clientId: string
   /** The client instance, which stays across reconnects and reloads; absent on older servers. */

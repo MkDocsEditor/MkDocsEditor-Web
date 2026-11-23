@@ -1,6 +1,13 @@
 import { ref, shallowRef } from 'vue'
 
-import { WAIT_LIMIT_MS, clampedFocus, focusAnchors, resolveAnchors } from './agentFocus'
+import {
+  WAIT_LIMIT_MS,
+  clampedFocus,
+  codePointIndex,
+  focusAnchors,
+  resolveAnchors,
+  revisionOf,
+} from './agentFocus'
 import type { FocusAnchors } from './agentFocus'
 import { UNKNOWN_USER_COLOR } from './authors'
 import type { AmDoc, AutomergeApi } from './automerge'
@@ -9,6 +16,7 @@ import type {
   AgentInfo,
   GhostInfo,
   LastPosition,
+  PresenceIndexes,
   PresenceInfo,
   PresenceLeave,
   SendMessage,
@@ -73,6 +81,8 @@ export interface PresenceOptions {
   isSynced: () => boolean
   send: SendMessage
   presenceMs: number
+  /** The server takes the position as indexes too (`presence-indexes`): send `at` with it. */
+  indexes?: () => boolean
 }
 
 /**
@@ -240,6 +250,30 @@ export function createPresence(options: PresenceOptions) {
     })
   }
 
+  /**
+   * The whole position now, as code points of the current text at its heads: the selections and,
+   * if the document is shown, the viewport (not throttled like `viewport`: `at` is never "the
+   * same as before").
+   */
+  function indexes(): PresenceIndexes {
+    const content = text()
+    const at = (index: number) => codePointIndex(content, index)
+    const last = Math.max(0, content.length - 1)
+    const inside = (index: number) => Math.max(0, Math.min(last, index))
+    return {
+      revision: revisionOf(options.automerge().getHeads(options.doc()!)),
+      selections: pendingSelections.map((s) => ({ anchor: at(s.anchor), head: at(s.head) })),
+      ...(nextViewport
+        ? {
+            viewport: {
+              top: at(inside(nextViewport.top)),
+              bottom: at(inside(nextViewport.bottom)),
+            },
+          }
+        : {}),
+    }
+  }
+
   function send(): void {
     timer = null
     if (!options.doc() || !options.isSynced()) return
@@ -268,6 +302,7 @@ export function createPresence(options: PresenceOptions) {
             },
           }),
       ...(pendingColor === undefined ? {} : { instanceColor: pendingColor }),
+      ...(options.indexes?.() ? { at: indexes() } : {}),
     })
     pendingColor = undefined
   }

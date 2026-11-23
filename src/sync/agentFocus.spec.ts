@@ -1,6 +1,14 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { WAIT_LIMIT_MS, clampedFocus, focusAnchors, resolveAnchors, utf16Index } from './agentFocus'
+import {
+  WAIT_LIMIT_MS,
+  clampedFocus,
+  codePointIndex,
+  focusAnchors,
+  resolveAnchors,
+  revisionOf,
+  utf16Index,
+} from './agentFocus'
 import { loadAutomerge } from './automerge'
 import type { AmDoc, AutomergeApi } from './automerge'
 import { createPresence } from './presence'
@@ -11,11 +19,11 @@ beforeAll(async () => {
   A = await loadAutomerge()
 })
 
-const revisionOf = (doc: AmDoc) => [...A.getHeads(doc)].sort().join('.')
+const revisionAt = (doc: AmDoc) => revisionOf(A.getHeads(doc))
 
 /** Where a focus made at `doc` is in `later`. */
 function resolvedIn(doc: AmDoc, later: AmDoc, focus: Omit<AgentFocus, 'revision'>) {
-  const anchors = focusAnchors(A, later, { ...focus, revision: revisionOf(doc) })
+  const anchors = focusAnchors(A, later, { ...focus, revision: revisionAt(doc) })
   return anchors && resolveAnchors(A, later, anchors)
 }
 
@@ -64,7 +72,7 @@ describe('agent focus', () => {
   it('waits for a revision the document does not have', () => {
     const doc = A.from({ content: 'eins' })
     const ahead = A.change(A.clone(doc), (d) => A.splice(d, ['content'], 4, 0, ' zwei'))
-    expect(focusAnchors(A, doc, { revision: revisionOf(ahead), from: 0, to: 0 })).toBeNull()
+    expect(focusAnchors(A, doc, { revision: revisionAt(ahead), from: 0, to: 0 })).toBeNull()
   })
 
   it('clamps the indexes to the current text when the revision never comes', () => {
@@ -108,7 +116,7 @@ describe('presence of an agent with a focus', () => {
   it('keeps the ghost of an agent where its focus was', () => {
     const doc = A.from({ content: 'hello world' })
     const presence = setup(() => doc)
-    presence.update(agentOf({ revision: revisionOf(doc), from: 6, to: 11 }))
+    presence.update(agentOf({ revision: revisionAt(doc), from: 6, to: 11 }))
     presence.remove({
       clientId: 'agent-1',
       instanceId: 'agent-1',
@@ -122,7 +130,7 @@ describe('presence of an agent with a focus', () => {
   it('shows the agent at its focus, like the cursor of a person', () => {
     const doc = A.from({ content: 'hello world' })
     const presence = setup(() => doc)
-    presence.update(agentOf({ revision: revisionOf(doc), from: 6, to: 11 }))
+    presence.update(agentOf({ revision: revisionAt(doc), from: 6, to: 11 }))
     expect(presence.peers.value[0]).toMatchObject({ selections: [{ anchor: 6, head: 11 }] })
   })
 
@@ -131,7 +139,7 @@ describe('presence of an agent with a focus', () => {
     let doc = A.from({ content: 'eins' })
     const ahead = A.change(A.clone(doc), (d) => A.splice(d, ['content'], 0, 0, 'null '))
     const presence = setup(() => doc)
-    presence.update(agentOf({ revision: revisionOf(ahead), from: 0, to: 4 }))
+    presence.update(agentOf({ revision: revisionAt(ahead), from: 0, to: 4 }))
     expect(presence.peers.value[0]!.selections).toEqual([])
 
     // the change arrives: the focus is on "null"
@@ -141,10 +149,29 @@ describe('presence of an agent with a focus', () => {
 
     // a revision that never comes: after the wait limit, the indexes as they are
     const never = A.change(A.clone(ahead), (d) => A.splice(d, ['content'], 0, 0, '!'))
-    presence.update(agentOf({ revision: revisionOf(never), from: 5, to: 9 }))
+    presence.update(agentOf({ revision: revisionAt(never), from: 5, to: 9 }))
     expect(presence.peers.value[0]!.selections).toEqual([{ anchor: 0, head: 4 }])
     vi.advanceTimersByTime(WAIT_LIMIT_MS)
     expect(presence.peers.value[0]!.selections).toEqual([{ anchor: 5, head: 9 }])
     presence.stop()
+  })
+})
+
+describe('codePointIndex', () => {
+  it('counts a pair of UTF-16 units as one code point', () => {
+    const text = 'a😀b'
+    expect(codePointIndex(text, 0)).toBe(0)
+    expect(codePointIndex(text, 1)).toBe(1)
+    expect(codePointIndex(text, 3)).toBe(2)
+    expect(codePointIndex(text, 4)).toBe(3)
+    // beyond the end: the length
+    expect(codePointIndex(text, 99)).toBe(3)
+    // the inverse of utf16Index
+    expect(utf16Index(text, codePointIndex(text, 3))).toBe(3)
+  })
+
+  it('sorts heads into a revision', () => {
+    expect(revisionOf(['b', 'a'])).toBe('a.b')
+    expect(revisionOf([])).toBe('')
   })
 })

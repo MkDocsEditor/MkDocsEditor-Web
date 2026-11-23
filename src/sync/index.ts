@@ -1,4 +1,5 @@
 import { useApi } from '@/api'
+import { serverFeatures } from '@/services/serverFeatures'
 
 import { loadAutomerge } from './automerge'
 import { createAutomergeSession } from './automergeSession'
@@ -26,6 +27,7 @@ export function createDocumentSession(
     ...localCopies(),
     onRenamed: options.onRenamed,
     clientName: `MkDocsEditor-Web/${import.meta.env.VITE_APP_VERSION ?? 'dev'}`,
+    features: serverFeatures(),
   })
 }
 

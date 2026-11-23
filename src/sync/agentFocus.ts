@@ -15,6 +15,27 @@ export function utf16Index(text: string, codePoints: number): number {
   return index
 }
 
+/** The code point index of a UTF-16 index of `text`, for the server (which counts code points). */
+export function codePointIndex(text: string, utf16: number): number {
+  const end = Math.max(0, Math.min(text.length, utf16))
+  let points = 0
+  for (let i = 0; i < end; i++) {
+    const code = text.charCodeAt(i)
+    // the low half of a pair is the same code point as its high half
+    if (code >= 0xdc00 && code < 0xe000 && i > 0) {
+      const before = text.charCodeAt(i - 1)
+      if (before >= 0xd800 && before < 0xdc00) continue
+    }
+    points++
+  }
+  return points
+}
+
+/** The revision of heads: sorted, joined with '.', like the content API's ETag. */
+export function revisionOf(heads: readonly string[]): string {
+  return [...heads].sort().join('.')
+}
+
 /** The heads of a revision of the content API: sorted, joined with '.'. */
 export function headsOf(revision: string): string[] {
   return revision.split('.').filter(Boolean)
