@@ -8,7 +8,14 @@ import { createFakeSession } from '@/test/fakeSession'
 import { appearance, appearingRanges, hiddenRanges } from './appearance'
 import { authorship, authorshipDecorations, lineShares, setAuthorship } from './authorship'
 import { fromChangeSet, sessionBinding, toChangeSet } from './binding'
-import { peerDecorations, remoteCursors, setPeers, withAlpha } from './remoteCursors'
+import {
+  peerDecorations,
+  peerSelections,
+  remoteCursors,
+  remoteSelections,
+  setPeers,
+  withAlpha,
+} from './remoteCursors'
 
 function editor(initial: string) {
   const fake = createFakeSession(initial)
@@ -140,16 +147,31 @@ describe('remote cursors', () => {
     selections: [{ anchor: 2, head: 5 }],
   }
 
-  it('builds a selection mark and a labelled caret per peer', () => {
+  it('builds a labelled caret and a selection per peer', () => {
     const set = peerDecorations([peer], 10)
     const found: { from: number; to: number }[] = []
     set.between(0, 10, (from, to) => {
       found.push({ from, to })
     })
-    expect(found).toEqual([
-      { from: 2, to: 5 },
-      { from: 5, to: 5 },
+    expect(found).toEqual([{ from: 5, to: 5 }])
+    expect(peerSelections([peer], 10)).toEqual([
+      { key: '0 Anna', from: 2, to: 5, head: 5, color: '#1971c240' },
     ])
+  })
+
+  it('moves selections with edits: text typed at their edges stays out', () => {
+    const { view } = editor('Hallo Welt')
+    view.dispatch({ effects: setPeers.of([{ ...peer, selections: [{ anchor: 0, head: 5 }] }]) })
+    view.dispatch({
+      changes: [
+        { from: 0, insert: '>> ' },
+        { from: 5, insert: '!' },
+      ],
+    })
+    expect(view.state.field(remoteSelections)).toMatchObject([{ from: 3, to: 8 }])
+    view.dispatch({ changes: { from: 3, to: 8 } })
+    expect(view.state.field(remoteSelections)).toMatchObject([{ from: 3, to: 3 }])
+    view.destroy()
   })
 
   it('clamps positions beyond the document and renders the name', () => {

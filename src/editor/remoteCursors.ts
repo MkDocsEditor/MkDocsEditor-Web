@@ -9,6 +9,7 @@ import type { AvatarOwner } from '@/services/avatars'
 import { instanceName } from '@/sync/session'
 
 import { cursorGlide } from './cursorGlide'
+import { selectionGlide } from './selectionGlide'
 import type { Peer } from '@/sync/session'
 
 /** Replaces the shown peers (their selections are indices of the current document). */
@@ -20,6 +21,8 @@ export type ShownPeer = Pick<
   'username' | 'displayName' | 'color' | 'selections' | 'deviceName' | 'accountId' | 'avatar'
 > & {
   ghost?: boolean
+  /** The client instance: one that leaves stays the same cursor as its ghost. */
+  instanceId?: string
 }
 
 const GHOST_OPACITY = 0.4
@@ -122,44 +125,64 @@ export function withAlpha(color: string, alpha: number): string {
   return `${full}${a}`
 }
 
+/**
+ * Which cursor of whom: a caret and its selection share it, so that both can glide. By instance,
+ * so that someone who leaves stays the same cursor as a ghost (it only fades).
+ */
+function peerKey(peer: ShownPeer, index: number): string {
+  return `${index} ${peer.instanceId ?? instanceName(peer)}`
+}
+
+/** The carets of the peers, labelled with their names; the selections are `remoteSelections`. */
 export function peerDecorations(peers: readonly ShownPeer[], docLength: number): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const clamp = (n: number) => Math.max(0, Math.min(docLength, n))
   for (const peer of peers) {
     const name = instanceName(peer)
     for (const [index, selection] of peer.selections.entries()) {
-      const anchor = clamp(selection.anchor)
-      const head = clamp(selection.head)
-      const from = Math.min(anchor, head)
-      const to = Math.max(anchor, head)
-      if (from < to) {
-        ranges.push(
-          Decoration.mark({
-            class: 'cm-remote-selection',
-            attributes: {
-              style: `background-color: ${withAlpha(peer.color, peer.ghost ? 0.25 * GHOST_OPACITY : 0.25)}`,
-            },
-          }).range(from, to),
-        )
-      }
       ranges.push(
         Decoration.widget({
-          widget: new CursorWidget(
-            `${peer.ghost ? 'ghost' : 'peer'} ${index} ${name}`,
-            name,
-            peer.color,
-            !!peer.ghost,
-            {
-              accountId: peer.accountId,
-              avatar: peer.avatar,
-            },
-          ),
+          widget: new CursorWidget(peerKey(peer, index), name, peer.color, !!peer.ghost, {
+            accountId: peer.accountId,
+            avatar: peer.avatar,
+          }),
           side: 1,
-        }).range(head),
+        }).range(clamp(selection.head)),
       )
     }
   }
   return Decoration.set(ranges, true)
+}
+
+/** A selection of a peer, drawn behind the text (it can then glide). Empty for a bare caret. */
+export interface RemoteSelection {
+  key: string
+  from: number
+  to: number
+  /** Where the caret is: `from` or `to`. Its move decides whether the selection glides. */
+  head: number
+  /** The fill: the peer's colour, see-through. */
+  color: string
+}
+
+export function peerSelections(
+  peers: readonly ShownPeer[],
+  docLength: number,
+): readonly RemoteSelection[] {
+  const clamp = (n: number) => Math.max(0, Math.min(docLength, n))
+  return peers.flatMap((peer) =>
+    peer.selections.map((selection, index) => {
+      const anchor = clamp(selection.anchor)
+      const head = clamp(selection.head)
+      return {
+        key: peerKey(peer, index),
+        from: Math.min(anchor, head),
+        to: Math.max(anchor, head),
+        head,
+        color: withAlpha(peer.color, peer.ghost ? 0.25 * GHOST_OPACITY : 0.25),
+      }
+    }),
+  )
 }
 
 const peersField = StateField.define<DecorationSet>({
@@ -174,7 +197,26 @@ const peersField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 })
 
-const theme = EditorView.baseTheme({
+/** The selections of the peers, moved along with edits like the carets. */
+export const remoteSelections = StateField.define<readonly RemoteSelection[]>({
+  create: () => [],
+  update(selections, tr) {
+    let next = selections
+    if (!tr.changes.empty)
+      next = next.map((s) => {
+        const from = tr.changes.mapPos(s.from, 1)
+        const to = Math.max(from, tr.changes.mapPos(s.to, -1))
+        // the caret stays at its end of the selection
+        return { ...s, from, to, head: s.head === s.to ? to : from }
+      })
+    for (const effect of tr.effects) {
+      if (effect.is(setPeers)) next = peerSelections(effect.value, tr.state.doc.length)
+    }
+    return next
+  },
+})
+
+const caretStyles: Parameters<typeof EditorView.baseTheme>[0] = {
   // a box of its own, not inline: only boxes can be moved with a transform (gliding)
   '.cm-remote-caret': {
     position: 'relative',
@@ -229,9 +271,22 @@ const theme = EditorView.baseTheme({
     objectFit: 'cover',
     verticalAlign: '-0.2em',
   },
+}
+
+/** A caret that went away, while it fades out (`cursorGlide`): styled the same, but no caret. */
+export const GONE = 'cm-remote-gone'
+
+const theme = EditorView.baseTheme({
+  ...caretStyles,
+  ...Object.fromEntries(
+    Object.entries(caretStyles).map(([selector, style]) => [
+      selector.replace(/cm-remote-caret/g, GONE),
+      style,
+    ]),
+  ),
 })
 
-/** Shows the cursors and selections of other users, labelled with their names; cursors glide. */
+/** Shows the cursors and selections of other users, labelled with their names; both glide. */
 export function remoteCursors() {
-  return [peersField, theme, cursorGlide]
+  return [peersField, remoteSelections, theme, cursorGlide, selectionGlide]
 }
