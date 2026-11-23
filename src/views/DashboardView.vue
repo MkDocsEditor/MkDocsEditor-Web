@@ -386,6 +386,7 @@ function entryLink(entry: FeedEntry) {
 }
 
 /* the page as part of this one: no scrolling or padding of its own, and no title */
+.dashboard-view__index :deep(.markdown-preview-frame),
 .dashboard-view__index :deep(.markdown-preview) {
   height: auto;
   overflow: visible;
