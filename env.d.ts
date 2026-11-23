@@ -9,6 +9,15 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** The pull requests merged before this build (scripts/changelog.ts). */
+declare module 'virtual:changelog' {
+  const changelog: {
+    commit: string | null
+    changes: { number: number; title: string; date: string }[]
+  }
+  export default changelog
+}
 // Type declarations for markdown-it plugins without bundled types.
 
 declare module 'markdown-it-task-lists' {

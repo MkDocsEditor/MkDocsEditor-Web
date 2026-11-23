@@ -17,3 +17,6 @@ public/config.json
 dist-e2e
 dist-preview
 .claude/worktrees/
+
+# written by scripts/changelog.ts for the Docker build
+/changelog.json

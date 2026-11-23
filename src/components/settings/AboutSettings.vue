@@ -1,13 +1,20 @@
 <script setup lang="ts">
+import { mdiChevronRight } from '@mdi/js'
+import build from 'virtual:changelog'
 import { computed, onMounted, ref } from 'vue'
 
 import { useAuthApi } from '@/api'
 import type { ServerInfo } from '@/api'
+import ChangelogDialog from '@/components/settings/ChangelogDialog.vue'
 import { getConfig } from '@/config'
 import { OBTAINIUM_ADD_URL } from '@/services/connectLink'
 
 /** Versions and addresses, for bug reports and for connecting other clients. */
 const appVersion = import.meta.env.VITE_APP_VERSION ?? 'dev'
+/** With the commit of the build, so that the changelog can be matched to it: "dev (699a5bc)". */
+const versionLine = build.commit ? `${appVersion} (${build.commit})` : appVersion
+const changelogOpen = ref(false)
+const changes = build.changes
 const appConfig = getConfig()
 const server = ref<ServerInfo | null>(null)
 const unreachable = ref(false)
@@ -27,7 +34,13 @@ onMounted(async () => {
   <div class="d-flex flex-column ga-4" data-testid="settings-about">
     <v-card title="MkDocsEditor for the web">
       <v-list lines="two" bg-color="transparent">
-        <v-list-item title="Version" :subtitle="appVersion" data-testid="about-version" />
+        <v-list-item
+          title="Version"
+          :subtitle="versionLine"
+          :append-icon="mdiChevronRight"
+          data-testid="about-version"
+          @click="changelogOpen = true"
+        />
         <v-list-item
           title="Source code"
           subtitle="github.com/MkDocsEditor/MkDocsEditor-Web"
@@ -67,5 +80,6 @@ onMounted(async () => {
       </v-card-text>
       <v-progress-linear v-else indeterminate />
     </v-card>
+    <ChangelogDialog v-model="changelogOpen" :version="versionLine" :changes="changes" />
   </div>
 </template>

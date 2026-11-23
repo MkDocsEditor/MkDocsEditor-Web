@@ -13,6 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # the changelog in the About screen lists the pull requests merged before this commit
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      # the image has no .git: the build bundles this file instead
+      - run: node scripts/changelog.ts > changelog.json
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
