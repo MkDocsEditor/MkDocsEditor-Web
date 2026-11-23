@@ -15,10 +15,12 @@ import { GONE, remoteSelections } from './remoteCursors'
  * when only the layout changed (resize, fonts), when it moved less than half a pixel, when
  * "Animate edits of others" is off, when the system reduces motion and while the page is hidden.
  *
- * A new place while it still glides (a reveal typing out, fast typing) catches up: that glide
- * takes 1.5 times the time since the place before, between `MIN_CATCH_UP_MS` and `GLIDE_MS`, and
- * starts in the frame it is drawn first, not one frame later. So a cursor moved in quick small
- * steps stays within about a character of its place; one move alone still takes `GLIDE_MS`.
+ * A new place while it still glides, or within `CATCH_UP_WITHIN_MS` of a glide's place (a reveal
+ * typing out, fast typing; steps come unevenly), catches up: that glide takes 1.5 times the time
+ * since the place before, between `MIN_CATCH_UP_MS` and `GLIDE_MS`, and moves in the frame it is
+ * drawn first, not one frame later (after a glide that ended less than a frame ago, on from its
+ * end). So a cursor moved in quick small steps stays within a few characters of its place; one
+ * move alone still takes `GLIDE_MS`. The rule of KodeEditor, so that web and Android match.
  *
  * A cursor that appears just appears. One that goes away (its user left, or an agent took its
  * pointer away) fades out over `FADE_OUT_MS`, linearly, under the same settings; if it comes
@@ -29,6 +31,7 @@ export const FADE_OUT_MS = 200
 export const MAX_WIDTH = 0.4
 export const MAX_SIDEWAYS = 3
 export const MIN_CATCH_UP_MS = 32
+export const CATCH_UP_WITHIN_MS = 90
 /** One frame, by which a catching-up glide starts earlier: it moves in the frame it is drawn. */
 const FRAME_MS = 1000 / 60
 
@@ -67,9 +70,15 @@ function glideFrom(
   now: number,
 ): Glide {
   const glide = { fromX: shown.x, fromY: shown.y, toX: to.x, toY: to.y, set: now }
-  if (!before || !moving(before, now)) return { ...glide, start: now, duration: GLIDE_MS }
-  const duration = Math.min(GLIDE_MS, Math.max(MIN_CATCH_UP_MS, 1.5 * (now - before.set)))
-  return { ...glide, start: now - FRAME_MS, duration: duration + FRAME_MS }
+  const since = before ? now - before.set : Infinity
+  const glided = !!before && (before.fromX !== before.toX || before.fromY !== before.toY)
+  if (!before || !(moving(before, now) || (glided && since < CATCH_UP_WITHIN_MS)))
+    return { ...glide, start: now, duration: GLIDE_MS }
+  const duration = Math.min(GLIDE_MS, Math.max(MIN_CATCH_UP_MS, 1.5 * since))
+  // a frame early, but not before the glide before ended: it went on until then
+  const ended = before.start + before.duration
+  const start = ended <= now ? Math.max(now - FRAME_MS, ended) : now - FRAME_MS
+  return { ...glide, start, duration: now + duration - start }
 }
 
 /** Where a glide draws the cursor at `time`. */

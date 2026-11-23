@@ -99,6 +99,36 @@ describe('catching up', () => {
     expect(slow.start + slow.duration).toBeCloseTo(1100 + GLIDE_MS)
   })
 
+  it('catches up also when the glide before just ended, within 90 ms of its place', () => {
+    const first = retarget(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000, true, LINE, WIDTH)
+    const short = retarget(first, { x: 60, y: 0 }, 1030, true, LINE, WIDTH)
+    // ended at 1075; the next place at 1080
+    const late = retarget(short, { x: 90, y: 0 }, 1080, true, LINE, WIDTH)
+    // 1.5 × 50 ms since the place before
+    expect(late.start + late.duration).toBeCloseTo(1080 + 75)
+    // on from where the glide before ended, not a whole frame early
+    expect(late.start).toBeCloseTo(1075)
+    // longer than 90 ms: from rest
+    const rest = retarget(short, { x: 90, y: 0 }, 1125, true, LINE, WIDTH)
+    expect(rest).toMatchObject({ start: 1125, duration: GLIDE_MS })
+    // a snap is no glide to catch up with
+    const snap = retarget(still({ x: 0, y: 0 }, 1000), { x: 30, y: 0 }, 1030, true, LINE, WIDTH)
+    expect(snap).toMatchObject({ start: 1030, duration: GLIDE_MS })
+  })
+
+  it('keeps a cursor typed out unevenly close', () => {
+    // 8 characters of 8 px after 32 or 64 ms in turn; one frame after each step
+    let glide = still({ x: 0, y: 0 }, 0)
+    let time = 0
+    const lag: number[] = []
+    for (let i = 1; i <= 40; i++) {
+      time += i % 2 ? 32 : 64
+      glide = retarget(glide, { x: i * 64, y: 0 }, time, true, LINE, WIDTH)
+      lag.push(i * 64 - glidePosition(glide, time + 1000 / 60).x)
+    }
+    expect(lag.slice(5).reduce((a, b) => a + b, 0) / 35).toBeLessThan(3 * 8)
+  })
+
   it('keeps a cursor typed out quickly within about a character', () => {
     // a reveal: 8 characters of 8 px every 30 ms; one frame after each step
     const lag = lags(64, 30, 40, 1000 / 60).slice(5)
