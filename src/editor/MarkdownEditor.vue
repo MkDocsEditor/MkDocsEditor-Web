@@ -22,6 +22,7 @@ import type { DocumentSession } from '@/sync/session'
 import { authorship, setAuthorship } from './authorship'
 import type { AuthorHighlightMode } from './authorship'
 import { isLocalEdit, sessionBinding } from './binding'
+import { appearance } from './appearance'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { formattingKeymap } from './formatting'
 import type { FormatName } from './formatting'
@@ -44,6 +45,8 @@ const props = defineProps<{
   shown?: boolean
   /** Who wrote which lines and when, for the tooltip on the gutter; none without it. */
   loadBlame?: () => Promise<Blame | null>
+  /** Text others write fades in (not with the system setting for reduced motion). */
+  fadeIn?: boolean
 }>()
 const emit = defineEmits<{
   /** The reading place after a scroll or an edit, for scrolling the preview along. */
@@ -57,6 +60,7 @@ const emit = defineEmits<{
 const host = ref<HTMLElement | null>(null)
 const readOnly = new Compartment()
 const gutter = new Compartment()
+const fadeInSetting = new Compartment()
 let view: EditorView | null = null
 let viewportPublisher: ReturnType<typeof createViewportPublisher> | null = null
 
@@ -123,6 +127,7 @@ onMounted(() => {
       EditorView.contentAttributes.of({ 'aria-label': 'Markdown text', spellcheck: 'true' }),
       remoteCursors(),
       authorship(),
+      fadeInSetting.of(appearance({ enabled: !!props.fadeIn })),
       sessionBinding(props.session),
       props.loadBlame ? lineHistory(props.loadBlame) : [],
       props.upload ? fileUpload(props.upload) : [],
@@ -169,6 +174,11 @@ watch([() => props.session.authorship.value, () => props.authorHighlight], pushA
 watch(
   () => props.lineNumbers,
   (show) => view?.dispatch({ effects: gutter.reconfigure(show ? lineNumberGutter() : []) }),
+)
+watch(
+  () => props.fadeIn,
+  (enabled) =>
+    view?.dispatch({ effects: fadeInSetting.reconfigure(appearance({ enabled: !!enabled })) }),
 )
 watch(
   () => props.session.status.value.readOnly,

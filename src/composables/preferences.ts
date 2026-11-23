@@ -25,6 +25,9 @@ export const authorHighlight = useStored<AuthorHighlightMode>(
   'marker',
 )
 
+/** Text that others (people and AI agents) write fades in, in the editor. */
+export const fadeIn = useStored('mkdocseditor.fadeIn', true)
+
 /** Line numbers next to the text, on wide screens (phones never have room for them). */
 export const lineNumbers = useStored('mkdocseditor.lineNumbers', true)
 

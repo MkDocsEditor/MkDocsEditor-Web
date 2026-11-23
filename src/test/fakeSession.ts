@@ -10,13 +10,16 @@ import type {
   TextChange,
   TextRange,
   TextSelection,
+  WrittenRange,
 } from '@/sync/session'
 import { applyChanges } from '@/sync/session'
 
 /** An in-memory DocumentSession for tests. */
 export function createFakeSession(initial = '', options: { readOnly?: boolean } = {}) {
   let text = initial
-  const listeners = new Set<(changes: readonly TextChange[]) => void>()
+  const listeners = new Set<
+    (changes: readonly TextChange[], written: readonly WrittenRange[]) => void
+  >()
   const localChanges: TextChange[][] = []
   const selections: TextSelection[][] = []
   const viewports: (TextRange | null)[] = []
@@ -74,10 +77,10 @@ export function createFakeSession(initial = '', options: { readOnly?: boolean } 
     get text() {
       return text
     },
-    /** Simulates an edit by another user. */
-    remote(changes: TextChange[]) {
+    /** Simulates an edit by another user; `written` is the text they inserted, by writer. */
+    remote(changes: TextChange[], written: WrittenRange[] = []) {
       text = applyChanges(text, changes)
-      for (const listener of listeners) listener(changes)
+      for (const listener of listeners) listener(changes, written)
     },
   }
 }

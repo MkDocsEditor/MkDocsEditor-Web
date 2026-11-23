@@ -17,6 +17,16 @@ export interface TextChange {
   insert: string
 }
 
+/**
+ * Text another writer just inserted, in the text after the changes it came with. `writer` is the
+ * Automerge actor id of the person's or agent's copy.
+ */
+export interface WrittenRange {
+  writer: string
+  from: number
+  to: number
+}
+
 export interface TextSelection {
   anchor: number
   head: number
@@ -145,8 +155,14 @@ export interface DocumentSession {
   setLocalViewport(viewport: TextRange | null): void
   /** Publishes the color of this instance; null goes back to the one of the account. */
   setLocalColor(color: string | null): void
-  /** Subscribes to text changes made by others (or by a resync). Returns an unsubscribe function. */
-  onRemoteChanges(listener: (changes: readonly TextChange[]) => void): () => void
+  /**
+   * Subscribes to text changes made by others (or by a resync). `written` is the text the
+   * changes inserted, by writer, when it is known (live edits, not a resync or a catch-up).
+   * Returns an unsubscribe function.
+   */
+  onRemoteChanges(
+    listener: (changes: readonly TextChange[], written: readonly WrittenRange[]) => void,
+  ): () => void
   /** Closes the connection. Unsynced edits stay persisted by implementations that support it. */
   close(): void
 }

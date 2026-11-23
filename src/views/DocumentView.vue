@@ -47,7 +47,7 @@ import { isImage, resourceKind } from '@/services/icons'
 import { copyText } from '@/services/clipboard'
 import { joinLink } from '@/services/join'
 import { linkDestination } from '@/services/linkPath'
-import { authorHighlight, lineNumbers, syncScroll } from '@/composables/preferences'
+import { authorHighlight, fadeIn, lineNumbers, syncScroll } from '@/composables/preferences'
 import { useDebounced } from '@/composables/useDebounced'
 import { useStored } from '@/composables/useStored'
 import { instanceColor, instanceId } from '@/sync/instance'
@@ -699,6 +699,7 @@ async function share(): Promise<void> {
           class="document-view__editor"
           :session="session"
           :author-highlight="authorHighlight"
+          :fade-in="fadeIn"
           :upload="upload"
           :line-numbers="!mobile && lineNumbers"
           :format-override="shortcutOverride"

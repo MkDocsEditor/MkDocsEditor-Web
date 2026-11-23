@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { applyChanges, diffText } from '@/sync/session'
 import { createFakeSession } from '@/test/fakeSession'
 
+import { appearance, appearingRanges } from './appearance'
 import { authorship, authorshipDecorations, lineShares, setAuthorship } from './authorship'
 import { fromChangeSet, sessionBinding, toChangeSet } from './binding'
 import { peerDecorations, remoteCursors, setPeers, withAlpha } from './remoteCursors'
@@ -14,7 +15,12 @@ function editor(initial: string) {
   const view = new EditorView({
     state: EditorState.create({
       doc: fake.session.getText(),
-      extensions: [sessionBinding(fake.session), remoteCursors(), authorship()],
+      extensions: [
+        sessionBinding(fake.session),
+        remoteCursors(),
+        authorship(),
+        appearance({ enabled: true }),
+      ],
     }),
     parent: document.body,
   })
@@ -69,6 +75,19 @@ describe('sessionBinding', () => {
     expect(view.state.doc.toString()).toBe('Oh, Hallo Welt')
     expect(view.state.selection.main.head).toBe(14)
     expect(fake.localChanges).toEqual([])
+    view.destroy()
+  })
+
+  it('lets the text of others fade in, from the transaction that inserts it', () => {
+    const { fake, view } = editor('Hallo')
+    fake.remote([{ from: 5, to: 5, insert: ' Welt' }], [{ writer: 'ben', from: 5, to: 10 }])
+    expect(appearingRanges(view.state)).toEqual([{ tag: 'ben', from: 5, to: 10 }])
+    // a resync or a change without writers fades nothing
+    fake.remote([{ from: 0, to: 0, insert: '>' }])
+    expect(appearingRanges(view.state)).toEqual([{ tag: 'ben', from: 6, to: 11 }])
+    // what the person types never fades
+    view.dispatch({ changes: { from: 0, insert: 'Ich' } })
+    expect(appearingRanges(view.state)).toEqual([{ tag: 'ben', from: 9, to: 14 }])
     view.destroy()
   })
 
