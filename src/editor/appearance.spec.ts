@@ -9,6 +9,7 @@ import {
   appearingRanges,
   finishAnimation,
   finishReveal,
+  growingRanges,
   hiddenRanges,
   revealHeads,
   revealText,
@@ -213,6 +214,57 @@ describe('typing reveal', () => {
     const view = editor('', { enabled: true, revealMaxChars: 100 })
     expect(revealsText(view.state, 100)).toBe(true)
     expect(revealsText(view.state, 101)).toBe(false)
+    view.destroy()
+  })
+
+  it('grows the space of a remote insert of several characters, and of every agent change', () => {
+    let s = written(state('Hallo'), 'ben', 5, ' Welt')
+    expect(growingRanges(s)).toEqual([{ from: 5, to: 10 }])
+    // one typed character: it just appears
+    s = written(s, 'ben', 10, '!')
+    expect(growingRanges(s)).toEqual([{ from: 5, to: 10 }])
+    // a live agent change grows however short
+    s = s.update({
+      changes: { from: 0, insert: 'Oh' },
+      effects: revealText.of([{ tag: 'agent', from: 0, to: 2 }]),
+    }).state
+    expect(growingRanges(s)).toEqual([
+      { from: 7, to: 12 },
+      { from: 0, to: 2 },
+    ])
+  })
+
+  it('grows nothing typed here, nor with the setting off or reduced motion', () => {
+    expect(
+      growingRanges(state('Hallo').update({ changes: { from: 0, insert: 'Lokal ' } }).state),
+    ).toEqual([])
+    expect(growingRanges(written(state('Hallo', {}), 'ben', 5, ' Welt'))).toEqual([])
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+    }))
+    expect(growingRanges(written(state('Hallo'), 'ben', 5, ' Welt'))).toEqual([])
+  })
+
+  it('animates the space of the inserted text in the editor', async () => {
+    const animate = vi.fn(() => ({ startTime: 0 }) as unknown as Animation)
+    HTMLElement.prototype.animate = animate
+    const view = new EditorView({ state: state('Hallo'), parent: document.body })
+    view.dispatch({
+      changes: { from: 5, insert: ' Welt' },
+      effects: animateText.of([{ tag: 'ben', from: 5, to: 10 }]),
+    })
+    // on CodeMirror's next measure
+    await vi.waitFor(() =>
+      expect(animate).toHaveBeenCalledWith(
+        [{ letterSpacing: '-1ch' }, { letterSpacing: '0ch' }],
+        expect.objectContaining({ duration: 120 }),
+      ),
+    )
     view.destroy()
   })
 })
