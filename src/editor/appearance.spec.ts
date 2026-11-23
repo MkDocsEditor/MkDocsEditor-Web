@@ -185,6 +185,34 @@ describe('typing reveal', () => {
     }
   })
 
+  it('judges each change of a live change on its own: a replace in hidden text shows it', () => {
+    const view = editor('Hallo ')
+    agentWrites(view, 6, 'Welt')
+    // the agent replaces a hidden character: not an insert, so not its own
+    view.dispatch({
+      changes: { from: 7, to: 8, insert: 'E' },
+      effects: revealText.of([{ tag: 'agent', from: 7, to: 8 }]),
+      annotations: remoteChange.of(true),
+    })
+    // the rest of "Welt" shows; the new text is a chunk of its own
+    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 7, to: 8 }])
+    view.destroy()
+
+    // a chunk at the end plus a delete inside, in one transaction: the delete shows it
+    const other = editor('Hallo ')
+    agentWrites(other, 6, 'Welt')
+    other.dispatch({
+      changes: [
+        { from: 7, to: 8 },
+        { from: 10, insert: ' heute' },
+      ],
+      effects: revealText.of([{ tag: 'agent', from: 9, to: 15 }]),
+      annotations: remoteChange.of(true),
+    })
+    expect(hiddenRanges(other.state)).toEqual([{ tag: 'agent', from: 9, to: 15 }])
+    other.destroy()
+  })
+
   it('moves hidden text with changes of others elsewhere', () => {
     const view = editor('Hallo ')
     agentWrites(view, 6, 'Welt')

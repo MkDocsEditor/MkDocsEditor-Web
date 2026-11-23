@@ -352,7 +352,7 @@ export function revealsText(state: EditorState, chars: number): boolean {
 /**
  * The writers whose reveals a transaction shows at once (R1): all of them for a change of the
  * person here; else those whose hidden text a change of anybody else touches, inside or at an
- * edge. A change that inserts a chunk of the writer's own is not one of anybody else.
+ * edge. Each change on its own: only one that inserts a chunk of the writer (no replace) is its own.
  */
 function finishedReveals(tr: Transaction): Set<string> | 'all' {
   if (isUserEdit(tr)) return 'all'
@@ -361,8 +361,11 @@ function finishedReveals(tr: Transaction): Set<string> | 'all' {
   if (!tr.docChanged || before.length === 0) return finished
   const chunks = tr.effects.flatMap((e) => (e.is(revealText) ? e.value : []))
   tr.changes.iterChanges((fromA, toA, fromB, toB) => {
+    // only an insert of a chunk is the writer's own; a replace is not, as in KodeEditor
     const owners = new Set(
-      chunks.filter((c) => c.from >= fromB && c.to <= toB && toB > fromB).map((c) => c.tag),
+      fromA === toA
+        ? chunks.filter((c) => c.from >= fromB && c.to <= toB && toB > fromB).map((c) => c.tag)
+        : [],
     )
     for (const range of before)
       if (fromA <= range.to && toA >= range.hiddenFrom && !owners.has(range.tag))
