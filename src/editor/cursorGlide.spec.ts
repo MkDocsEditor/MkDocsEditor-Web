@@ -11,6 +11,7 @@ import {
   retarget,
   still,
 } from './cursorGlide'
+import type { Glide } from './cursorGlide'
 import { selectionRects } from './selectionGlide'
 
 const LINE = 20
@@ -153,6 +154,37 @@ describe('catching up', () => {
     const first = glideTo(still({ x: 0, y: 0 }, 0), { x: 30, y: 0 }, 1000)
     expect(first.duration).toBe(GLIDE_MS)
     expect(glideTo(first, { x: 60, y: 0 }, 1030).duration).toBe(45)
+  })
+})
+
+describe('typing', () => {
+  const CHAR = 8
+  const step = (before: Glide, x: number, time: number, y = 0) =>
+    retarget(before, { x, y }, time, true, LINE, WIDTH, CHAR)
+
+  it('glides a step of up to 3 characters evenly, for the time since the place before', () => {
+    const first = step(still({ x: 0, y: 0 }, 0), 8, 1000)
+    // the first step after a rest: the ease-out
+    expect(first).toMatchObject({ duration: GLIDE_MS })
+    expect(first.linear).toBeUndefined()
+    const second = step(first, 16, 1150)
+    expect(second).toMatchObject({ linear: true, start: 1150, duration: 150 })
+    // from where it is drawn, at an even speed
+    expect(glidePosition(second, 1150).x).toBeCloseTo(glidePosition(first, 1150).x)
+    const from = glidePosition(second, 1150).x
+    expect(glidePosition(second, 1225).x).toBeCloseTo(from + (16 - from) / 2)
+    expect(glideSpeed(second, 1200).x).toBeCloseTo((16 - from) / 150)
+    // at least 32 ms, at most 250
+    expect(step(second, 24, 1160).duration).toBe(32)
+  })
+
+  it('keeps the rules of gliding for larger steps, other rows, and after a pause', () => {
+    const first = step(still({ x: 0, y: 0 }, 0), 8, 1000)
+    expect(step(first, 8 + 4 * CHAR, 1100).linear).toBeUndefined()
+    expect(step(first, 8, 1100, LINE).linear).toBeUndefined()
+    expect(step(first, 16, 1300).linear).toBeUndefined()
+    // without the width of a character: never
+    expect(retarget(first, { x: 16, y: 0 }, 1100, true, LINE, WIDTH).linear).toBeUndefined()
   })
 })
 

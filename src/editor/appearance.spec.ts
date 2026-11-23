@@ -9,7 +9,10 @@ import {
   appearingRanges,
   finishAnimation,
   finishReveal,
+  GROW_MS,
   growingRanges,
+  growsUpTo,
+  growthsForTests,
   hiddenRanges,
   remoteChange,
   revealHeads,
@@ -28,6 +31,17 @@ function written(s: EditorState, tag: string, at: number, text: string): EditorS
     changes: { from: at, insert: text },
     effects: animateText.of([{ tag, from: at, to: at + text.length }]),
   }).state
+}
+
+/** The growths of a state, without ids and times. */
+function growths(s: EditorState) {
+  return growthsForTests(s).map(({ from, to, duration, linear, spacing }) => ({
+    from,
+    to,
+    duration,
+    linear,
+    spacing,
+  }))
 }
 
 describe('appearance', () => {
@@ -345,12 +359,11 @@ describe('typing reveal', () => {
     view.destroy()
   })
 
-  it('grows the space of a remote insert of several characters, and of every agent change', () => {
+  it('grows the space of every remote insert, and of every agent change', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
     let s = written(state('Hallo'), 'ben', 5, ' Welt')
     expect(growingRanges(s)).toEqual([{ from: 5, to: 10 }])
-    // one typed character: it just appears
-    s = written(s, 'ben', 10, '!')
-    expect(growingRanges(s)).toEqual([{ from: 5, to: 10 }])
+    expect(growsUpTo(s, 10)).toBe(true)
     // a live agent change grows however short
     s = s.update({
       changes: { from: 0, insert: 'Oh' },
@@ -360,6 +373,34 @@ describe('typing reveal', () => {
       { from: 7, to: 12 },
       { from: 0, to: 2 },
     ])
+    vi.advanceTimersByTime(GROW_MS)
+    expect(growsUpTo(s, 12)).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('grows typed text evenly and takes the growth under way along', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    let s = written(state('Hallo'), 'ben', 5, '!')
+    expect(growths(s)).toEqual([{ from: 5, to: 6, duration: GROW_MS, linear: false, spacing: -1 }])
+    // the next key 100 ms later, right behind: even, for those 100 ms, the one before along
+    vi.advanceTimersByTime(100)
+    s = written(s, 'ben', 6, '?')
+    const [first, second] = growths(s)
+    expect(second).toEqual({ from: 6, to: 7, duration: 100, linear: true, spacing: -1 })
+    // the first stopped where it was: about 1 - (1 - 100/120)³ of it was there
+    expect(first).toMatchObject({ duration: 100, linear: true })
+    expect(first!.spacing).toBeCloseTo(-((1 - 100 / 120) ** 3))
+    // more than 3 characters, not right behind, or 250 ms later: the ease-out
+    vi.advanceTimersByTime(300)
+    s = written(s, 'ben', 7, 'x')
+    expect(growths(s).at(-1)).toMatchObject({ duration: GROW_MS, linear: false })
+    vi.advanceTimersByTime(50)
+    s = written(s, 'ben', 8, 'long')
+    expect(growths(s).at(-1)).toMatchObject({ duration: GROW_MS, linear: false })
+    vi.advanceTimersByTime(50)
+    s = written(s, 'ben', 0, 'y')
+    expect(growths(s).at(-1)).toMatchObject({ duration: GROW_MS, linear: false })
+    vi.useRealTimers()
   })
 
   it('grows nothing typed here, nor with the setting off or reduced motion', () => {
