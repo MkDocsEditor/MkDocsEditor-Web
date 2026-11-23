@@ -3,6 +3,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, setApiClient, useApi } from '@/api'
+import { showFilesInTree } from '@/composables/preferences'
+import { showInTree } from '@/composables/showInTree'
 import { useAuthStore } from '@/stores/auth'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree, user } from '@/test/fixtures'
@@ -115,6 +117,43 @@ describe('App', () => {
     expect(wrapper.find('[data-testid="nav-drawer"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Account page')
     expect(mock.requests.some((r) => r.url.endsWith('/section/'))).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('shows the open item in the tree: opens its folders, scrolls to it and focuses it', async () => {
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = scrolled
+    const { pinia } = signedIn()
+    const { wrapper } = await mountWithPlugins(App, { initialPath: '/document/d-apfel', pinia })
+    await flushPromises()
+    const row = () =>
+      document.querySelector<HTMLElement>('[data-testid="nav-drawer"] [data-item-id="d-apfel"]')
+    // folded away by hand
+    await wrapper.find('[data-item-id="s-rezepte"] button[aria-label="Collapse"]').trigger('click')
+    expect(row()).toBeNull()
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { altKey: true, shiftKey: true, code: 'KeyL', key: 'L' }),
+    )
+    await flushPromises()
+    expect(row()).not.toBeNull()
+    expect(document.activeElement).toBe(row())
+    expect(scrolled).toHaveBeenCalledWith({ block: 'nearest' })
+    wrapper.unmount()
+  })
+
+  it('shows the files in the tree to show a file there', async () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    showFilesInTree.value = false
+    const { pinia } = signedIn()
+    const { wrapper } = await mountWithPlugins(App, { initialPath: '/resource/r-apfel', pinia })
+    await flushPromises()
+    const row = () => document.querySelector<HTMLElement>('[data-item-id="r-apfel"]')
+    expect(row()).toBeNull()
+    showInTree('r-apfel')
+    await flushPromises()
+    expect(showFilesInTree.value).toBe(true)
+    expect(document.activeElement).toBe(row())
     wrapper.unmount()
   })
 })

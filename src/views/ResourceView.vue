@@ -3,6 +3,7 @@ import {
   mdiContentCopy,
   mdiDelete,
   mdiDownload,
+  mdiFileTreeOutline,
   mdiFolderMoveOutline,
   mdiOpenInNew,
   mdiPencil,
@@ -17,6 +18,8 @@ import { useApi } from '@/api'
 import { copyText, downloadUrl } from '@/services/clipboard'
 import { KIND_LABELS, colorFor, formatSize, iconFor, isSvg, resourceKind } from '@/services/icons'
 import { openFile } from '@/composables/useOpenFile'
+import { SHOW_IN_TREE_KEY, showInTree } from '@/composables/showInTree'
+import { shortcutLabel } from '@/editor/formatting'
 import { resourceObjectUrl, resourceVersion } from '@/services/resourceUrls'
 import { useMovedRedirect } from '@/composables/useMovedRedirect'
 import { formatDate } from '@/services/time'
@@ -33,6 +36,7 @@ const notify = useNotifyStore()
 const moveStore = useMoveStore()
 const actions = useItemActionsStore()
 const transfers = useTransfersStore()
+const showInTreeShortcut = shortcutLabel(SHOW_IN_TREE_KEY)
 
 const resource = computed(() => {
   const item = tree.get(props.id)
@@ -139,6 +143,14 @@ async function copyPath(): Promise<void> {
         </v-btn>
         <v-btn :prepend-icon="mdiDownload" variant="outlined" @click="download">Download</v-btn>
         <v-btn :prepend-icon="mdiContentCopy" @click="copyPath">Copy path</v-btn>
+        <v-btn
+          :prepend-icon="mdiFileTreeOutline"
+          :title="`Show in tree (${showInTreeShortcut})`"
+          data-testid="show-in-tree"
+          @click="showInTree(resource.id)"
+        >
+          Show in tree
+        </v-btn>
         <v-btn
           :prepend-icon="mdiPencil"
           data-testid="resource-rename"

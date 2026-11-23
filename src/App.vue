@@ -11,12 +11,13 @@ import {
   mdiRefresh,
   mdiShieldAccount,
 } from '@mdi/js'
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay, useTheme } from 'vuetify'
 
 import { ApiError } from '@/api'
 import { showFilesInTree as showFiles, startPage, themeChoice } from '@/composables/preferences'
+import { isShowInTreeKey, showInTree, showInTreeRequest } from '@/composables/showInTree'
 import ReauthDialog from '@/components/auth/ReauthDialog.vue'
 import NotificationHost from '@/components/common/NotificationHost.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
@@ -85,6 +86,23 @@ watch(
   },
   { immediate: true },
 )
+
+// "Show in tree": open the drawer and the folders down to the item, and bring its row into view
+watch(showInTreeRequest, async (request) => {
+  if (!request) return
+  const item = tree.get(request.id)
+  if (!item) return
+  drawer.value = true
+  for (const section of tree.ancestors(item.id)) opened.add(section.id)
+  if (item.type === 'resource') showFiles.value = true
+  await nextTick()
+  const row = document.querySelector<HTMLElement>(
+    `[data-testid="nav-drawer"] [data-item-id="${CSS.escape(item.id)}"]`,
+  )
+  if (!row) return
+  row.scrollIntoView({ block: 'nearest' })
+  row.focus({ preventScroll: true })
+})
 
 function toggle(id: string): void {
   if (opened.has(id)) opened.delete(id)
@@ -197,6 +215,9 @@ function onKeydown(event: KeyboardEvent): void {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && showWiki.value) {
     event.preventDefault()
     searchOpen.value = true
+  } else if (isShowInTreeKey(event) && showWiki.value && activeId.value) {
+    event.preventDefault()
+    showInTree(activeId.value)
   }
 }
 window.addEventListener('keydown', onKeydown)
