@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { GLIDE_MS, easeOut, glidePosition, glides } from './cursorGlide'
+import { GLIDE_MS, easeOut, glidePosition, glides, retarget } from './cursorGlide'
+import { selectionRects } from './selectionGlide'
 
 const LINE = 20
 const WIDTH = 800
@@ -30,5 +31,51 @@ describe('cursorGlide', () => {
     // past the half way at half the time: fast start, gentle stop
     expect(half.x).toBeGreaterThan(50)
     expect(glidePosition(glide, 1000 + GLIDE_MS * 2)).toEqual({ x: 100, y: 20 })
+  })
+})
+
+describe('retarget', () => {
+  it('keeps a glide to the same place, and goes on from where it is drawn to a new one', () => {
+    const glide = retarget(
+      { fromX: 0, fromY: 0, toX: 0, toY: 0, start: 0 },
+      { x: 30, y: 0 },
+      1000,
+      true,
+      LINE,
+      WIDTH,
+    )
+    expect(glide).toMatchObject({ fromX: 0, toX: 30, start: 1000 })
+    expect(retarget(glide, { x: 30.2, y: 0 }, 1050, true, LINE, WIDTH)).toBe(glide)
+    const on = retarget(glide, { x: 60, y: 0 }, 1000 + GLIDE_MS / 2, true, LINE, WIDTH)
+    expect(on.fromX).toBeCloseTo(30 * easeOut(0.5))
+    expect(on.toX).toBe(60)
+    // without animations it snaps
+    expect(retarget(glide, { x: 60, y: 0 }, 1050, false, LINE, WIDTH)).toMatchObject({
+      fromX: 60,
+      toX: 60,
+    })
+  })
+})
+
+describe('selectionRects', () => {
+  const row = (x: number, y: number) => ({ x, y, height: 20 })
+
+  it('fills one row between the ends, also when they passed each other', () => {
+    expect(selectionRects(row(10, 0), row(50, 0), 0, 400)).toEqual([
+      { left: 10, top: 0, width: 40, height: 20 },
+    ])
+    expect(selectionRects(row(50, 0), row(10, 0), 0, 400)).toEqual([
+      { left: 10, top: 0, width: 40, height: 20 },
+    ])
+    // a caret: nothing to fill
+    expect(selectionRects(row(10, 0), row(10, 0), 0, 400)).toEqual([])
+  })
+
+  it('fills to the end of the first row, the rows between and the start of the last', () => {
+    expect(selectionRects(row(100, 0), row(30, 72), 0, 400)).toEqual([
+      { left: 100, top: 0, width: 300, height: 20 },
+      { left: 0, top: 20, width: 400, height: 52 },
+      { left: 0, top: 72, width: 30, height: 20 },
+    ])
   })
 })
