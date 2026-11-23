@@ -58,6 +58,8 @@ const emit = defineEmits<{
   localEdit: []
   /** Where each agent's reveal is (by actor), while the editor types out a live change. */
   revealHeads: [heads: ReadonlyMap<string, number>]
+  /** The editor is there, with the text of the session. */
+  ready: [view: EditorView]
 }>()
 
 const host = ref<HTMLElement | null>(null)
@@ -158,6 +160,7 @@ onMounted(() => {
   viewportPublisher.publish()
   pushPeers()
   pushAuthorship()
+  emit('ready', view)
 })
 
 /** The heads of the reveals that the cursors of agents show. */

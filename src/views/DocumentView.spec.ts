@@ -7,6 +7,7 @@ import { useTreeStore } from '@/stores/tree'
 import { createFakeSession } from '@/test/fakeSession'
 import { createFetchMock, json } from '@/test/fetchMock'
 import { sampleTree } from '@/test/fixtures'
+import { rememberView } from '@/sync/viewMemory'
 import { mountWithPlugins } from '@/test/mount'
 
 const fakes: ReturnType<typeof createFakeSession>[] = []
@@ -59,6 +60,41 @@ describe('DocumentView', () => {
     fake.status.value = { ...fake.status.value, connection: 'online' }
     await vi.waitFor(() => expect(selected()).toBe('Drei ist hier'))
     await vi.waitFor(() => expect(router.currentRoute.value.query.line).toBeUndefined())
+    wrapper.unmount()
+  })
+
+  it('opens where it was left on this device, fitted into a changed text', async () => {
+    const first = await setup()
+    const view = (wrapper: typeof first.wrapper) =>
+      wrapper.findComponent({ name: 'MarkdownEditor' }).vm.getView()!
+    await vi.waitFor(() => expect(view(first.wrapper)).toBeTruthy())
+    view(first.wrapper).dispatch({ selection: { anchor: 2, head: 13 } })
+    first.wrapper.unmount()
+
+    const second = await setup()
+    await vi.waitFor(() => {
+      const { from, to } = view(second.wrapper).state.selection.main
+      expect(view(second.wrapper).state.sliceDoc(from, to)).toBe('Apfelkuchen')
+    })
+    second.wrapper.unmount()
+
+    // the text got shorter since
+    rememberView('d-apfel', { selection: [{ anchor: 5, head: 500 }], main: 0, length: 600 })
+    const third = await setup()
+    await vi.waitFor(() =>
+      expect(view(third.wrapper).state.selection.main).toMatchObject({ from: 5, to: 22 }),
+    )
+    third.wrapper.unmount()
+  })
+
+  it('opens at a linked line instead of where it was left', async () => {
+    rememberView('d-apfel', { selection: [{ anchor: 2, head: 13 }], main: 0, length: 22 })
+    const { wrapper } = await setup('/document/d-apfel?line=3')
+    const view = () => wrapper.findComponent({ name: 'MarkdownEditor' }).vm.getView()!
+    await vi.waitFor(() => {
+      const { from, to } = view().state.selection.main
+      expect(view().state.sliceDoc(from, to)).toBe('Lecker.')
+    })
     wrapper.unmount()
   })
 

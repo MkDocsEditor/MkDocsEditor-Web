@@ -5,6 +5,7 @@ import { accountKey } from '@/sync/account'
 import { wikiCopy } from '@/sync/wikiCopy'
 
 import { clearRecentSearches } from '@/sync/recentSearches'
+import { clearViews } from '@/sync/viewMemory'
 
 /**
  * Signs out on purpose. This also removes what search and browsing keep on this device, because it
@@ -18,5 +19,6 @@ export async function signOut(): Promise<void> {
   useTreeStore().reset()
   usePagesStore().reset()
   clearRecentSearches(account)
+  clearViews(account)
   await copy.clear()
 }

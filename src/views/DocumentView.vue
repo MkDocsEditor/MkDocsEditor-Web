@@ -13,6 +13,7 @@ import {
   mdiTune,
   mdiViewSplitVertical,
 } from '@mdi/js'
+import type { EditorView } from '@codemirror/view'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
@@ -67,6 +68,7 @@ import { useDocumentSession } from './document/useDocumentSession'
 import { useEditorInsertion } from './document/useEditorInsertion'
 import { useFollow } from './document/useFollow'
 import { useJoinJump } from './document/useJoinJump'
+import { useViewMemory } from './document/useViewMemory'
 import { useSearchText } from './document/useSearchText'
 
 const props = defineProps<{ id: string }>()
@@ -201,10 +203,12 @@ watch(scrollDriver, (driver) => {
 })
 
 function onEditorAnchor(anchor: ScrollAnchor): void {
+  memory.onEditorAnchor(anchor)
   if (syncScroll.value && scrollDriver.value === 'editor') editorAnchor.value = anchor
 }
 
 function onPreviewAnchor(anchor: ScrollAnchor): void {
+  memory.onPreviewAnchor(anchor)
   if (syncScroll.value && mode.value === 'split' && scrollDriver.value === 'preview')
     editor.value?.scrollToAnchor(anchor)
 }
@@ -217,6 +221,23 @@ function onPreviewLines(lines: { first: number; last: number } | null): void {
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const editorView = () => editor.value?.getView() ?? null
 const preview = ref<InstanceType<typeof MarkdownPreview> | null>(null)
+
+// where the page was left on this device; links, following and join links place it instead
+/** The editor once it is there: `editor` is set a moment before it has made its view. */
+const mountedView = shallowRef<EditorView | null>(null)
+const panes = ref<HTMLElement | null>(null)
+const memory = useViewMemory({
+  id: () => props.id,
+  view: () => mountedView.value,
+  text: () => text.value,
+  ready: () => ready.value,
+  editorShown: () => mode.value !== 'preview',
+  previewShown: () => mode.value !== 'edit',
+  previewFollows: () => mode.value === 'split' && syncScroll.value,
+  scrollEditor: (anchor) => editor.value?.scrollToAnchor(anchor),
+  scrollPreview: (anchor) => preview.value?.scrollToAnchor(anchor),
+  panes: () => panes.value,
+})
 const { selectedText, replaceSelection, insertSnippets, reveal, revealLine } = useEditorInsertion(
   editorView,
   () => text.value,
@@ -302,6 +323,7 @@ watch(
   ([isReady, line]) => {
     const number = Number(line)
     if (!isReady || !Number.isInteger(number) || number < 1) return
+    memory.cancel()
     showEditor()
     void router.replace({ query: { ...route.query, line: undefined } })
     revealLine(number)
@@ -387,6 +409,7 @@ watch(
     ] as const,
   ([isReady, change, section]) => {
     if (!isReady || (change === undefined && section === undefined)) return
+    memory.cancel()
     void router.replace({ query: { ...route.query, change: undefined, section: undefined } })
     clearTimeout(changeTimer)
     const query = changeQuery(change, section)
@@ -419,6 +442,7 @@ const follow = useFollow({
 const { following, paused: followPaused } = follow
 
 function startFollowing(instanceId: string): void {
+  memory.cancel()
   editorWanted.value = true
   // the editor scrolls along with the one followed, and the preview with it
   scrollDriver.value = 'editor'
@@ -461,6 +485,7 @@ watch(
   () => route.query.join,
   (join) => {
     if (!join) return
+    memory.cancel()
     editorWanted.value = true
     const { from, instance } = route.query
     jump.start(
@@ -688,7 +713,12 @@ async function share(): Promise<void> {
       data-testid="upload-progress"
     />
 
-    <div v-if="session" class="document-view__panes" :class="`document-view__panes--${mode}`">
+    <div
+      v-if="session"
+      ref="panes"
+      class="document-view__panes"
+      :class="`document-view__panes--${mode}`"
+    >
       <div
         v-show="mode !== 'preview'"
         class="document-view__pane document-view__pane--editor"
@@ -719,6 +749,7 @@ async function share(): Promise<void> {
           @local-edit="follow.stop()"
           @reveal-heads="(heads: ReadonlyMap<string, number>) => (revealHeads = heads)"
           @anchor="onEditorAnchor"
+          @ready="(view: EditorView) => (mountedView = view)"
         />
       </div>
       <v-divider v-if="mode === 'split'" vertical />
