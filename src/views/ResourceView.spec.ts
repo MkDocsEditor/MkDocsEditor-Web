@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 
 import { ApiClient, setApiClient } from '@/api'
+import { showInTreeRequest } from '@/composables/showInTree'
 import { useNotifyStore } from '@/stores/notify'
 import { useTreeStore } from '@/stores/tree'
 import { createFetchMock, json } from '@/test/fetchMock'
@@ -93,6 +94,13 @@ describe('ResourceView', () => {
     await wrapper.find('[data-testid="copy-svg"]').trigger('click')
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(SVG))
     expect(useNotifyStore().queue.at(-1)?.text).toBe('SVG copied')
+    wrapper.unmount()
+  })
+
+  it('shows the file in the tree', async () => {
+    const { wrapper } = await setup('r-text')
+    await wrapper.find('[data-testid="show-in-tree"]').trigger('click')
+    expect(showInTreeRequest.value).toEqual({ id: 'r-text' })
     wrapper.unmount()
   })
 

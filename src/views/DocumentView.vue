@@ -28,6 +28,7 @@ import BacklinksList from '@/components/references/BacklinksList.vue'
 import ResourcesPanel from '@/components/resources/ResourcesPanel.vue'
 import ItemActionItems from '@/components/tree/ItemActionItems.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
+import ShowInTreeItem from '@/components/tree/ShowInTreeItem.vue'
 import PageQrDialog from '@/components/qr/PageQrDialog.vue'
 import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
@@ -656,6 +657,7 @@ async function share(): Promise<void> {
               rel="noopener"
             />
             <template v-if="page">
+              <ShowInTreeItem :id="page.id" />
               <v-divider />
               <ItemActionItems :item="page" />
             </template>

@@ -14,6 +14,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import OnlineAvatars from '@/components/common/OnlineAvatars.vue'
 import NameDialog from '@/components/common/NameDialog.vue'
 import ItemActionsMenu from '@/components/tree/ItemActionsMenu.vue'
+import ShowInTreeItem from '@/components/tree/ShowInTreeItem.vue'
 import ItemBreadcrumbs from '@/components/tree/ItemBreadcrumbs.vue'
 import SyncStatus from '@/components/tree/SyncStatus.vue'
 import ResourceThumb from '@/components/resources/ResourceThumb.vue'
@@ -163,7 +164,10 @@ function onDrop(event: DragEvent): void {
       <ItemBreadcrumbs v-if="!isRoot" :ancestors="ancestors" />
       <PageHeader :title="title" testid="section-title">
         <template v-if="!isRoot" #actions>
-          <ItemActionsMenu :item="section" size="default" />
+          <ItemActionsMenu :item="section" size="default">
+            <ShowInTreeItem :id="section.id" />
+            <v-divider />
+          </ItemActionsMenu>
         </template>
         <SyncStatus class="mt-1" />
       </PageHeader>
