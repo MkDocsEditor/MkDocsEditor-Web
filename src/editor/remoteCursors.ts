@@ -25,7 +25,7 @@ export type ShownPeer = Pick<
   instanceId?: string
 }
 
-const GHOST_OPACITY = 0.4
+export const GHOST_OPACITY = 0.4
 /** WCAG 1.4.11: a flag with less contrast to the surface gets an outline (as on Android). */
 const MIN_CONTRAST = 3
 
@@ -87,6 +87,8 @@ class CursorWidget extends WidgetType {
     caret.style.borderColor = this.color
     caret.setAttribute('aria-hidden', 'true')
     caret.dataset.peer = this.key
+    // the name sits at the first cursor of each user only
+    if (!this.key.startsWith('0 ')) return caret
     const label = document.createElement('span')
     label.className = 'cm-remote-caret-label'
     label.style.backgroundColor = this.color
@@ -254,6 +256,10 @@ const caretStyles: Parameters<typeof EditorView.baseTheme>[0] = {
     userSelect: 'none',
     zIndex: '10',
     fontFamily: 'system-ui, sans-serif',
+  },
+  // below the cursor (`cursorGlide`): the corner at the cursor is square
+  '.cm-remote-caret-label--below': {
+    borderRadius: '0 3px 3px 3px',
   },
   // a thin line in the text colour of the editor around a flag that is hard to see
   '.v-theme--light & .cm-remote-caret--faint-light .cm-remote-caret-label, .v-theme--dark & .cm-remote-caret--faint-dark .cm-remote-caret-label':

@@ -10,7 +10,9 @@ import {
   typingStep,
   typingWay,
 } from './typingTiming'
-import { GONE, remoteSelections } from './remoteCursors'
+import { LabelMotion } from './labelMotion'
+import type { Box } from './labelMotion'
+import { GHOST_OPACITY, GONE, remoteSelections, setPeers } from './remoteCursors'
 
 /**
  * Remote cursors (and their name flags) glide to a new place instead of jumping: an ease-out
@@ -50,9 +52,14 @@ import { GONE, remoteSelections } from './remoteCursors'
  * when the caret passes it, also while the caret lags behind the head. The cut reaches half a line
  * further than the text, so the part of a letter beyond its place is cut too.
  *
- * A cursor that appears just appears. One that goes away (its user left, or an agent took its
- * pointer away) fades out over `FADE_OUT_MS`, linearly, under the same settings; if it comes
- * back meanwhile it shows in full at once. The own cursor is CodeMirror's and never glides.
+ * A cursor that appears fades in over `FADE_OUT_MS`, one that goes away (its user left, or an
+ * agent took its pointer away) fades out in the same time, linearly, under the same settings; one
+ * that comes back meanwhile fades in from where it is. The own cursor is CodeMirror's and never
+ * glides.
+ *
+ * The label with the name sits at the first cursor of each user and stays calm while they write
+ * fast (R9, `labelMotion`): above the cursor, below it on the first row and at the start of a row
+ * that continues a wrapped line, inside the right edge of what is visible.
  */
 export const GLIDE_MS = 120
 export const FADE_OUT_MS = 200
@@ -298,6 +305,21 @@ export function animates(view: EditorView): boolean {
 
 const CARET = '.cm-remote-caret[data-peer]'
 
+/** The first cursor of a user: the one with the label (the key of `peerKey`). */
+const isFirst = (key: string) => key.startsWith('0 ')
+
+/** What the label of a first cursor needs, measured in `read`, relative to the content. */
+interface LabelInfo {
+  /** The box of the cursor without the shift of its glide. */
+  caret: Box
+  width: number
+  height: number
+  below: boolean
+  inView: boolean
+  /** The right edge of what is visible. */
+  right: number
+}
+
 /** A caret as it was last drawn, in the scrolled content, to fade it out when it goes. */
 interface Drawn {
   caret: HTMLElement
@@ -317,15 +339,60 @@ class CursorGlider {
   private frame = 0
   /** Carets that went away, while they fade out. */
   private readonly fading: HTMLElement
+  /** The heads of the carets, to tell a new place from a move with the text. */
+  private heads = new Map<string, number>()
+  /** Carets that got a new place since they were read last. */
+  private moves = new Set<string>()
+  /** Carets that come, while they fade in: from what alpha, since when. */
+  private appearing = new Map<string, { from: number; start: number | null }>()
+  private readonly labels = new LabelMotion()
+  private labelInfo = new Map<string, LabelInfo>()
+  private localCaret: Box | null = null
+  /** The mouse over the editor, in the coordinates of the page. */
+  private hover: { x: number; y: number } | null = null
+  private labelTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly onPointer = (event: MouseEvent) => {
+    this.hover = event.type === 'mouseleave' ? null : { x: event.clientX, y: event.clientY }
+    if (this.labelInfo.size > 0) this.schedule(false)
+  }
+  private readonly onScroll = () => {
+    if (this.labelInfo.size > 0) this.schedule(false)
+  }
 
   constructor(private readonly view: EditorView) {
     this.fading = view.scrollDOM.appendChild(document.createElement('div'))
     this.fading.className = 'cm-layer cm-remoteCaretFadeLayer'
     this.fading.setAttribute('aria-hidden', 'true')
+    view.scrollDOM.addEventListener('mousemove', this.onPointer, { passive: true })
+    view.scrollDOM.addEventListener('mouseleave', this.onPointer, { passive: true })
+    view.scrollDOM.addEventListener('scroll', this.onScroll, { passive: true })
+    this.noteHeads()
     this.schedule(false)
   }
 
+  /** Notes which carets got a new place, and which came. */
+  private noteHeads(mapped?: ViewUpdate): void {
+    const next = new Map<string, number>()
+    for (const s of this.view.state.field(remoteSelections)) {
+      next.set(s.key, s.head)
+      const before = this.heads.get(s.key)
+      if (before === undefined) {
+        // one that left a moment ago fades in from where it is
+        const copy = this.copies.get(s.key)
+        const from = copy ? Number(getComputedStyle(copy).opacity || 0) : 0
+        if (animates(this.view)) this.appearing.set(s.key, { from, start: null })
+      } else if ((mapped ? mapped.changes.mapPos(before, 1) : before) !== s.head)
+        this.moves.add(s.key)
+    }
+    this.heads = next
+  }
+
   update(update: ViewUpdate): void {
+    // new places come with the peers; else the carets only move with the text
+    if (update.transactions.some((tr) => tr.effects.some((e) => e.is(setPeers))))
+      this.noteHeads(update)
+    else if (update.docChanged)
+      this.heads = new Map(this.view.state.field(remoteSelections).map((s) => [s.key, s.head]))
     // moved with the text or by a new place of the peer, or only laid out anew
     const moved = update.docChanged || update.transactions.some((tr) => tr.effects.length > 0)
     // the place a caret rode at goes along with the text
@@ -363,6 +430,7 @@ class CursorGlider {
     for (const key of this.copies.keys()) if (present.has(key)) this.returning.push(key)
     const next = new Map<string, Glide>()
     const drawn = new Map<string, Drawn>()
+    const labels = new Map<string, LabelInfo>()
     for (const caret of this.view.contentDOM.querySelectorAll<HTMLElement>(CARET)) {
       const key = caret.dataset.peer!
       // in the text, so that scrolling moves nothing; without the shift of a glide under way
@@ -388,6 +456,45 @@ class CursorGlider {
         )
       } else next.set(key, retarget(before, to, now, animate, lineHeight, width, charWidth))
       drawn.set(key, { caret, x: box.left - baseX, y: box.top - baseY })
+      if (!isFirst(key)) continue
+      if (this.moves.has(key)) {
+        // a jump: no glide there
+        const glide = next.get(key)!
+        const glided = glide.fromX !== glide.toX || glide.fromY !== glide.toY || !!glide.riding
+        this.labels.moved(key, !animate || !glided, now)
+      }
+      const label = caret.querySelector<HTMLElement>('.cm-remote-caret-label')
+      if (!label || head === undefined) continue
+      const left = box.left - origin.left - dx
+      const top = box.top - origin.top - dy
+      const height = label.offsetHeight
+      labels.set(key, {
+        caret: { left, top, right: left + box.width, bottom: top + box.height },
+        width: label.offsetWidth,
+        height,
+        // no room above on the first row; at the start of a row that continues a wrapped line
+        // it would cover what was just written in the row above
+        below: top - this.view.documentPadding.top < height || atWrappedRowStart(this.view, head),
+        inView:
+          box.bottom > scroller.top &&
+          box.top < scroller.bottom &&
+          box.right > scroller.left &&
+          box.left < scroller.right,
+        right:
+          Math.min(scroller.left + this.view.scrollDOM.clientWidth, origin.right) - origin.left,
+      })
+    }
+    this.moves.clear()
+    this.labels.retain(new Set(labels.keys()))
+    this.labelInfo = labels
+    const local = this.view.hasFocus
+      ? this.view.coordsAtPos(this.view.state.selection.main.head)
+      : null
+    this.localCaret = local && {
+      left: local.left - origin.left,
+      top: local.top - origin.top,
+      right: local.right - origin.left,
+      bottom: local.bottom - origin.top,
     }
     // carets scrolled out of view keep their last place, should they go away there
     for (const [key, last] of this.drawn)
@@ -439,24 +546,103 @@ class CursorGlider {
     this.frame = 0
     const now = frameNow()
     let running = false
+    const animate = animates(this.view)
+    // before anything is written: the layout is still clean
+    const origin = this.labelInfo.size > 0 ? this.view.contentDOM.getBoundingClientRect() : null
     for (const caret of this.view.contentDOM.querySelectorAll<HTMLElement>(CARET)) {
-      const glide = this.glides.get(caret.dataset.peer!)
+      const key = caret.dataset.peer!
+      const glide = this.glides.get(key)
+      let dx = 0
+      let dy = 0
       if (!glide || !moving(glide, now)) {
         caret.style.transform = ''
         delete caret.dataset.dx
         delete caret.dataset.dy
-        continue
+      } else {
+        running = true
+        const at = glidePosition(glide, now)
+        dx = at.x - glide.toX
+        dy = at.y - glide.toY
+        caret.style.transform = `translate(${dx}px, ${dy}px)`
+        caret.dataset.dx = String(dx)
+        caret.dataset.dy = String(dy)
       }
-      running = true
-      const at = glidePosition(glide, now)
-      const dx = at.x - glide.toX
-      const dy = at.y - glide.toY
-      caret.style.transform = `translate(${dx}px, ${dy}px)`
-      caret.dataset.dx = String(dx)
-      caret.dataset.dy = String(dy)
+      if (this.fadeIn(caret, key, now)) running = true
+      const info = this.labelInfo.get(key)
+      if (info && origin) this.placeLabel(caret, key, info, dx, dy, origin, now, animate)
     }
     this.clip()
+    if (this.labels.busy(now)) running = true
     if (running) this.frame = requestAnimationFrame(() => this.draw())
+    // a writer who rests, or has written steadily for long enough, changes its label later
+    if (this.labelTimer) clearTimeout(this.labelTimer)
+    const wait = this.labels.waitMs(now)
+    this.labelTimer =
+      wait === null
+        ? null
+        : setTimeout(() => {
+            this.labelTimer = null
+            this.draw()
+          }, wait + 1)
+  }
+
+  /** A caret that comes fades in, from where it was if it left a moment ago. */
+  private fadeIn(caret: HTMLElement, key: string, now: number): boolean {
+    const appear = this.appearing.get(key)
+    if (!appear) return false
+    appear.start ??= now
+    const t = (now - appear.start) / FADE_OUT_MS
+    if (t >= 1) {
+      this.appearing.delete(key)
+      caret.style.opacity = ''
+      return false
+    }
+    // a ghost is faint: its class says how much
+    const full = caret.classList.contains('cm-remote-caret--ghost') ? GHOST_OPACITY : 1
+    caret.style.opacity = String(appear.from + (full - appear.from) * Math.max(0, t))
+    return true
+  }
+
+  /** Puts the label of a first cursor where it belongs now, with its alpha (R9). */
+  private placeLabel(
+    caret: HTMLElement,
+    key: string,
+    info: LabelInfo,
+    dx: number,
+    dy: number,
+    origin: DOMRect,
+    now: number,
+    animate: boolean,
+  ): void {
+    const label = caret.querySelector<HTMLElement>('.cm-remote-caret-label')
+    if (!label) return
+    const box = {
+      left: info.caret.left + dx,
+      top: info.caret.top + dy,
+      right: info.caret.right + dx,
+      bottom: info.caret.bottom + dy,
+    }
+    // the cursor stays under the label; a label of a cursor out of sight stays with it
+    const x =
+      box.left > info.right
+        ? box.left
+        : Math.max(box.left - info.width, Math.min(box.left, info.right - info.width))
+    const hover = this.hover && { x: this.hover.x - origin.left, y: this.hover.y - origin.top }
+    const { y, alpha } = this.labels.place(
+      key,
+      { ...info, caret: box, x, localCaret: this.localCaret, hover },
+      now,
+      animate,
+    )
+    const shiftX = x - box.left
+    const shiftY = y - (box.top - info.height)
+    label.style.transform =
+      Math.abs(shiftX) < 0.01 && Math.abs(shiftY) < 0.01
+        ? ''
+        : `translate(${shiftX}px, ${shiftY}px)`
+    label.style.opacity = alpha >= 1 ? '' : String(alpha)
+    // the corner at the cursor is square
+    label.classList.toggle('cm-remote-caret-label--below', y > box.top - info.height / 2)
   }
 
   /** Cuts fading text at the carets it ends at (R7). */
@@ -519,8 +705,21 @@ class CursorGlider {
 
   destroy(): void {
     cancelAnimationFrame(this.frame)
+    if (this.labelTimer) clearTimeout(this.labelTimer)
+    this.view.scrollDOM.removeEventListener('mousemove', this.onPointer)
+    this.view.scrollDOM.removeEventListener('mouseleave', this.onPointer)
+    this.view.scrollDOM.removeEventListener('scroll', this.onScroll)
     this.fading.remove()
   }
+}
+
+/** Whether `head` is at the start of a row that continues a wrapped line. */
+function atWrappedRowStart(view: EditorView, head: number): boolean {
+  const { doc } = view.state
+  if (head <= 0 || head > doc.length || doc.sliceString(head - 1, head) === '\n') return false
+  const before = view.coordsAtPos(head, -1)
+  const after = view.coordsAtPos(head, 1)
+  return !!before && !!after && after.top >= before.bottom - 1
 }
 
 /** Lets the cursors of `remoteCursors` glide, and fade out when they go. */
