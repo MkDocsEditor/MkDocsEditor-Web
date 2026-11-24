@@ -123,6 +123,16 @@ export function fadesText(state: EditorState): boolean {
 /** The clock of `document.timeline`, which Web Animations start times use. */
 const now = () => performance.now()
 
+/**
+ * The time of the frame being drawn, as the browser's own animations take it: in a frame, the same
+ * for every callback, however late it runs in it. Animations drawn by hand sample it, so that
+ * each frame moves them on by the time between the frames, not by when their callback came.
+ */
+export function frameNow(): number {
+  const time = typeof document === 'undefined' ? null : document.timeline?.currentTime
+  return time == null ? now() : Number(time)
+}
+
 let nextId = 1
 
 /** How visible a piece is at `time`: the ease-out quadratic, fast at first (R4). */
@@ -354,7 +364,7 @@ const animator = ViewPlugin.fromClass(
     private draw(): void {
       const { ranges } = this.view.state.field(appearing)
       if (ranges.length === 0) return
-      const time = now()
+      const time = frameNow()
       const pieces = ranges.map((r) => ({
         from: r.from,
         to: r.to,

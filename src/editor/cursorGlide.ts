@@ -1,7 +1,7 @@
 import { EditorView, ViewPlugin } from '@codemirror/view'
 import type { ViewUpdate } from '@codemirror/view'
 
-import { appearingSpans, fadesText, growsUpTo } from './appearance'
+import { appearingSpans, fadesText, frameNow, growsUpTo } from './appearance'
 import {
   TYPING_CHARS,
   TYPING_WITHIN_MS,
@@ -344,7 +344,7 @@ class CursorGlider {
   }
 
   private read(moved: boolean): void {
-    const now = performance.now()
+    const now = frameNow()
     const animate = moved && animates(this.view)
     const lineHeight = this.view.defaultLineHeight
     const charWidth = this.view.defaultCharacterWidth
@@ -354,8 +354,6 @@ class CursorGlider {
     const baseX = scroller.left - this.view.scrollDOM.scrollLeft
     const baseY = scroller.top - this.view.scrollDOM.scrollTop
     // gone from the state, not only scrolled out of what CodeMirror draws
-    // the clock of the animations: whether text still grows as it is drawn in this frame
-    const frameTime = Number(document.timeline?.currentTime ?? now)
     const selections = this.view.state.field(remoteSelections)
     const present = new Set(selections.map((s) => s.key))
     const heads = new Map(selections.map((s) => [s.key, s.head]))
@@ -374,7 +372,7 @@ class CursorGlider {
       const to = { x: box.left - origin.left - dx, y: box.top - origin.top - dy }
       const before = this.glides.get(key)
       const head = heads.get(key)
-      if (head !== undefined && growsUpTo(this.view.state, head, frameTime))
+      if (head !== undefined && growsUpTo(this.view.state, head, now))
         next.set(key, { ...still(to, now), riding: true, rodeAt: head })
       // the growth ended where the layout carried it: on from there, without a glide
       else if (before?.riding && (head === before.rodeAt || before.rodeAt === undefined))
@@ -439,7 +437,7 @@ class CursorGlider {
     this.fadeOut()
     cancelAnimationFrame(this.frame)
     this.frame = 0
-    const now = performance.now()
+    const now = frameNow()
     let running = false
     for (const caret of this.view.contentDOM.querySelectorAll<HTMLElement>(CARET)) {
       const glide = this.glides.get(caret.dataset.peer!)
