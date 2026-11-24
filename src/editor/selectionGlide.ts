@@ -11,6 +11,7 @@ import {
   retarget,
 } from './cursorGlide'
 import type { Glide } from './cursorGlide'
+import { frameNow } from './appearance'
 import { remoteSelections } from './remoteCursors'
 
 /**
@@ -88,7 +89,7 @@ class SelectionGlider {
 
   private read(moved: boolean): void {
     const { view } = this
-    const now = performance.now()
+    const now = frameNow()
     const animate = moved && animates(view)
     const lineHeight = view.defaultLineHeight
     const width = view.contentDOM.clientWidth
@@ -154,7 +155,7 @@ class SelectionGlider {
   private draw(): void {
     cancelAnimationFrame(this.frame)
     this.frame = 0
-    const now = performance.now()
+    const now = frameNow()
     const boxes: HTMLElement[] = []
     let running = false
     for (const [key, { color, from, to, fadeStart }] of this.shown) {

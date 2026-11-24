@@ -37,9 +37,14 @@ test('remote cursors glide to a near place and jump to a far one', async ({
   const caret = bob.locator('.cm-remote-caret')
   await expect(caret).toBeVisible()
 
-  // a few characters on: it glides, and ends where the text is
-  const near = await shiftsDuring(bob, () => alice.keyboard.type(' vier'))
-  expect(near.some((t) => /translate\(-\d/.test(t))).toBe(true)
+  // a few characters back: it glides, and ends where the text is (while somebody types, the
+  // growing text carries it: typingMotion.spec.ts)
+  // the text typed has grown to its full width: the caret is no longer carried by it
+  await bob.waitForTimeout(300)
+  const near = await shiftsDuring(bob, async () => {
+    for (let i = 0; i < 3; i++) await alice.keyboard.press('ArrowLeft')
+  })
+  expect(near.some((t) => /translate\(\d*[1-9]/.test(t))).toBe(true)
   await expect(caret).toHaveCSS('transform', 'none')
 
   // to the next line and back to its start: far, so it jumps

@@ -64,7 +64,8 @@ test.describe('live collaboration', () => {
             const end = performance.now() + 4_000
             const frame = () => {
               for (const span of document.querySelectorAll<HTMLElement>('.cm-appear')) {
-                if (span.getAnimations().length > 0) seen.add(span.textContent ?? '')
+                // fading: masked, less than fully visible
+                if (span.style.maskImage) seen.add(span.textContent ?? '')
               }
               if (performance.now() < end) requestAnimationFrame(frame)
               else resolve([...seen])

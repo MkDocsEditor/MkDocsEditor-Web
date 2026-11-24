@@ -1,7 +1,15 @@
 import { EditorView, ViewPlugin } from '@codemirror/view'
 import type { ViewUpdate } from '@codemirror/view'
 
-import { fadesText } from './appearance'
+import { appearingSpans, fadesText, frameNow, growsUpTo } from './appearance'
+import {
+  TYPING_CHARS,
+  TYPING_WITHIN_MS,
+  smoothInterval,
+  typingSpeed,
+  typingStep,
+  typingWay,
+} from './typingTiming'
 import { GONE, remoteSelections } from './remoteCursors'
 
 /**
@@ -24,6 +32,23 @@ import { GONE, remoteSelections } from './remoteCursors'
  * `GLIDE_MS`. So does one within `CATCH_UP_WITHIN_MS` after a glide ended (steps come unevenly):
  * from a glide that ended at most `CONTINUE_MS` ago it starts in this frame, else one frame back,
  * so that it moves in its first frame. One move alone still takes `GLIDE_MS`.
+ *
+ * Typing (R5b, R5c): a step of at most `TYPING_CHARS` characters in its row, at most
+ * `TYPING_WITHIN_MS` after the place before, glides from where the cursor is drawn with the timing
+ * of `typingTiming`: for fast keys at an even speed, for 1.5 times the time between the steps
+ * (smoothed), and a frame early, so it moves in the frame it is drawn first; for slow keys a short
+ * ease-out step; in between a blend. So the cursor of somebody who types fast keeps moving between
+ * their keys instead of starting fast and stopping at each ("pumping"). At the head of a reveal it
+ * is a short glide.
+ *
+ * A caret right behind text of others that grows its space (`appearance`, R6b) does not glide: the
+ * layout carries it at the moving edge, so the text behind it moves exactly with it.
+ *
+ * Nothing shows ahead of a caret (R7): text that fades in and ends at its place (pieces one behind
+ * the other, and pieces right behind it, whose cursor may come a frame later) is drawn only left
+ * of where the caret is drawn in its row, and not in later rows. So a character of a reveal shows
+ * when the caret passes it, also while the caret lags behind the head. The cut reaches half a line
+ * further than the text, so the part of a letter beyond its place is cut too.
  *
  * A cursor that appears just appears. One that goes away (its user left, or an agent took its
  * pointer away) fades out over `FADE_OUT_MS`, linearly, under the same settings; if it comes
@@ -54,6 +79,16 @@ export interface Glide {
   /** Its speed at the start, in px per ms; that of the ease-out for a glide from rest. */
   vx: number
   vy: number
+  /** A typing step: its way is `typingWay` with `crisp`; its start speed then does not count. */
+  typing?: boolean
+  /** Typing: 0 for an even step, 1 for the ease-out. */
+  crisp?: number
+  /** Typing: the time between the steps, smoothed. */
+  interval?: number
+  /** Carried by the layout, behind growing text: drawn where it is, and on from there after. */
+  riding?: boolean
+  /** Riding: the place in the text it rode at. */
+  rodeAt?: number
 }
 
 /** The Hermite basis: how much of the start distance and of the start speed are left at `t`. */
@@ -133,6 +168,10 @@ function glideFrom(
 export function glideSpeed(glide: Glide, time: number): { x: number; y: number } {
   const t = (time - glide.start) / glide.duration
   if (t < 0 || t >= 1) return { x: 0, y: 0 }
+  if (glide.typing) {
+    const v = typingSpeed(t, glide.crisp ?? 0) / glide.duration
+    return { x: (glide.toX - glide.fromX) * v, y: (glide.toY - glide.fromY) * v }
+  }
   // the derivatives of h00 and h10 by t
   const d00 = (6 * t ** 2 - 6 * t) / glide.duration
   const d10 = 3 * t ** 2 - 4 * t + 1
@@ -145,6 +184,13 @@ export function glideSpeed(glide: Glide, time: number): { x: number; y: number }
 /** Where a glide draws the cursor at `time`. */
 export function glidePosition(glide: Glide, time: number): { x: number; y: number } {
   const t = Math.min(1, Math.max(0, (time - glide.start) / glide.duration))
+  if (glide.typing) {
+    const way = typingWay(t, glide.crisp ?? 0)
+    return {
+      x: glide.fromX + (glide.toX - glide.fromX) * way,
+      y: glide.fromY + (glide.toY - glide.fromY) * way,
+    }
+  }
   // how far it is from its place: d0 and the start speed, as Hermite says
   const a = h00(t)
   const b = h10(t) * glide.duration
@@ -179,13 +225,52 @@ export function retarget(
   animate: boolean,
   lineHeight: number,
   width: number,
+  /** The width of a character: steps of a few are typing. None: no typing glides. */
+  charWidth = 0,
 ): Glide {
   if (before && Math.abs(before.toX - to.x) < 0.5 && Math.abs(before.toY - to.y) < 0.5)
     return before
   const shown = before && glidePosition(before, now)
-  if (animate && shown && glides(shown, to, lineHeight, width))
-    return glideFrom(before, shown, to, now)
+  if (animate && shown && glides(shown, to, lineHeight, width)) {
+    const typing = typingGlide(before, shown, to, now, lineHeight, charWidth)
+    return typing ?? glideFrom(before, shown, to, now)
+  }
   return still(to, now)
+}
+
+/** The even glide of a typing step (R5b), if the step to `to` is one. */
+function typingGlide(
+  before: Glide,
+  shown: { x: number; y: number },
+  to: { x: number; y: number },
+  now: number,
+  lineHeight: number,
+  charWidth: number,
+): Glide | undefined {
+  const since = now - before.set
+  // a snap forgets the time of its place: the first step after it is no typing
+  const glided = before.fromX !== before.toX || before.fromY !== before.toY
+  if (!glided || since > TYPING_WITHIN_MS || charWidth <= 0) return undefined
+  if (Math.abs(to.y - before.toY) >= lineHeight / 2) return undefined
+  if (Math.abs(to.x - before.toX) > TYPING_CHARS * charWidth + 0.5) return undefined
+  // the time between the steps, smoothed; the first step of a run takes it as it is
+  const interval = smoothInterval(before.typing ? before.interval : undefined, since)
+  const { duration, crisp, early } = typingStep(interval)
+  return {
+    fromX: shown.x,
+    fromY: shown.y,
+    toX: to.x,
+    toY: to.y,
+    // an even one a frame early: it moves in the frame it is drawn first
+    start: now - early,
+    duration,
+    set: now,
+    vx: 0,
+    vy: 0,
+    typing: true,
+    crisp,
+    interval,
+  }
 }
 
 /** A glide to `to` from where `before` draws it now, however far; a snap without `before`. */
@@ -227,6 +312,8 @@ class CursorGlider {
   /** The fading copies, by caret; one whose caret comes back goes at once. */
   private copies = new Map<string, HTMLElement>()
   private returning: string[] = []
+  /** Spans of fading text cut at a caret, to let go of. */
+  private clipped = new Set<HTMLElement>()
   private frame = 0
   /** Carets that went away, while they fade out. */
   private readonly fading: HTMLElement
@@ -241,6 +328,11 @@ class CursorGlider {
   update(update: ViewUpdate): void {
     // moved with the text or by a new place of the peer, or only laid out anew
     const moved = update.docChanged || update.transactions.some((tr) => tr.effects.length > 0)
+    // the place a caret rode at goes along with the text
+    if (update.docChanged)
+      for (const [key, glide] of this.glides)
+        if (glide.rodeAt !== undefined)
+          this.glides.set(key, { ...glide, rodeAt: update.changes.mapPos(glide.rodeAt, -1) })
     if (moved || update.geometryChanged || update.viewportChanged) this.schedule(moved)
   }
 
@@ -252,16 +344,19 @@ class CursorGlider {
   }
 
   private read(moved: boolean): void {
-    const now = performance.now()
+    const now = frameNow()
     const animate = moved && animates(this.view)
     const lineHeight = this.view.defaultLineHeight
+    const charWidth = this.view.defaultCharacterWidth
     const width = this.view.contentDOM.clientWidth
     const origin = this.view.contentDOM.getBoundingClientRect()
     const scroller = this.view.scrollDOM.getBoundingClientRect()
     const baseX = scroller.left - this.view.scrollDOM.scrollLeft
     const baseY = scroller.top - this.view.scrollDOM.scrollTop
     // gone from the state, not only scrolled out of what CodeMirror draws
-    const present = new Set(this.view.state.field(remoteSelections).map((s) => s.key))
+    const selections = this.view.state.field(remoteSelections)
+    const present = new Set(selections.map((s) => s.key))
+    const heads = new Map(selections.map((s) => [s.key, s.head]))
     if (animates(this.view))
       for (const [key, drawn] of this.drawn)
         if (!present.has(key)) this.leaving.push({ ...drawn, key })
@@ -275,7 +370,23 @@ class CursorGlider {
       const dx = Number(caret.dataset.dx ?? 0)
       const dy = Number(caret.dataset.dy ?? 0)
       const to = { x: box.left - origin.left - dx, y: box.top - origin.top - dy }
-      next.set(key, retarget(this.glides.get(key), to, now, animate, lineHeight, width))
+      const before = this.glides.get(key)
+      const head = heads.get(key)
+      if (head !== undefined && growsUpTo(this.view.state, head, now))
+        next.set(key, { ...still(to, now), riding: true, rodeAt: head })
+      // the growth ended where the layout carried it: on from there, without a glide
+      else if (before?.riding && (head === before.rodeAt || before.rodeAt === undefined))
+        next.set(key, still(to, now))
+      // moved on from where it rode: from where the layout drew it there, as from rest
+      else if (before?.riding) {
+        const was = this.view.coordsAtPos(Math.min(before.rodeAt!, this.view.state.doc.length), 1)
+        const is = head === undefined ? null : this.view.coordsAtPos(head, 1)
+        const from = was && is ? { x: to.x + was.left - is.left, y: to.y + was.top - is.top } : to
+        next.set(
+          key,
+          retarget(still(from, before.set), to, now, animate, lineHeight, width, charWidth),
+        )
+      } else next.set(key, retarget(before, to, now, animate, lineHeight, width, charWidth))
       drawn.set(key, { caret, x: box.left - baseX, y: box.top - baseY })
     }
     // carets scrolled out of view keep their last place, should they go away there
@@ -326,7 +437,7 @@ class CursorGlider {
     this.fadeOut()
     cancelAnimationFrame(this.frame)
     this.frame = 0
-    const now = performance.now()
+    const now = frameNow()
     let running = false
     for (const caret of this.view.contentDOM.querySelectorAll<HTMLElement>(CARET)) {
       const glide = this.glides.get(caret.dataset.peer!)
@@ -344,7 +455,66 @@ class CursorGlider {
       caret.dataset.dx = String(dx)
       caret.dataset.dy = String(dy)
     }
+    this.clip()
     if (running) this.frame = requestAnimationFrame(() => this.draw())
+  }
+
+  /** Cuts fading text at the carets it ends at (R7). */
+  private clip(): void {
+    const { state } = this.view
+    const spans = appearingSpans(state)
+    const cut = new Map<string, HTMLElement>()
+    if (spans.length > 0) {
+      const heads = new Map(state.field(remoteSelections).map((s) => [s.key, s.head]))
+      for (const caret of this.view.contentDOM.querySelectorAll<HTMLElement>(CARET)) {
+        const head = heads.get(caret.dataset.peer!)
+        if (head === undefined) continue
+        // the chain of fading text that ends at the caret, and the one right behind it
+        const ids = new Set<string>()
+        for (let at = head, found = true; found;) {
+          found = false
+          for (const s of spans)
+            if (s.to === at && !ids.has(s.id)) {
+              ids.add(s.id)
+              at = s.from
+              found = true
+            }
+        }
+        for (let at = head, found = true; found;) {
+          found = false
+          for (const s of spans)
+            if (s.from === at && !ids.has(s.id)) {
+              ids.add(s.id)
+              at = s.to
+              found = true
+            }
+        }
+        for (const id of ids) cut.set(id, caret)
+      }
+    }
+    const lineHeight = this.view.defaultLineHeight
+    const reach = lineHeight / 2
+    const done = new Set<HTMLElement>()
+    for (const [id, caret] of cut) {
+      const c = caret.getBoundingClientRect()
+      // the middle of the caret's line, its border of 2 px
+      const x = c.left + 1
+      for (const span of this.view.contentDOM.querySelectorAll<HTMLElement>(
+        `[data-appear="${id}"]`,
+      )) {
+        const box = span.getBoundingClientRect()
+        let clip = ''
+        // a row before the caret's: passed; a row after it: not yet
+        if (box.bottom <= c.top + lineHeight / 4) clip = ''
+        else if (box.top >= c.bottom - lineHeight / 4 || box.left >= x) clip = 'inset(50%)'
+        else if (x < box.right + reach)
+          clip = `inset(-${reach}px ${Math.max(-reach, box.right - x)}px -${reach}px -${reach}px)`
+        span.style.clipPath = clip
+        if (clip) done.add(span)
+      }
+    }
+    for (const span of this.clipped) if (!done.has(span)) span.style.clipPath = ''
+    this.clipped = done
   }
 
   destroy(): void {

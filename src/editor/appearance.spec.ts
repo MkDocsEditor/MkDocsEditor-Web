@@ -7,10 +7,18 @@ import {
   animateText,
   appearance,
   appearingRanges,
+  appearingSpans,
   finishAnimation,
+  FADE_MAX_MS,
+  FADE_MIN_MS,
+  fadeDuration,
   finishReveal,
+  GROW_MS,
   growingRanges,
+  growsUpTo,
+  growthsForTests,
   hiddenRanges,
+  pieceAlpha,
   remoteChange,
   revealHeads,
   revealText,
@@ -28,6 +36,17 @@ function written(s: EditorState, tag: string, at: number, text: string): EditorS
     changes: { from: at, insert: text },
     effects: animateText.of([{ tag, from: at, to: at + text.length }]),
   }).state
+}
+
+/** The growths of a state, without ids and times. */
+function growths(s: EditorState) {
+  return growthsForTests(s).map(({ from, to, duration, crisp, spacing }) => ({
+    from,
+    to,
+    duration,
+    crisp,
+    spacing,
+  }))
 }
 
 describe('appearance', () => {
@@ -55,29 +74,83 @@ describe('appearance', () => {
     expect(appearingRanges(s)).toEqual([])
   })
 
-  it('fades only the newest characters of a writer', () => {
-    let s = written(state(''), 'ben', 0, 'x'.repeat(40))
-    expect(appearingRanges(s)).toEqual([{ tag: 'ben', from: 24, to: 40 }])
-    s = written(s, 'ben', 40, 'y'.repeat(10))
-    expect(appearingRanges(s)).toEqual([
-      { tag: 'ben', from: 34, to: 40 },
-      { tag: 'ben', from: 40, to: 50 },
-    ])
-    // another writer has a window of their own
-    s = written(s, 'anna', 0, 'a')
-    expect(appearingRanges(s)).toHaveLength(3)
+  it('fades all of the text, however long, and each piece with its own start', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    let s = written(state(''), 'ben', 0, 'x'.repeat(400))
+    expect(appearingRanges(s)).toEqual([{ tag: 'ben', from: 0, to: 400 }])
+    vi.advanceTimersByTime(16)
+    s = written(s, 'ben', 400, 'y')
+    expect(appearingRanges(s)).toHaveLength(2)
+    vi.useRealTimers()
   })
 
-  it('fades at most maxRanges ranges, the newest', () => {
+  it('fades in with the ease-out quadratic over 500 ms', () => {
+    expect(pieceAlpha(0, 0, 500)).toBe(0)
+    expect(pieceAlpha(0, 250, 500)).toBeCloseTo(0.75)
+    expect(pieceAlpha(0, 500, 500)).toBe(1)
+    // never more than 0.1 from one frame to the next
+    for (let t = 0; t < 500; t += 16)
+      expect(pieceAlpha(0, t + 16, 500) - pieceAlpha(0, t, 500)).toBeLessThan(0.1)
+  })
+
+  it('fades the text of a slow writer shortly and of a fast one longer', () => {
+    expect(fadeDuration(0)).toBe(FADE_MIN_MS)
+    expect(fadeDuration(10)).toBe(FADE_MIN_MS)
+    expect(fadeDuration(65)).toBeCloseTo(660)
+    expect(fadeDuration(120)).toBe(FADE_MAX_MS)
+    expect(fadeDuration(5_000)).toBe(FADE_MAX_MS)
+  })
+
+  it('takes the rate of a writer from its characters, forgetting within a second', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    const duration = (s: EditorState, at: number) =>
+      appearingSpans(s).find((r) => r.from === at)!.duration
+    // a person: one character every 150 ms stays slow
+    let s = state('')
+    for (let i = 0; i < 10; i++) {
+      s = written(s, 'ben', i, 'x')
+      vi.advanceTimersByTime(150)
+    }
+    expect(duration(s, 9)).toBe(FADE_MIN_MS)
+    // an agent: 200 characters at once is fast
+    s = written(s, 'agent', 10, 'y'.repeat(200))
+    expect(duration(s, 10)).toBe(FADE_MAX_MS)
+    // two seconds later it has forgotten most of it: e^-2 of 200 is 27
+    vi.advanceTimersByTime(2_000)
+    s = written(s, 'agent', 210, 'z')
+    expect(duration(s, 210)).toBeCloseTo(fadeDuration(200 * Math.exp(-2) + 1), 0)
+    vi.useRealTimers()
+  })
+
+  it('merges the closest pieces one behind the other of a writer past maxRanges', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
     let s = state('', { enabled: true, maxRanges: 3 })
-    for (const tag of ['a', 'b', 'c', 'd']) s = written(s, tag, s.doc.length, tag)
-    expect(appearingRanges(s).map((r) => r.tag)).toEqual(['b', 'c', 'd'])
+    // a, then b and c at the same time, right behind: b and c are the closest
+    s = written(s, 'ben', 0, 'a')
+    vi.advanceTimersByTime(100)
+    s = written(s, 'ben', 1, 'b')
+    s = written(s, 'ben', 2, 'c')
+    vi.advanceTimersByTime(100)
+    s = written(s, 'ben', 3, 'd')
+    expect(appearingRanges(s)).toEqual([
+      { tag: 'ben', from: 0, to: 1 },
+      { tag: 'ben', from: 3, to: 4 },
+      { tag: 'ben', from: 1, to: 3 },
+    ])
+    // no neighbours of a writer: the most visible shows at once
+    let t = state('', { enabled: true, maxRanges: 2 })
+    for (const tag of ['a', 'b', 'c']) {
+      t = written(t, tag, t.doc.length, tag)
+      vi.advanceTimersByTime(50)
+    }
+    expect(appearingRanges(t).map((r) => r.tag)).toEqual(['b', 'c'])
+    vi.useRealTimers()
   })
 
   it('finishes the fades of one writer and leaves the others', () => {
-    let s = written(written(state(''), 'ben', 0, 'Ben'), 'agent', 3, 'Agent')
+    let s = written(written(state(''), 'ben', 0, 'Benny'), 'agent', 5, 'Agent')
     s = s.update({ effects: finishAnimation.of('agent') }).state
-    expect(appearingRanges(s)).toEqual([{ tag: 'ben', from: 0, to: 3 }])
+    expect(appearingRanges(s)).toEqual([{ tag: 'ben', from: 0, to: 5 }])
   })
 
   it('fades nothing when the system reduces motion', () => {
@@ -345,12 +418,11 @@ describe('typing reveal', () => {
     view.destroy()
   })
 
-  it('grows the space of a remote insert of several characters, and of every agent change', () => {
+  it('grows the space of every remote insert, and of every agent change', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
     let s = written(state('Hallo'), 'ben', 5, ' Welt')
     expect(growingRanges(s)).toEqual([{ from: 5, to: 10 }])
-    // one typed character: it just appears
-    s = written(s, 'ben', 10, '!')
-    expect(growingRanges(s)).toEqual([{ from: 5, to: 10 }])
+    expect(growsUpTo(s, 10)).toBe(true)
     // a live agent change grows however short
     s = s.update({
       changes: { from: 0, insert: 'Oh' },
@@ -360,6 +432,91 @@ describe('typing reveal', () => {
       { from: 7, to: 12 },
       { from: 0, to: 2 },
     ])
+    // and a while after, for a late frame: 250 ms
+    vi.advanceTimersByTime(GROW_MS + 200)
+    expect(growsUpTo(s, 12)).toBe(true)
+    vi.advanceTimersByTime(50)
+    expect(growsUpTo(s, 12)).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('grows typed text evenly and takes the growth under way along', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    let s = written(state('Hallo'), 'ben', 5, '!')
+    expect(growths(s)).toEqual([{ from: 5, to: 6, duration: GROW_MS, crisp: 1, spacing: -1 }])
+    // the next key 100 ms later, right behind: even, for 1.5 × 100 ms, the one before along
+    vi.advanceTimersByTime(100)
+    s = written(s, 'ben', 6, '?')
+    const [first, second] = growths(s)
+    expect(second).toEqual({ from: 6, to: 7, duration: 150, crisp: 0, spacing: -1 })
+    // the first stopped where it was: about 1 - (1 - 100/120)³ of it was there
+    expect(first).toMatchObject({ duration: 150, crisp: 0 })
+    // a frame early
+    expect(growthsForTests(s).at(-1)!.start).toBe(performance.now() - 16)
+    // the next 50 ms later: the time between smoothed, 100 + 0.3 × (50 - 100)
+    vi.advanceTimersByTime(50)
+    s = written(s, 'ben', 7, '.')
+    expect(growths(s).at(-1)).toMatchObject({ duration: 1.5 * 85, crisp: 0 })
+    expect(first!.spacing).toBeCloseTo(-((1 - 100 / 120) ** 3))
+    // more than 3 characters, not right behind, or 250 ms later: the ease-out
+    vi.advanceTimersByTime(300)
+    s = written(s, 'ben', 8, 'x')
+    expect(growths(s).at(-1)).toMatchObject({ duration: GROW_MS, crisp: 1 })
+    vi.advanceTimersByTime(50)
+    s = written(s, 'ben', 9, 'long')
+    expect(growths(s).at(-1)).toMatchObject({ duration: GROW_MS, crisp: 1 })
+    vi.advanceTimersByTime(50)
+    s = written(s, 'ben', 0, 'y')
+    expect(growths(s).at(-1)).toMatchObject({ duration: GROW_MS, crisp: 1 })
+    vi.useRealTimers()
+  })
+
+  it('grows slowly typed text in short ease-out steps (R5c)', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    let s = written(state('Hallo'), 'ben', 5, '!')
+    // 240 ms later: 100 ms of the ease-out, from now
+    vi.advanceTimersByTime(240)
+    s = written(s, 'ben', 6, '?')
+    expect(growths(s).at(-1)).toEqual({ from: 6, to: 7, duration: 100, crisp: 1, spacing: -1 })
+    expect(growthsForTests(s).at(-1)!.start).toBe(performance.now())
+    vi.useRealTimers()
+  })
+
+  it('closes the gap of text that others remove, and of no removal here', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    const removed = (s: EditorState, from: number, to: number, insert = '') =>
+      s.update({ changes: { from, to, insert }, annotations: remoteChange.of(true) }).state
+    let s = removed(state('Hallo Welt'), 5, 10)
+    expect(growths(s)).toEqual([{ from: 5, to: 5, duration: GROW_MS, crisp: 1, spacing: 5 }])
+    expect(growsUpTo(s, 5)).toBe(true)
+    // across lines, too long, or here: at once
+    expect(growths(removed(state('a\nb'), 0, 3))).toEqual([])
+    expect(growths(removed(state('x'.repeat(100)), 0, 100))).toEqual([])
+    expect(growths(state('Hallo').update({ changes: { from: 0, to: 5 } }).state)).toEqual([])
+    // a replace: the gap of the old text, then the new one
+    s = removed(state('Hallo Welt'), 6, 10, 'Ben')
+    expect(growths(s)).toEqual([{ from: 6, to: 6, duration: GROW_MS, crisp: 1, spacing: 4 }])
+    vi.useRealTimers()
+  })
+
+  it('closes a backspace evenly, as typing backwards, and types on after it', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    let s = written(state('Hallo'), 'ben', 5, 'x')
+    vi.advanceTimersByTime(100)
+    // ben's backspace: the key he typed last, 100 ms later
+    s = s.update({ changes: { from: 5, to: 6 }, annotations: remoteChange.of(true) }).state
+    expect(growths(s)).toEqual([{ from: 5, to: 5, duration: 150, crisp: 0, spacing: 1 }])
+    // a frame early
+    expect(growthsForTests(s)[0]!.start).toBe(performance.now() - 16)
+    // the right key there 100 ms later: typing on, the gap along
+    vi.advanceTimersByTime(100)
+    s = written(s, 'ben', 5, 'y')
+    const [gap, key] = growths(s)
+    expect(key).toEqual({ from: 5, to: 6, duration: 150, crisp: 0, spacing: -1 })
+    expect(gap).toMatchObject({ from: 5, to: 5, duration: 150, crisp: 0 })
+    // it had closed 100 of 150 ms
+    expect(gap!.spacing).toBeCloseTo(1 - 116 / 150)
+    vi.useRealTimers()
   })
 
   it('grows nothing typed here, nor with the setting off or reduced motion', () => {
