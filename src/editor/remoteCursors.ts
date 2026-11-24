@@ -8,6 +8,7 @@ import { avatarUrl, loadedAvatarUrl } from '@/services/avatars'
 import type { AvatarOwner } from '@/services/avatars'
 import { instanceName } from '@/sync/session'
 
+import { caretHeads } from './appearance'
 import { cursorGlide } from './cursorGlide'
 import { selectionGlide } from './selectionGlide'
 import type { Peer } from '@/sync/session'
@@ -294,5 +295,12 @@ const theme = EditorView.baseTheme({
 
 /** Shows the cursors and selections of other users, labelled with their names; both glide. */
 export function remoteCursors() {
-  return [peersField, remoteSelections, theme, cursorGlide, selectionGlide]
+  return [
+    peersField,
+    remoteSelections,
+    caretHeads.of((state) => state.field(remoteSelections).map((s) => s.head)),
+    theme,
+    cursorGlide,
+    selectionGlide,
+  ]
 }

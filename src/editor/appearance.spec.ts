@@ -17,6 +17,7 @@ import {
   revealEnds,
   GROW_MS,
   growingRanges,
+  caretHeads,
   growsUpTo,
   growthsForTests,
   hiddenRanges,
@@ -575,7 +576,8 @@ describe('typing reveal', () => {
       s.update({ changes: { from, to, insert }, annotations: remoteChange.of(true) }).state
     let s = removed(state('Hallo Welt'), 5, 10)
     expect(growths(s)).toEqual([{ from: 5, to: 5, duration: GROW_MS, crisp: 1, spacing: 5 }])
-    expect(growsUpTo(s, 5)).toBe(true)
+    // no caret was behind the removed text: none rides the gap
+    expect(growsUpTo(s, 5)).toBe(false)
     // across lines, too long, or here: at once
     expect(growths(removed(state('a\nb'), 0, 3))).toEqual([])
     expect(growths(removed(state('x'.repeat(100)), 0, 100))).toEqual([])
@@ -583,6 +585,26 @@ describe('typing reveal', () => {
     // a replace: the gap of the old text, then the new one
     s = removed(state('Hallo Welt'), 6, 10, 'Ben')
     expect(growths(s)).toEqual([{ from: 6, to: 6, duration: GROW_MS, crisp: 1, spacing: 4 }])
+    vi.useRealTimers()
+  })
+
+  it('lets a caret behind removed text ride its gap, and one at its start stay', () => {
+    vi.useFakeTimers({ toFake: ['performance'] })
+    /** Carets of others at `heads`, and a removal of 5 to 10. */
+    const removed = (heads: number[]) =>
+      EditorState.create({
+        doc: 'Hallo Welt!',
+        extensions: [appearance({ enabled: true }), caretHeads.of(() => heads)],
+      }).update({ changes: { from: 5, to: 10 }, annotations: remoteChange.of(true) }).state
+    const ridden = (s: EditorState) => growthsForTests(s).map((g) => g.ridden)
+    // a backspace, or a selection removed from its end: the caret rides the text into the gap
+    let s = removed([10])
+    expect(ridden(s)).toEqual([true])
+    expect(growsUpTo(s, 5)).toBe(true)
+    // a forward delete, or a selection removed from its start: the caret stays, before the gap
+    s = removed([5])
+    expect(ridden(s)).toEqual([false])
+    expect(growsUpTo(s, 5)).toBe(false)
     vi.useRealTimers()
   })
 

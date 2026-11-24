@@ -83,6 +83,12 @@ export interface PresenceOptions {
   presenceMs: number
   /** The server takes the position as indexes too (`presence-indexes`): send `at` with it. */
   indexes?: () => boolean
+  /**
+   * Sends the changes not sent yet, right before a presence message: its cursors point into the
+   * text with them, and others would place them in the text without them (one removed before a
+   * caret would put it further right there).
+   */
+  beforeSend?: () => void
 }
 
 /**
@@ -277,6 +283,7 @@ export function createPresence(options: PresenceOptions) {
   function send(): void {
     timer = null
     if (!options.doc() || !options.isSynced()) return
+    options.beforeSend?.()
     lastSent = Date.now()
     // a cursor that moved took the view along: it must not arrive without it, because this user
     // can be gone before the viewport timer runs, and their ghost would show the old place
