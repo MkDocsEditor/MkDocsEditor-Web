@@ -1,5 +1,11 @@
 import { Annotation, Facet, Prec, StateEffect, StateField } from '@codemirror/state'
-import type { ChangeSet, EditorState, Extension, Transaction } from '@codemirror/state'
+import type {
+  ChangeSet,
+  EditorSelection,
+  EditorState,
+  Extension,
+  Transaction,
+} from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType } from '@codemirror/view'
 import type { DecorationSet, PluginValue, ViewUpdate } from '@codemirror/view'
 
@@ -261,9 +267,11 @@ function update(value: AppearState, tr: Transaction): AppearState {
         const pieces =
           !reveal && to - from <= TYPED_CHARS
             ? Array.from({ length: to - from }, (_, k) => [from + k, from + k + 1] as const)
-            : to > from
-              ? [[from, to] as const]
-              : []
+            : reveal
+              ? wordPieces(tr.state, from, to)
+              : to > from
+                ? [[from, to] as const]
+                : []
         for (const [a, b] of pieces)
           next = [
             ...next,
@@ -289,6 +297,23 @@ function update(value: AppearState, tr: Transaction): AppearState {
     return next.length > 0 || rates.size > 0 ? { ranges: [], rates: new Map() } : value
   if (added && next.length > config.maxRanges) next = cap(next, config, now())
   return next === ranges && rates === value.rates ? value : { ranges: next, rates }
+}
+
+/**
+ * A piece of a reveal from `from` to `to`, split where a word starts: a word carried over a wrap
+ * (`wrapCarry`, R8) is drawn apart from the space in front of it. The parts fade alike.
+ */
+function wordPieces(state: EditorState, from: number, to: number): (readonly [number, number])[] {
+  const text = state.doc.sliceString(from, to)
+  const pieces: (readonly [number, number])[] = []
+  let start = 0
+  for (let k = 1; k < text.length; k++)
+    if (/\s/.test(text[k - 1]!) && !/\s/.test(text[k]!)) {
+      pieces.push([from + start, from + k])
+      start = k
+    }
+  if (text.length > start) pieces.push([from + start, to])
+  return pieces
 }
 
 const appearing = StateField.define<AppearState>({
@@ -427,6 +452,7 @@ export function appearance(config: Partial<AppearanceConfig> = {}): Extension {
     appearing,
     animator,
     revealing,
+    revealEndsField,
     revealer,
     revealTheme,
     growing,
@@ -445,8 +471,13 @@ export function appearance(config: Partial<AppearanceConfig> = {}): Extension {
  *   what is hidden. Only inserts are typed out: the new text of a replace shows at once, and
  *   fades in like the text of others. Nobody types into hidden text: a change of the person here, anywhere, and a
  *   change of anybody else inside the hidden text of a writer or right at its start or end, show
- *   all hidden text of that writer at once and end its fades (so does a click into it). Other
- *   changes move the hidden text.
+ *   all hidden text of that writer at once and end its fades. So does a cursor or selection of
+ *   the person here put into the text being revealed (its hidden text and its text that still
+ *   appears, as one where they touch): between its start and its end, or covering part of it; not
+ *   one right at its start or end, nor one that only moves with the text. Other changes move the
+ *   hidden text.
+ * - R2 (`revealEnds`): between chunks, while nothing is hidden, the cursor of an agent without a
+ *   focus of its own stays where the text revealed last ends.
  * - R2: the head is the start of the hidden text of the first entry; it goes on to the next entry
  *   in the same frame when there are characters left. The agent's cursor is drawn there.
  * - R3: each frame reveals `rate × elapsed` characters and carries the fraction; the first frame
@@ -521,6 +552,9 @@ function splitChunks(tr: Transaction): { inserts: TaggedRange[]; replaces: Tagge
 function finishedReveals(tr: Transaction): Set<string> | 'all' {
   if (isUserEdit(tr)) return 'all'
   const finished = new Set<string>()
+  // a cursor or selection put into the text being revealed: not one moved along by a change
+  if (tr.selection && !tr.docChanged && !tr.annotation(remoteChange))
+    for (const tag of selectedReveals(tr.startState, tr.selection)) finished.add(tag)
   const before = tr.startState.field(revealing, false) ?? []
   if (!tr.docChanged || before.length === 0) return finished
   const chunks = tr.effects.flatMap((e) => (e.is(revealText) ? e.value : []))
@@ -536,6 +570,55 @@ function finishedReveals(tr: Transaction): Set<string> | 'all' {
         finished.add(range.tag)
   })
   return finished
+}
+
+/**
+ * The text each writer reveals (R1): its hidden text and its text that still appears from a reveal,
+ * as one where they touch.
+ */
+function revealedText(state: EditorState): TaggedRange[] {
+  const parts: TaggedRange[] = [
+    ...(state.field(revealing, false) ?? []).map((r) => ({
+      tag: r.tag,
+      from: r.hiddenFrom,
+      to: r.to,
+    })),
+    ...(state.field(appearing, false)?.ranges ?? [])
+      .filter((r) => r.reveal)
+      .map(({ tag, from, to }) => ({ tag, from, to })),
+  ].sort((a, b) => a.from - b.from)
+  const merged: TaggedRange[] = []
+  const last = new Map<string, TaggedRange>()
+  for (const part of parts) {
+    const before = last.get(part.tag)
+    if (before && part.from <= before.to) before.to = Math.max(before.to, part.to)
+    else {
+      const next = { ...part }
+      merged.push(next)
+      last.set(part.tag, next)
+    }
+  }
+  return merged
+}
+
+/**
+ * The writers whose revealed text a selection of the person here goes into (R1): a cursor between
+ * its start and its end, or a selection that covers part of it. One right at its start or end
+ * does not.
+ */
+function selectedReveals(state: EditorState, selection: EditorSelection): Set<string> {
+  const tags = new Set<string>()
+  const revealed = revealedText(state)
+  if (revealed.length === 0) return tags
+  for (const range of selection.ranges)
+    for (const part of revealed)
+      if (
+        range.empty
+          ? range.head > part.from && range.head < part.to
+          : range.from < part.to && range.to > part.from
+      )
+        tags.add(part.tag)
+  return tags
 }
 
 /**
@@ -608,11 +691,11 @@ const revealing = StateField.define<readonly Revealing[]>({
   create: () => [],
   update(value, tr) {
     let next = value
-    if (tr.docChanged && next.length > 0) {
+    if ((tr.docChanged || tr.selection) && next.length > 0) {
       const finished = finishedReveals(tr)
       if (finished === 'all') return []
       if (finished.size > 0) next = next.filter((r) => !finished.has(r.tag))
-      next = mapReveals(next, tr.changes)
+      if (tr.docChanged) next = mapReveals(next, tr.changes)
     }
     const config = tr.state.facet(appearanceConfig)
     if (fadesText(tr.state) && tr.effects.some((e) => e.is(revealText)))
@@ -642,6 +725,37 @@ const revealing = StateField.define<readonly Revealing[]>({
     ),
 })
 
+/** Forgets where the reveal of a writer ended: they left. */
+export const forgetRevealEnd = StateEffect.define<string>()
+
+/**
+ * Where the text each writer revealed last ends (R2): the end of its hidden text, as the reveal
+ * shows all of it, step by step or at once. Their cursor stays there between chunks.
+ */
+const revealEndsField = StateField.define<ReadonlyMap<string, number>>({
+  create: () => new Map(),
+  update(value, tr) {
+    let next = value
+    if (tr.docChanged && next.size > 0)
+      next = new Map([...next].map(([tag, end]) => [tag, tr.changes.mapPos(end, -1)] as const))
+    for (const range of tr.startState.field(revealing, false) ?? []) {
+      const end = tr.changes.mapPos(range.to, -1)
+      if (next.get(range.tag) !== end) next = new Map(next).set(range.tag, end)
+    }
+    for (const effect of tr.effects)
+      if (effect.is(forgetRevealEnd) && next.has(effect.value)) {
+        next = new Map(next)
+        ;(next as Map<string, number>).delete(effect.value)
+      }
+    return next
+  },
+})
+
+/** Where the text of each writer revealed last ends (by tag), also once nothing is hidden. */
+export function revealEnds(state: EditorState): ReadonlyMap<string, number> {
+  return state.field(revealEndsField, false) ?? new Map()
+}
+
 /** Where each agent's reveal is now (by tag): its cursor is drawn there and followed. */
 export function revealHeads(state: EditorState): Map<string, number> {
   const heads = new Map<string, number>()
@@ -664,8 +778,7 @@ export function hiddenRanges(state: EditorState): readonly TaggedRange[] {
 const FIRST_FRAME_MS = 16
 
 /**
- * Types the reveals out, a step in each frame, and lets a click on the text being revealed show it
- * at once. The step comes right after a frame, so that the next frame draws the text it uncovers
+ * Types the reveals out, a step in each frame. The step comes right after a frame, so that the next frame draws the text it uncovers
  * and the cursor at its head together (CodeMirror measures the cursors in a frame of its own).
  */
 const revealer = ViewPlugin.fromClass(
@@ -733,22 +846,6 @@ const revealer = ViewPlugin.fromClass(
     destroy(): void {
       this.cancel()
     }
-  },
-  {
-    eventHandlers: {
-      mousedown(event, view) {
-        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false)
-        // any text of an agent's reveal, also its later ranges: nobody clicks into hidden text
-        const tags = new Set(
-          view.state
-            .field(revealing)
-            .filter((r) => pos >= r.from && pos <= r.to)
-            .map((r) => r.tag),
-        )
-        for (const tag of tags) view.dispatch({ effects: finishReveal.of(tag) })
-        return false
-      },
-    },
   },
 )
 
