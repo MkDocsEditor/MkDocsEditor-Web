@@ -105,7 +105,9 @@ for (const { typist, median } of [
         return { x: NaN, row: NaN }
       }
       let alphas = new Map<string, number>()
-      let last = performance.now()
+      // the time of the frame, as the animations take it: not when this runs, after the layout
+      let frameTime = performance.now()
+      let last = frameTime
       new ResizeObserver(() => {
         // the alpha of each fading character, from the mask of its span
         const next = new Map<string, number>()
@@ -125,7 +127,7 @@ for (const { typist, median } of [
         }
         alphas = next
         // per frame of 60 Hz: a browser under load skips some
-        const time = performance.now()
+        const time = frameTime
         jump = (jump * (1000 / 60)) / Math.max(1000 / 60, time - last)
         last = time
         const caret = content.querySelector('.cm-remote-caret')
@@ -144,7 +146,7 @@ for (const { typist, median } of [
           }
           const tail = tailX()
           w.frames.push({
-            time: performance.now(),
+            time,
             caret: x,
             row: c.top,
             tail: tail.x,
@@ -155,7 +157,10 @@ for (const { typist, median } of [
           })
         }
         if (!w.stop)
-          requestAnimationFrame(() => (probe.style.width = (flip = !flip) ? '1px' : '2px'))
+          requestAnimationFrame((t) => {
+            frameTime = t
+            probe.style.width = (flip = !flip) ? '1px' : '2px'
+          })
       }).observe(probe)
     })
 
