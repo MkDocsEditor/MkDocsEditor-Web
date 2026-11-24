@@ -22,6 +22,7 @@ import type { DocumentSession } from '@/sync/session'
 import { authorship, setAuthorship } from './authorship'
 import type { AuthorHighlightMode } from './authorship'
 import { isLocalEdit, sessionBinding } from './binding'
+import { keepView } from './keepView'
 import { appearance, revealHeads } from './appearance'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { formattingKeymap } from './formatting'
@@ -134,6 +135,7 @@ onMounted(() => {
       authorship(),
       fadeInSetting.of(appearance({ enabled: !!props.fadeIn })),
       sessionBinding(props.session),
+      keepView,
       props.loadBlame ? lineHistory(props.loadBlame) : [],
       props.upload ? fileUpload(props.upload) : [],
       EditorView.updateListener.of((update) => {
