@@ -42,6 +42,23 @@ describe('presence', () => {
   beforeEach(() => void vi.useFakeTimers())
   afterEach(() => void vi.useRealTimers())
 
+  it('sends the changes not sent yet first: its cursors point into the text with them', () => {
+    const order: string[] = []
+    const presence = createPresence({
+      automerge: () => automerge,
+      doc: () => ({ content: 'x'.repeat(10) }) as unknown as AmDoc,
+      documentId: () => 'doc',
+      ownInstance: () => 'own',
+      isSynced: () => true,
+      send: (message) => void order.push(String(message.type)),
+      presenceMs: 100,
+      beforeSend: () => void order.push('changes'),
+    })
+    presence.setLocalSelections([{ anchor: 3, head: 3 }])
+    vi.runAllTimers()
+    expect(order).toEqual(['changes', 'presence'])
+  })
+
   it('lists an agent with its token and without a cursor', () => {
     const { presence } = setup()
     const agent = { tokenId: 't1', name: 'Claude Code on Linux' }

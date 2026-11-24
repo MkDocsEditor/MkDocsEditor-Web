@@ -177,7 +177,10 @@ test('renders the preview like the wiki, with images and links', async ({ page }
   await page.getByTestId('search-input').locator('input').fill('apfelkuchen')
   await page.keyboard.press('Enter')
   const preview = page.getByTestId('markdown-preview')
-  await expect(preview.locator('.admonition.tip .admonition-title')).toHaveText('Tipp')
+  // loading the page can take more than the default 5 s on a busy machine (see `openEditor`)
+  await expect(preview.locator('.admonition.tip .admonition-title')).toHaveText('Tipp', {
+    timeout: 30_000,
+  })
   await expect(preview.locator('input[type=checkbox]')).toHaveCount(2)
   // the image is a resource that needs auth: it is loaded as a blob
   const image = preview.locator('img[alt="Foto"]')

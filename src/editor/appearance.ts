@@ -113,6 +113,12 @@ const appearanceConfig = Facet.define<Partial<AppearanceConfig>, AppearanceConfi
   combine: (values) => Object.assign({}, DEFAULT_APPEARANCE, ...values) as AppearanceConfig,
 })
 
+/**
+ * Where the carets of others are in a state (`remoteCursors` provides it): a removal right in front
+ * of one slides, and the caret rides the text into the gap; one at its start stays where it is.
+ */
+export const caretHeads = Facet.define<(state: EditorState) => readonly number[]>()
+
 /** The system asks for less motion: nothing fades. */
 export function reducedMotion(): boolean {
   return (
@@ -915,8 +921,9 @@ export function appearingRanges(state: EditorView['state']): readonly TaggedRang
  * A backspace, a removal of at most `TYPING_CHARS` characters that ends where the writer typed
  * last, within `TYPING_WITHIN_MS`, is typing backwards: it closes with the timing of typing and
  * takes the growths and gaps of the writer along, as typing does, and an
- * insert there right after it goes on typing. The writer's caret is right behind the gap and moves
- * with it. Not for removals across lines (the lines below would jump anyway), nor long ones.
+ * insert there right after it goes on typing. A caret right behind removed text (the writer's,
+ * after a backspace) is right behind the gap and moves with it; one at its start (a forward delete)
+ * stays, before the gap (`caretHeads`). Not for removals across lines (the lines below would jump anyway), nor long ones.
  *
  * Never for local changes (only `animateText`, `revealText` and `remoteChange` mark changes of
  * others), and under the settings of the fade.
@@ -952,6 +959,11 @@ interface Growing {
   spacing: number
   /** The gap of removed text, at `from` (= `to`). */
   gap?: boolean
+  /**
+   * A gap with a caret right behind the removed text: drawn before that caret, which rides the
+   * text into it. Else it is drawn after the carets at its place, which stay where they are.
+   */
+  ridden?: boolean
   id: number
 }
 
@@ -1039,6 +1051,10 @@ const growing = StateField.define<GrowState>({
       tr.changes.iterChanges((fromA, toA, fromB) => {
         if (toA > fromA) removals.push({ fromA, toA, at: fromB })
       })
+      const heads =
+        removals.length === 0
+          ? []
+          : tr.startState.facet(caretHeads).flatMap((of) => of(tr.startState))
       for (const { fromA, toA, at } of removals) {
         const chars = toA - fromA
         if (chars > MAX_GAP_CHARS || tr.startState.doc.sliceString(fromA, toA).includes('\n'))
@@ -1051,7 +1067,8 @@ const growing = StateField.define<GrowState>({
           chars,
         )
         const tag = typing ? writer! : ''
-        start({ tag, from: at, to: at, duration, crisp, spacing: chars, gap: true }, early)
+        const ridden = heads.includes(toA)
+        start({ tag, from: at, to: at, duration, crisp, spacing: chars, gap: true, ridden }, early)
         if (typing)
           last = new Map(last).set(tag, {
             to: at,
@@ -1089,8 +1106,9 @@ const growing = StateField.define<GrowState>({
       Decoration.set(
         ranges.map((r) =>
           r.gap
-            ? // before the caret of the writer (`side: 1`), which it then carries along
-              Decoration.widget({ widget: new GapWidget(r), side: -1 }).range(r.from)
+            ? // before the caret of the writer (`side: 1`), which it then carries along; after a
+              // caret that was at its start, which then stays
+              Decoration.widget({ widget: new GapWidget(r), side: r.ridden ? -1 : 2 }).range(r.from)
             : Decoration.mark({ attributes: { 'data-grow': String(r.id) } }).range(r.from, r.to),
         ),
         true,
@@ -1125,13 +1143,14 @@ export function growthsForTests(state: EditorState): readonly Growing[] {
 }
 
 /**
- * Whether text that grows right now ends at `pos`: a caret there is carried by the layout. Also a
+ * Whether text that grows right now ends at `pos`, or a gap closes there that a caret rides: a
+ * caret there is carried by the layout. Also a
  * while after: a browser under load may draw its next frame only once the growth is over, and the
  * caret is then where the layout put it, not to glide there from where it was.
  */
 export function growsUpTo(state: EditorState, pos: number, time = now()): boolean {
   return (state.field(growing, false)?.ranges ?? []).some(
-    (r) => r.to === pos && time < r.start + r.duration + CARRY_MS,
+    (r) => r.to === pos && (!r.gap || r.ridden) && time < r.start + r.duration + CARRY_MS,
   )
 }
 
@@ -1186,7 +1205,8 @@ const grower = ViewPlugin.fromClass(
           {
             duration: range.duration,
             easing: growEasing(range.crisp),
-            fill: 'backwards',
+            // a gap stays shut after: else it opens to the width it was drawn with, until it goes
+            fill: range.gap ? 'both' : 'backwards',
           },
         )
         animation.startTime = range.start

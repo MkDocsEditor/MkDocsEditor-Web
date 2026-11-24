@@ -186,6 +186,7 @@ export function createAutomergeSession(options: AutomergeSessionOptions): Docume
     isSynced: () => connection.synced,
     send,
     presenceMs: timing.presenceMs,
+    beforeSend: () => flush(),
   })
   const authors = createAuthors({
     automerge: () => A,
