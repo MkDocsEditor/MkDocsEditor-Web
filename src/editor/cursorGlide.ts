@@ -15,12 +15,15 @@ import { GONE, remoteSelections } from './remoteCursors'
  * when only the layout changed (resize, fonts), when it moved less than half a pixel, when
  * "Animate edits of others" is off, when the system reduces motion and while the page is hidden.
  *
- * A new place while it still glides, or within `CATCH_UP_WITHIN_MS` of a glide's place (a reveal
- * typing out, fast typing; steps come unevenly), catches up: that glide takes 1.5 times the time
- * since the place before, between `MIN_CATCH_UP_MS` and `GLIDE_MS`, and moves in the frame it is
- * drawn first, not one frame later (after a glide that ended less than a frame ago, on from its
- * end). So a cursor moved in quick small steps stays within a few characters of its place; one
- * move alone still takes `GLIDE_MS`. The rule of KodeEditor, so that web and Android match.
+ * The rules of KodeEditor (docs/reveal.md, R5), so that web and Android match. A cursor at rest
+ * glides with the cubic ease-out. One that gets a new place while it glides (the head of a reveal,
+ * fast typing) starts a new glide from where it is drawn and keeps its speed: a cubic Hermite
+ * curve that stops at its place, with the speed it has, toward the new place only, and at most
+ * the start speed of the ease-out, so it never shoots past or swings sideways. That glide catches
+ * up: it takes 1.5 times the time since the place before, between `MIN_CATCH_UP_MS` and
+ * `GLIDE_MS`. So does one within `CATCH_UP_WITHIN_MS` after a glide ended (steps come unevenly):
+ * from a glide that ended at most `CONTINUE_MS` ago it starts in this frame, else one frame back,
+ * so that it moves in its first frame. One move alone still takes `GLIDE_MS`.
  *
  * A cursor that appears just appears. One that goes away (its user left, or an agent took its
  * pointer away) fades out over `FADE_OUT_MS`, linearly, under the same settings; if it comes
@@ -32,8 +35,9 @@ export const MAX_WIDTH = 0.4
 export const MAX_SIDEWAYS = 3
 export const MIN_CATCH_UP_MS = 32
 export const CATCH_UP_WITHIN_MS = 90
-/** One frame, by which a catching-up glide starts earlier: it moves in the frame it is drawn. */
-const FRAME_MS = 1000 / 60
+export const CONTINUE_MS = 20
+/** One frame, by which a catching-up glide from rest starts earlier: it moves in its first frame. */
+const FRAME_MS = 16
 
 /** Ease-out cubic: fast start, gentle stop. */
 export const easeOut = (t: number) => 1 - (1 - t) ** 3
@@ -47,7 +51,14 @@ export interface Glide {
   duration: number
   /** When it got its place `to`. */
   set: number
+  /** Its speed at the start, in px per ms; that of the ease-out for a glide from rest. */
+  vx: number
+  vy: number
 }
+
+/** The Hermite basis: how much of the start distance and of the start speed are left at `t`. */
+const h00 = (t: number) => 2 * t ** 3 - 3 * t ** 2 + 1
+const h10 = (t: number) => t ** 3 - 2 * t ** 2 + t
 
 /** A cursor drawn at `to`, not moving. */
 export function still(to: { x: number; y: number }, now: number): Glide {
@@ -59,7 +70,22 @@ export function still(to: { x: number; y: number }, now: number): Glide {
     start: now,
     duration: GLIDE_MS,
     set: now,
+    vx: 0,
+    vy: 0,
   }
+}
+
+/** A glide from `from` to `to` with the start speed of the ease-out. */
+function easingOut(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  start: number,
+  duration: number,
+  set: number,
+): Glide {
+  const vx = (3 * (to.x - from.x)) / duration
+  const vy = (3 * (to.y - from.y)) / duration
+  return { fromX: from.x, fromY: from.y, toX: to.x, toY: to.y, start, duration, set, vx, vy }
 }
 
 /** A glide from where `before` draws it now to `to`: a catch-up if `before` still moves. */
@@ -69,25 +95,62 @@ function glideFrom(
   to: { x: number; y: number },
   now: number,
 ): Glide {
-  const glide = { fromX: shown.x, fromY: shown.y, toX: to.x, toY: to.y, set: now }
   const since = before ? now - before.set : Infinity
+  // a snap forgets the time of its place
   const glided = !!before && (before.fromX !== before.toX || before.fromY !== before.toY)
-  if (!before || !(moving(before, now) || (glided && since < CATCH_UP_WITHIN_MS)))
-    return { ...glide, start: now, duration: GLIDE_MS }
+  if (!before || !glided) return easingOut(shown, to, now, GLIDE_MS, now)
   const duration = Math.min(GLIDE_MS, Math.max(MIN_CATCH_UP_MS, 1.5 * since))
-  // a frame early, but not before the glide before ended: it went on until then
+  if (moving(before, now)) {
+    // on with its speed toward the new place, from where it is drawn in this frame
+    const dx = to.x - shown.x
+    const dy = to.y - shown.y
+    const distance = Math.hypot(dx, dy)
+    const speed = glideSpeed(before, now)
+    const along = Math.min(
+      Math.max(0, (speed.x * dx + speed.y * dy) / distance),
+      (3 * distance) / duration,
+    )
+    return {
+      fromX: shown.x,
+      fromY: shown.y,
+      toX: to.x,
+      toY: to.y,
+      start: now,
+      duration,
+      set: now,
+      vx: (along * dx) / distance,
+      vy: (along * dy) / distance,
+    }
+  }
+  if (since >= CATCH_UP_WITHIN_MS) return easingOut(shown, to, now, GLIDE_MS, now)
+  // at rest a moment: on from the frame it ended in, if that was just now, else a frame back
   const ended = before.start + before.duration
-  const start = ended <= now ? Math.max(now - FRAME_MS, ended) : now - FRAME_MS
-  return { ...glide, start, duration: now + duration - start }
+  const start = now - ended <= CONTINUE_MS ? now : now - FRAME_MS
+  return easingOut(shown, to, start, now + duration - start, now)
+}
+
+/** How fast a glide moves at `time`, in px per ms. */
+export function glideSpeed(glide: Glide, time: number): { x: number; y: number } {
+  const t = (time - glide.start) / glide.duration
+  if (t < 0 || t >= 1) return { x: 0, y: 0 }
+  // the derivatives of h00 and h10 by t
+  const d00 = (6 * t ** 2 - 6 * t) / glide.duration
+  const d10 = 3 * t ** 2 - 4 * t + 1
+  return {
+    x: d00 * (glide.fromX - glide.toX) + d10 * glide.vx,
+    y: d00 * (glide.fromY - glide.toY) + d10 * glide.vy,
+  }
 }
 
 /** Where a glide draws the cursor at `time`. */
 export function glidePosition(glide: Glide, time: number): { x: number; y: number } {
   const t = Math.min(1, Math.max(0, (time - glide.start) / glide.duration))
-  const k = easeOut(t)
+  // how far it is from its place: d0 and the start speed, as Hermite says
+  const a = h00(t)
+  const b = h10(t) * glide.duration
   return {
-    x: glide.fromX + (glide.toX - glide.fromX) * k,
-    y: glide.fromY + (glide.toY - glide.fromY) * k,
+    x: glide.toX + a * (glide.fromX - glide.toX) + b * glide.vx,
+    y: glide.toY + a * (glide.fromY - glide.toY) + b * glide.vy,
   }
 }
 

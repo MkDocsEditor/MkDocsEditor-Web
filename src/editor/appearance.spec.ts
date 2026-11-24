@@ -11,6 +11,7 @@ import {
   finishReveal,
   growingRanges,
   hiddenRanges,
+  remoteChange,
   revealHeads,
   revealText,
   revealsText,
@@ -92,7 +93,15 @@ describe('typing reveal', () => {
   })
 
   function editor(doc: string, config: Partial<AppearanceConfig> = { enabled: true }) {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+    vi.useFakeTimers({
+      toFake: [
+        'setTimeout',
+        'clearTimeout',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'performance',
+      ],
+    })
     return new EditorView({
       state: EditorState.create({ doc, extensions: appearance(config) }),
       parent: document.body,
@@ -146,36 +155,155 @@ describe('typing reveal', () => {
     view.destroy()
   })
 
-  it('finishes a range when someone edits inside it or at its edge', () => {
+  /** Somebody else (not an agent with a reveal) changes the text. */
+  function otherWrites(view: EditorView, from: number, to: number, insert = '') {
+    view.dispatch({ changes: { from, to, insert }, annotations: remoteChange.of(true) })
+  }
+
+  it('shows all hidden text of the person here changes the text, anywhere', () => {
     const view = editor('Hallo ')
     agentWrites(view, 6, 'Welt')
-    view.dispatch({ changes: { from: 10, insert: '!' } })
+    agentWrites(view, 0, 'Oh ', 'other')
+    view.dispatch({ changes: { from: 0, insert: '!' } })
     expect(hiddenRanges(view.state)).toEqual([])
     view.destroy()
   })
 
-  it('does not finish it for edits elsewhere', () => {
+  it('shows the hidden text of a writer that somebody else changes, inside or at an edge', () => {
+    for (const [from, to] of [
+      [7, 8],
+      [6, 6],
+      [10, 10],
+    ] as const) {
+      const view = editor('Hallo ')
+      agentWrites(view, 6, 'Welt')
+      agentWrites(view, 0, 'Oh ', 'other')
+      // positions after "Oh " went in front
+      otherWrites(view, from + 3, to + 3, 'x')
+      expect(hiddenRanges(view.state)).toEqual([{ tag: 'other', from: 0, to: 3 }])
+      view.destroy()
+    }
+  })
+
+  it('judges each change of a live change on its own: a replace in hidden text shows it', () => {
     const view = editor('Hallo ')
     agentWrites(view, 6, 'Welt')
-    view.dispatch({ changes: { from: 0, insert: 'Oh, ' } })
+    // the agent replaces a hidden character: not an insert, so not its own
+    view.dispatch({
+      changes: { from: 7, to: 8, insert: 'E' },
+      effects: revealText.of([{ tag: 'agent', from: 7, to: 8 }]),
+      annotations: remoteChange.of(true),
+    })
+    // all of it shows: the rest of "Welt", and the new text of the replace, which fades in
+    expect(hiddenRanges(view.state)).toEqual([])
+    expect(appearingRanges(view.state)).toContainEqual({ tag: 'agent', from: 7, to: 8 })
+    view.destroy()
+
+    // a chunk at the end plus a delete inside, in one transaction: the delete shows it
+    const other = editor('Hallo ')
+    agentWrites(other, 6, 'Welt')
+    other.dispatch({
+      changes: [
+        { from: 7, to: 8 },
+        { from: 10, insert: ' heute' },
+      ],
+      effects: revealText.of([{ tag: 'agent', from: 9, to: 15 }]),
+      annotations: remoteChange.of(true),
+    })
+    expect(hiddenRanges(other.state)).toEqual([{ tag: 'agent', from: 9, to: 15 }])
+    other.destroy()
+  })
+
+  it('moves hidden text with changes of others elsewhere', () => {
+    const view = editor('Hallo ')
+    agentWrites(view, 6, 'Welt')
+    otherWrites(view, 0, 0, 'Oh, ')
     expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 10, to: 14 }])
     view.destroy()
   })
 
-  it('finishes the running reveal of an agent when its next change comes', () => {
+  it('queues the chunks of an agent and never shows hidden text early', () => {
+    const view = editor('a b')
+    agentWrites(view, 1, ' eins')
+    // right at the end of the newest chunk: joins it
+    agentWrites(view, 6, ' zwei')
+    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 1, to: 11 }])
+    // elsewhere, and right at the start of hidden text: new entries at the end of the queue
+    agentWrites(view, 13, ' drei')
+    agentWrites(view, 1, 'vier')
+    expect(hiddenRanges(view.state)).toEqual([
+      { tag: 'agent', from: 5, to: 15 },
+      { tag: 'agent', from: 17, to: 22 },
+      { tag: 'agent', from: 1, to: 5 },
+    ])
+    // inside hidden text: part of it
+    agentWrites(view, 7, 'X')
+    expect(hiddenRanges(view.state)[0]).toEqual({ tag: 'agent', from: 5, to: 16 })
+    // the head walks the queue in its order
+    expect(revealHeads(view.state).get('agent')).toBe(5)
+    vi.advanceTimersByTime(100)
+    expect(revealHeads(view.state).get('agent')).toBeGreaterThan(5)
+    vi.advanceTimersByTime(4_000)
+    expect(hiddenRanges(view.state)).toEqual([])
+    view.destroy()
+  })
+
+  it('shows the reveal of one agent at once and leaves the others', () => {
     const view = editor('')
     agentWrites(view, 0, 'eins ')
-    agentWrites(view, 5, 'zwei')
-    expect(hiddenRanges(view.state)).toEqual([{ tag: 'agent', from: 5, to: 9 }])
-    // another agent's reveal runs at the same time
     agentWrites(view, 0, 'drei ', 'other')
-    expect(
-      hiddenRanges(view.state)
-        .map((r) => r.tag)
-        .sort(),
-    ).toEqual(['agent', 'other'])
     view.dispatch({ effects: finishReveal.of('agent') })
     expect(hiddenRanges(view.state)).toEqual([{ tag: 'other', from: 0, to: 5 }])
+    view.destroy()
+  })
+
+  it('reveals at 60 characters a second, faster for a backlog, and never slower', () => {
+    const view = editor('')
+    agentWrites(view, 0, 'x'.repeat(30))
+    vi.advanceTimersByTime(250)
+    // about 15 of 30
+    const left = hiddenRanges(view.state)[0]!
+    expect(left.to - left.from).toBeGreaterThanOrEqual(13)
+    expect(left.to - left.from).toBeLessThanOrEqual(17)
+    vi.advanceTimersByTime(1_000)
+    expect(hiddenRanges(view.state)).toEqual([])
+
+    // 2,000 characters at once: within 4 s, at an even speed
+    agentWrites(view, 30, 'y'.repeat(2_000))
+    const shown: number[] = []
+    for (let i = 0; i < 8; i++) {
+      vi.advanceTimersByTime(500)
+      const [range] = hiddenRanges(view.state)
+      shown.push(2_000 - (range ? range.to - range.from : 0))
+    }
+    expect(shown.at(-1)).toBe(2_000)
+    const steps = shown.slice(0, 7).map((n, i) => n - (shown[i - 1] ?? 0))
+    for (const step of steps) expect(Math.abs(step - 250)).toBeLessThanOrEqual(10)
+    view.destroy()
+  })
+
+  it('keeps the speed when a small chunk comes while a big one is revealed', () => {
+    const view = editor('')
+    agentWrites(view, 0, 'x'.repeat(1_000))
+    vi.advanceTimersByTime(2_000)
+    agentWrites(view, 1_000, 'y'.repeat(10))
+    // all that was hidden when the chunk came shows within 4 s
+    vi.advanceTimersByTime(2_100)
+    expect(hiddenRanges(view.state)).toEqual([])
+    view.destroy()
+  })
+
+  it('lets every piece of a reveal fade in full, also past the window of fades', () => {
+    const view = editor('', { enabled: true, revealCharsPerSecond: 600 })
+    agentWrites(view, 0, 'x'.repeat(100))
+    vi.advanceTimersByTime(100)
+    const fading = appearingRanges(view.state).reduce((sum, r) => sum + r.to - r.from, 0)
+    expect(fading).toBeGreaterThan(16)
+    // a new chunk ends none of them; a change of the person here ends them all
+    agentWrites(view, 100, 'y')
+    expect(appearingRanges(view.state).length).toBeGreaterThan(0)
+    view.dispatch({ changes: { from: 0, insert: '!' } })
+    expect(appearingRanges(view.state)).toEqual([])
     view.destroy()
   })
 
@@ -205,7 +333,7 @@ describe('typing reveal', () => {
       addListener: () => undefined,
       removeListener: () => undefined,
     }))
-    vi.advanceTimersByTime(30)
+    vi.advanceTimersByTime(50)
     expect(hiddenRanges(view.state)).toEqual([])
     view.destroy()
   })
