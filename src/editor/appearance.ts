@@ -20,6 +20,11 @@ import {
 /** Marks transactions that come from the session: what others wrote, or a resync. */
 export const remoteChange = Annotation.define<boolean>()
 
+/** Whether a transaction shows more of an agent's text (a step of a reveal). */
+export function isRevealStep(tr: Transaction): boolean {
+  return tr.effects.some((e) => e.is(revealPiece))
+}
+
 /**
  * Whether the person here changed the text: not the session, and not text marked to fade or to be
  * revealed (which only ever comes from others).
