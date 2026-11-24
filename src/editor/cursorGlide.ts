@@ -87,6 +87,8 @@ export interface Glide {
   interval?: number
   /** Carried by the layout, behind growing text: drawn where it is, and on from there after. */
   riding?: boolean
+  /** Riding: the place in the text it rode at. */
+  rodeAt?: number
 }
 
 /** The Hermite basis: how much of the start distance and of the start speed are left at `t`. */
@@ -326,6 +328,11 @@ class CursorGlider {
   update(update: ViewUpdate): void {
     // moved with the text or by a new place of the peer, or only laid out anew
     const moved = update.docChanged || update.transactions.some((tr) => tr.effects.length > 0)
+    // the place a caret rode at goes along with the text
+    if (update.docChanged)
+      for (const [key, glide] of this.glides)
+        if (glide.rodeAt !== undefined)
+          this.glides.set(key, { ...glide, rodeAt: update.changes.mapPos(glide.rodeAt, -1) })
     if (moved || update.geometryChanged || update.viewportChanged) this.schedule(moved)
   }
 
@@ -368,10 +375,20 @@ class CursorGlider {
       const before = this.glides.get(key)
       const head = heads.get(key)
       if (head !== undefined && growsUpTo(this.view.state, head, frameTime))
-        next.set(key, { ...still(to, now), riding: true })
+        next.set(key, { ...still(to, now), riding: true, rodeAt: head })
       // the growth ended where the layout carried it: on from there, without a glide
-      else if (before?.riding) next.set(key, still(to, now))
-      else next.set(key, retarget(before, to, now, animate, lineHeight, width, charWidth))
+      else if (before?.riding && (head === before.rodeAt || before.rodeAt === undefined))
+        next.set(key, still(to, now))
+      // moved on from where it rode: from where the layout drew it there, as from rest
+      else if (before?.riding) {
+        const was = this.view.coordsAtPos(Math.min(before.rodeAt!, this.view.state.doc.length), 1)
+        const is = head === undefined ? null : this.view.coordsAtPos(head, 1)
+        const from = was && is ? { x: to.x + was.left - is.left, y: to.y + was.top - is.top } : to
+        next.set(
+          key,
+          retarget(still(from, before.set), to, now, animate, lineHeight, width, charWidth),
+        )
+      } else next.set(key, retarget(before, to, now, animate, lineHeight, width, charWidth))
       drawn.set(key, { caret, x: box.left - baseX, y: box.top - baseY })
     }
     // carets scrolled out of view keep their last place, should they go away there
