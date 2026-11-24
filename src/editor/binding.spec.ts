@@ -54,15 +54,69 @@ describe('change conversion', () => {
 })
 
 describe('diffText', () => {
-  it('finds a minimal replacement', () => {
+  /** Where a caret at `pos` is after the changes from `before` to `after`, as CodeMirror maps it. */
+  const caret = (before: string, after: string, pos: number) =>
+    toChangeSet(diffText(before, after), before.length).mapPos(pos)
+
+  it('finds the parts that differ', () => {
     expect(diffText('abcdef', 'abXYef')).toEqual([{ from: 2, to: 4, insert: 'XY' }])
     expect(diffText('same', 'same')).toEqual([])
     expect(applyChanges('Grüße', diffText('Grüße', 'Grüß Gott'))).toBe('Grüß Gott')
   })
 
+  it('changes each part on its own, one after the other', () => {
+    const before = 'Der erste Satz.\nIn der Mitte.\nDas Ende.\n'
+    const after = 'Der neue erste Satz.\nIn der Mitte.\nDas Ende. Mehr.\n'
+    const changes = diffText(before, after)
+    expect(changes).toHaveLength(2)
+    expect(applyChanges(before, changes)).toBe(after)
+  })
+
+  it('leaves a caret in text that stayed at its text', () => {
+    const before = 'Der erste Satz.\nIn der Mitte.\nDas Ende.\n'
+    const after = 'Ganz neu.\nIn der Mitte.\nDas Ende. Mehr.\n'
+    // after "Mitte": before, the one replace from the first to the last change took it to its start
+    const at = before.indexOf('Mitte') + 5
+    expect(caret(before, after, at)).toBe(after.indexOf('Mitte') + 5)
+    // near the end, after the last change
+    expect(caret(before, after, before.length)).toBe(after.length)
+  })
+
+  it('takes a caret in a changed word to that word, not to the start of all changes', () => {
+    const before = 'Eins zwei drei.\nVier fünf sechs.\n'
+    const after = 'Eins 2 drei.\nVier 5 sechs.\n'
+    const moved = caret(before, after, before.indexOf('fünf') + 2)
+    expect(moved).toBeGreaterThanOrEqual(after.indexOf('5'))
+    expect(moved).toBeLessThanOrEqual(after.indexOf('5') + 1)
+  })
+
   it('does not split surrogate pairs', () => {
-    const [change] = diffText('a😀b', 'a😃b')
-    expect(change).toEqual({ from: 1, to: 3, insert: '😃' })
+    expect(diffText('a😀b', 'a😃b')).toEqual([{ from: 1, to: 3, insert: '😃' }])
+    expect(diffText('a😀b', 'a🙀b')).toEqual([{ from: 1, to: 3, insert: '🙀' }])
+  })
+
+  it('turns any text into any other', () => {
+    const pieces = ['a', 'b', ' ', '\n', 'ü', '😀', '😃', 'xyz']
+    let seed = 7
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    const text = () =>
+      Array.from(
+        { length: Math.floor(random() * 30) },
+        () => pieces[Math.floor(random() * 8)],
+      ).join('')
+    for (let i = 0; i < 300; i++) {
+      const before = text()
+      const after = text()
+      const changes = diffText(before, after)
+      expect(applyChanges(before, changes)).toBe(after)
+      // no change starts or ends inside a pair, in the text it applies to
+      let current = before
+      for (const c of changes) {
+        for (const at of [c.from, c.to])
+          expect(/[\udc00-\udfff]/.test(current.charAt(at)) && at > 0).toBe(false)
+        current = applyChanges(current, [c])
+      }
+    }
   })
 })
 

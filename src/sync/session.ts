@@ -1,3 +1,4 @@
+import DiffMatchPatch, { DIFF_DELETE, DIFF_EQUAL } from 'diff-match-patch'
 import type { Ref } from 'vue'
 
 import type { AgentInfo } from './protocol'
@@ -185,29 +186,64 @@ export function applyChanges(text: string, changes: readonly TextChange[]): stri
 }
 
 /**
- * Minimal single replacement turning `before` into `after` (common prefix and suffix are kept).
- * Avoids splitting UTF-16 surrogate pairs.
+ * The changes turning `before` into `after`, as sequential TextChanges: only the parts that differ,
+ * each on its own, so that a caret in text that stayed keeps its place, and one in a changed word
+ * lands there, not at the start of everything between the first and the last difference. The
+ * diff of the backend's `spliceDiff` (diff-match-patch with its semantic cleanup, so changes are
+ * whole words where that reads better). Never splits a UTF-16 surrogate pair.
  */
 export function diffText(before: string, after: string): TextChange[] {
   if (before === after) return []
-  let start = 0
-  const minLength = Math.min(before.length, after.length)
-  while (start < minLength && before.charCodeAt(start) === after.charCodeAt(start)) start++
-  let endBefore = before.length
-  let endAfter = after.length
-  while (
-    endBefore > start &&
-    endAfter > start &&
-    before.charCodeAt(endBefore - 1) === after.charCodeAt(endAfter - 1)
-  ) {
-    endBefore--
-    endAfter--
+  const dmp = new DiffMatchPatch()
+  // on a huge text, a coarser diff rather than a long wait
+  dmp.Diff_Timeout = 0.5
+  const diffs = dmp.diff_main(before, after)
+  dmp.diff_cleanupSemantic(diffs)
+  // the parts that differ, by where they are in both texts
+  const hunks: { fromA: number; toA: number; fromB: number; toB: number }[] = []
+  let a = 0
+  let b = 0
+  for (const [op, text] of diffs) {
+    if (op === DIFF_EQUAL) {
+      a += text.length
+      b += text.length
+      continue
+    }
+    const last = hunks.at(-1)
+    const hunk =
+      last && last.toA === a && last.toB === b ? last : { fromA: a, toA: a, fromB: b, toB: b }
+    if (hunk !== last) hunks.push(hunk)
+    if (op === DIFF_DELETE) hunk.toA = a += text.length
+    else hunk.toB = b += text.length
   }
-  const isLowSurrogate = (code: number) => code >= 0xdc00 && code <= 0xdfff
-  if (start > 0 && isLowSurrogate(before.charCodeAt(start))) start--
-  if (endBefore < before.length && isLowSurrogate(before.charCodeAt(endBefore))) {
-    endBefore++
-    endAfter++
+  const isLow = (code: number) => code >= 0xdc00 && code <= 0xdfff
+  // a pair split at an edge: the whole pair is in the part
+  for (const h of hunks) {
+    if (h.fromA > 0 && (isLow(before.charCodeAt(h.fromA)) || isLow(after.charCodeAt(h.fromB)))) {
+      h.fromA--
+      h.fromB--
+    }
+    if (isLow(before.charCodeAt(h.toA)) || isLow(after.charCodeAt(h.toB))) {
+      h.toA++
+      h.toB++
+    }
   }
-  return [{ from: start, to: endBefore, insert: after.slice(start, endAfter) }]
+  // parts that grew into each other are one
+  const merged: typeof hunks = []
+  for (const h of hunks) {
+    const last = merged.at(-1)
+    if (last && h.fromA <= last.toA) {
+      last.toA = Math.max(last.toA, h.toA)
+      last.toB = Math.max(last.toB, h.toB)
+    } else merged.push({ ...h })
+  }
+  // each relative to the text after the ones before
+  const changes: TextChange[] = []
+  let shift = 0
+  for (const h of merged) {
+    const from = h.fromA + shift
+    changes.push({ from, to: from + h.toA - h.fromA, insert: after.slice(h.fromB, h.toB) })
+    shift += h.toB - h.fromB - (h.toA - h.fromA)
+  }
+  return changes
 }
