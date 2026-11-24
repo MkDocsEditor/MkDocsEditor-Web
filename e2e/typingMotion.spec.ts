@@ -184,7 +184,13 @@ for (const { typist, median } of [
     const same = frames.filter((f) => Math.abs(f.tailRow - f.row) < 4 && Number.isFinite(f.tail))
     const gaps = same.map((f) => f.tail - f.caret)
     const rest = gaps.at(-1)!
-    const off = gaps.map((g) => Math.abs(g - rest))
+    // only frames that came on time: after a browser stood still for a second under load, several
+    // keys arrive in one frame, and that frame shows the state of none of them
+    const onTime = same.map((f) => {
+      const before = frames[frames.indexOf(f) - 1]
+      return !!before && f.time - before.time <= 40
+    })
+    const off = gaps.map((g, i) => (onTime[i] ? Math.abs(g - rest) : 0))
     // within a row: a new row is a jump
     const speeds = frames
       .slice(1)
