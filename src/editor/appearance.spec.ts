@@ -13,6 +13,8 @@ import {
   FADE_MIN_MS,
   fadeDuration,
   finishReveal,
+  forgetRevealEnd,
+  revealEnds,
   GROW_MS,
   growingRanges,
   growsUpTo,
@@ -318,6 +320,78 @@ describe('typing reveal', () => {
     expect(revealHeads(view.state).get('agent')).toBeGreaterThan(5)
     vi.advanceTimersByTime(4_000)
     expect(hiddenRanges(view.state)).toEqual([])
+    view.destroy()
+  })
+
+  it('shows the reveal a cursor or selection of the person here goes into, not one at its edge (R1)', () => {
+    const reveal = () => {
+      const view = editor('Hallo ')
+      agentWrites(view, 6, 'Welt, wie geht es?')
+      agentWrites(view, 0, 'Oh ', 'other')
+      vi.advanceTimersByTime(50)
+      return view
+    }
+    // positions after "Oh "; the agent's text is 9 to 27
+    for (const [anchor, head, shows] of [
+      [9, 9, false],
+      [27, 27, false],
+      [5, 9, false],
+      [10, 10, true],
+      [20, 20, true],
+      [5, 12, true],
+      [25, 27, true],
+    ] as const) {
+      const view = reveal()
+      const head0 = revealHeads(view.state).get('agent')
+      view.dispatch({ selection: { anchor, head } })
+      // the other writer goes on either way
+      expect({
+        at: [anchor, head],
+        hidden: hiddenRanges(view.state).map((r) => r.tag),
+        appearing: appearingRanges(view.state).some((r) => r.tag === 'agent'),
+        head: revealHeads(view.state).get('agent'),
+      }).toEqual({
+        at: [anchor, head],
+        hidden: shows ? ['other'] : ['agent', 'other'],
+        appearing: !shows,
+        head: shows ? undefined : head0,
+      })
+      view.destroy()
+    }
+  })
+
+  it('shows nothing for a cursor that only moves with the text', () => {
+    const view = editor('Hallo ')
+    view.dispatch({ selection: { anchor: 6 } })
+    agentWrites(view, 6, 'Welt')
+    agentWrites(view, 0, 'Oh ', 'other')
+    expect(view.state.selection.main.head).toBe(9)
+    expect(
+      hiddenRanges(view.state)
+        .map((r) => r.tag)
+        .sort(),
+    ).toEqual(['agent', 'other'])
+    view.destroy()
+  })
+
+  it('remembers where the text revealed last ends, as it is typed out or shown at once (R2)', () => {
+    const view = editor('Hallo ')
+    agentWrites(view, 6, 'Welt')
+    vi.advanceTimersByTime(50)
+    expect(revealEnds(view.state).get('agent')).toBe(10)
+    vi.advanceTimersByTime(5_000)
+    expect(revealHeads(view.state).size).toBe(0)
+    expect(revealEnds(view.state).get('agent')).toBe(10)
+    // moves with the text, and stays in front of the next chunk
+    otherWrites(view, 0, 0, '¡')
+    expect(revealEnds(view.state).get('agent')).toBe(11)
+    agentWrites(view, 11, ', du')
+    vi.advanceTimersByTime(5_000)
+    expect(revealEnds(view.state).get('agent')).toBe(15)
+    view.dispatch({ changes: { from: 0, insert: '!' } })
+    expect(revealEnds(view.state).get('agent')).toBe(16)
+    view.dispatch({ effects: forgetRevealEnd.of('agent') })
+    expect(revealEnds(view.state).size).toBe(0)
     view.destroy()
   })
 

@@ -23,7 +23,7 @@ import { authorship, setAuthorship } from './authorship'
 import type { AuthorHighlightMode } from './authorship'
 import { isLocalEdit, sessionBinding } from './binding'
 import { keepView } from './keepView'
-import { appearance, revealHeads } from './appearance'
+import { appearance, forgetRevealEnd, revealEnds, revealHeads } from './appearance'
 import { codeTheme, lineNumberGutter, markdownMarkTags } from './codeTheme'
 import { formattingKeymap } from './formatting'
 import type { FormatName } from './formatting'
@@ -31,7 +31,8 @@ import { lineHistory } from './lineHistory'
 import { remoteCursors, setPeers } from './remoteCursors'
 import { fileUpload } from './upload'
 import type { UploadFiles } from './upload'
-import { withRevealHeads } from './revealHeads'
+import { NO_REVEAL_PLACES, withRevealHeads } from './revealHeads'
+import type { RevealPlaces } from './revealHeads'
 import { createViewportPublisher } from './viewportPublisher'
 
 const props = defineProps<{
@@ -58,7 +59,7 @@ const emit = defineEmits<{
   /** This user changed the text. */
   localEdit: []
   /** Where each agent's reveal is (by actor), while the editor types out a live change. */
-  revealHeads: [heads: ReadonlyMap<string, number>]
+  revealPlaces: [places: RevealPlaces]
   /** The editor is there, with the text of the session. */
   ready: [view: EditorView]
 }>()
@@ -146,10 +147,13 @@ onMounted(() => {
           update.view.requestMeasure({ read: emitAnchor })
         }
         if (update.docChanged || update.geometryChanged) viewportPublisher?.publish()
-        const heads = revealHeads(update.state)
-        if (!sameHeads(heads, shownHeads)) {
-          shownHeads = heads
-          emit('revealHeads', heads)
+        const places = { heads: revealHeads(update.state), ends: revealEnds(update.state) }
+        if (
+          !samePlaces(places.heads, shownPlaces.heads) ||
+          !samePlaces(places.ends, shownPlaces.ends)
+        ) {
+          shownPlaces = places
+          emit('revealPlaces', places)
           // not during the update: CodeMirror refuses dispatches then
           queueMicrotask(pushPeers)
         }
@@ -165,17 +169,22 @@ onMounted(() => {
   emit('ready', view)
 })
 
-/** The heads of the reveals that the cursors of agents show. */
-let shownHeads: ReadonlyMap<string, number> = new Map()
+/** Where the cursors of agents are shown while their changes are typed out. */
+let shownPlaces: RevealPlaces = NO_REVEAL_PLACES
 
-function sameHeads(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): boolean {
+function samePlaces(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): boolean {
   return a.size === b.size && [...a].every(([tag, head]) => b.get(tag) === head)
 }
 
 function pushPeers(): void {
   const ghosts = props.session.ghosts.value.map((ghost) => ({ ...ghost, ghost: true }))
-  const peers = withRevealHeads(props.session.peers.value, shownHeads)
-  view?.dispatch({ effects: setPeers.of([...peers, ...ghosts]) })
+  const present = props.session.peers.value
+  const peers = withRevealHeads(present, shownPlaces)
+  // an agent that left takes the place of its cursor along
+  const left = [...shownPlaces.ends.keys()].filter((tag) => !present.some((p) => p.actorId === tag))
+  view?.dispatch({
+    effects: [setPeers.of([...peers, ...ghosts]), ...left.map((tag) => forgetRevealEnd.of(tag))],
+  })
 }
 
 function pushAuthorship(): void {
@@ -210,7 +219,8 @@ watch(
 
 onBeforeUnmount(() => {
   // the next editor starts without reveals: nothing may stay on the cursors of agents
-  if (shownHeads.size > 0) emit('revealHeads', new Map())
+  if (shownPlaces.heads.size > 0 || shownPlaces.ends.size > 0)
+    emit('revealPlaces', NO_REVEAL_PLACES)
   viewportPublisher?.destroy()
   viewportPublisher = null
   view?.destroy()

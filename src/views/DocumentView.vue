@@ -35,7 +35,8 @@ import ViewPanel from '@/editor/ViewPanel.vue'
 import FormatToolbar from '@/editor/FormatToolbar.vue'
 import { flashLines } from '@/editor/flashLines'
 import MarkdownEditor from '@/editor/MarkdownEditor.vue'
-import { withRevealHeads } from '@/editor/revealHeads'
+import { NO_REVEAL_PLACES, withRevealHeads } from '@/editor/revealHeads'
+import type { RevealPlaces } from '@/editor/revealHeads'
 import { placeRanges, textHash } from '@/markdown/changeRanges'
 import type { ChangeRange, ChangeTarget } from '@/markdown/changeRanges'
 import { sectionOf } from '@/markdown/headings'
@@ -431,10 +432,10 @@ watch(
 
 const auth = useAuthStore()
 /** Where the editor types out live changes of agents: their cursors are there meanwhile. */
-const revealHeads = shallowRef<ReadonlyMap<string, number>>(new Map())
+const revealPlaces = shallowRef<RevealPlaces>(NO_REVEAL_PLACES)
 const follow = useFollow({
   view: editorView,
-  peers: () => withRevealHeads(peers.value, revealHeads.value),
+  peers: () => withRevealHeads(peers.value, revealPlaces.value),
   ghosts: () => ghosts.value,
   presenceKnown: () => presenceKnown.value,
   onEnded: (name) => notify.push(`${name} has left, no longer following.`),
@@ -747,7 +748,7 @@ async function share(): Promise<void> {
           :load-blame="mobile ? undefined : loadBlame"
           @change="(t: string) => (text = t)"
           @local-edit="follow.stop()"
-          @reveal-heads="(heads: ReadonlyMap<string, number>) => (revealHeads = heads)"
+          @reveal-places="(places: RevealPlaces) => (revealPlaces = places)"
           @anchor="onEditorAnchor"
           @ready="(view: EditorView) => (mountedView = view)"
         />
