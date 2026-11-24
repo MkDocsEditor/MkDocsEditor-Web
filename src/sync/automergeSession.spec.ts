@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '@/api'
+import { toChangeSet } from '@/editor/binding'
 import { FakeSocket, FakeSyncServer } from '@/test/fakeSyncServer'
 
 import { loadAutomerge } from './automerge'
@@ -83,6 +84,10 @@ function client(
     },
   }
 }
+
+/** The length of the text before `changes`: the mirror of a client has them already. */
+const lengthBefore = (mirror: string, changes: readonly TextChange[]) =>
+  mirror.length - changes.reduce((n, c) => n + c.insert.length - (c.to - c.from), 0)
 
 const online = (c: ReturnType<typeof client>) =>
   vi.waitFor(() => expect(c.session.status.value.connection).toBe('online'))
@@ -273,6 +278,23 @@ describe('Automerge session', () => {
       expect(anna.session.getText()).toBe(server.text)
     })
     expect(anna.mirror).toBe(anna.session.getText())
+  })
+
+  it('leaves a caret in text that stayed at its text when the server starts a new epoch', async () => {
+    const server = new FakeSyncServer(A, 'Der erste Satz.\nIn der Mitte.\nDas Ende.\n')
+    const anna = client(server, 'anna')
+    await online(anna)
+    // the editor's caret after "Mitte", mapped as CodeMirror maps it
+    let caret = anna.mirror.indexOf('Mitte') + 5
+    anna.session.onRemoteChanges((changes) => {
+      caret = toChangeSet(changes, lengthBefore(anna.mirror, changes)).mapPos(caret)
+    })
+    server.offline = true
+    server.restartWithNewEpoch('Ganz neu.\nIn der Mitte.\nDas Ende. Mehr.\n')
+    await vi.waitFor(() => expect(anna.session.status.value.connection).toBe('offline'))
+    server.offline = false
+    await vi.waitFor(() => expect(anna.mirror).toBe('Ganz neu.\nIn der Mitte.\nDas Ende. Mehr.\n'))
+    expect(caret).toBe(anna.mirror.indexOf('Mitte') + 5)
   })
 
   it('keeps file changes after the insert position in a new epoch', async () => {
@@ -1106,6 +1128,35 @@ describe('Automerge session: stored copy and other tabs', () => {
       expect(server.text).toContain('von Tab 1')
       expect(server.text).toContain('von Tab 2')
     })
+  })
+
+  it('a second tab keeps its caret at its text when it takes in the copy of the first', async () => {
+    const server = new FakeSyncServer(A, 'Kopf\nMitte\nFuß\n')
+    const store = memoryStore()
+    const first = client(server, 'anna', store)
+    await online(first)
+    const second = client(server, 'anna', store, { timing: { retryClaimMs: 0 } })
+    await online(second)
+    server.offline = true
+    server.disconnectAll()
+    await vi.waitFor(() => expect(first.session.status.value.connection).toBe('offline'))
+    // the first tab changes the top and the end, and closes
+    first.insert(0, 'Oben ')
+    first.insert('end', 'Unten\n')
+    first.session.close()
+    await vi.waitFor(async () =>
+      expect(A.load<{ content: string }>((await store.get('doc-1'))!.bytes).content).toContain(
+        'Unten',
+      ),
+    )
+    // the second tab types in the middle, its caret right behind it
+    second.insert(second.mirror.indexOf('Mitte') + 5, '!')
+    let caret = second.mirror.indexOf('Mitte!') + 6
+    second.session.onRemoteChanges((changes) => {
+      caret = toChangeSet(changes, lengthBefore(second.mirror, changes)).mapPos(caret)
+    })
+    await vi.waitFor(() => expect(second.mirror).toBe('Oben Kopf\nMitte!\nFuß\nUnten\n'))
+    expect(caret).toBe(second.mirror.indexOf('Mitte!') + 6)
   })
 
   it('a second tab leaves a stored copy of another epoch alone', async () => {

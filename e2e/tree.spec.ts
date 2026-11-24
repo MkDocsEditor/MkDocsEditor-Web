@@ -25,7 +25,8 @@ function storedPageCount(page: Page): Promise<number> {
 
 /**
  * Opens the actions menu of an entry and picks an action. A live tree update (another test's
- * edit reaching the disk) can close the menu in between, so this retries until `opens` shows.
+ * edit reaching the disk) can close the menu in between, so this retries until `opens` shows,
+ * opening the menu again only when it is not open any more.
  *
  * It waits for the menu's opening animation first. Otherwise Playwright retries the click while
  * the item is "not stable" and scrolls the page on its fourth try. In a long list the menu then
@@ -33,18 +34,21 @@ function storedPageCount(page: Page): Promise<number> {
  */
 async function menuAction(page: Page, entry: string, action: string, opens: Locator) {
   await expect(async () => {
-    await page
-      .locator('main')
-      .getByRole('button', { name: `Actions for ${entry}` })
-      .click()
     const item = page.locator('.v-overlay--active').getByText(action, { exact: true })
+    // a menu still open from the try before: clicking its button again would close it
+    if (!(await item.isVisible()))
+      await page
+        .locator('main')
+        .getByRole('button', { name: `Actions for ${entry}` })
+        .click()
     await item.evaluate((element) => {
       const menu = element.closest('.v-overlay__content') ?? element
       return Promise.all(menu.getAnimations({ subtree: true }).map((a) => a.finished))
     })
-    await item.click({ timeout: 2000 })
-    await expect(opens).toBeVisible({ timeout: 2000 })
-  }).toPass({ timeout: 20_000 })
+    // a busy machine can take more than 2 s to answer a click
+    await item.click({ timeout: 5000 })
+    await expect(opens).toBeVisible({ timeout: 5000 })
+  }).toPass({ timeout: 30_000 })
 }
 
 test('rejects a wrong password', async ({ page }) => {
