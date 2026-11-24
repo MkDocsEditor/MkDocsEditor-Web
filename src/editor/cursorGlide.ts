@@ -11,6 +11,8 @@ import {
   typingWay,
 } from './typingTiming'
 import { LabelMotion } from './labelMotion'
+import { WrapCarries } from './wrapCarry'
+import type { Carried } from './wrapCarry'
 import type { Box } from './labelMotion'
 import { GHOST_OPACITY, GONE, remoteSelections, setPeers } from './remoteCursors'
 
@@ -21,7 +23,8 @@ import { GHOST_OPACITY, GONE, remoteSelections, setPeers } from './remoteCursors
  *
  * It glides when it stays on its visual line and moves at most `MAX_WIDTH` of the text's
  * width, or when it moves one line up or down and at most `MAX_SIDEWAYS` line heights sideways.
- * Else it snaps: a jump elsewhere, a wrap or a new line (to the start of the next line), and also
+ * Else it snaps: a jump elsewhere, a wrap or a new line (to the start of the next line; at the head
+ * of a reveal these are carried instead, `wrapCarry`, R8), and also
  * when only the layout changed (resize, fonts), when it moved less than half a pixel, when
  * "Animate edits of others" is off, when the system reduces motion and while the page is hidden.
  *
@@ -96,6 +99,8 @@ export interface Glide {
   riding?: boolean
   /** Riding: the place in the text it rode at. */
   rodeAt?: number
+  /** In a word carried over a wrap that slides to its place (R8): drawn where the word is. */
+  carry?: Carried
 }
 
 /** The Hermite basis: how much of the start distance and of the start speed are left at `t`. */
@@ -346,6 +351,12 @@ class CursorGlider {
   /** Carets that come, while they fade in: from what alpha, since when. */
   private appearing = new Map<string, { from: number; start: number | null }>()
   private readonly labels = new LabelMotion()
+  /** Words carried over a wrap (R8), the parts of them drawn away now, and their spans. */
+  private readonly carries = new WrapCarries()
+  private carried: Carried[] = []
+  private shifted = new Set<HTMLElement>()
+  /** Where each caret is in the layout: its glide may aim elsewhere, at a carried word. */
+  private bases = new Map<string, { x: number; y: number }>()
   private labelInfo = new Map<string, LabelInfo>()
   private localCaret: Box | null = null
   /** The mouse over the editor, in the coordinates of the page. */
@@ -388,6 +399,7 @@ class CursorGlider {
   }
 
   update(update: ViewUpdate): void {
+    if (update.docChanged) this.carries.map(update.changes)
     // new places come with the peers; else the carets only move with the text
     if (update.transactions.some((tr) => tr.effects.some((e) => e.is(setPeers))))
       this.noteHeads(update)
@@ -412,6 +424,15 @@ class CursorGlider {
 
   private read(moved: boolean): void {
     const now = frameNow()
+    // the layout without the carried words: the draw shifts them again, before the paint
+    this.unshift()
+    if (animates(this.view) && this.view.lineWrapping)
+      this.carried = this.carries.measure(this.view, now)
+    else {
+      this.carries.clear()
+      this.carried = []
+    }
+    const bases = new Map<string, { x: number; y: number }>()
     const animate = moved && animates(this.view)
     const lineHeight = this.view.defaultLineHeight
     const charWidth = this.view.defaultCharacterWidth
@@ -440,7 +461,23 @@ class CursorGlider {
       const to = { x: box.left - origin.left - dx, y: box.top - origin.top - dy }
       const before = this.glides.get(key)
       const head = heads.get(key)
-      if (head !== undefined && growsUpTo(this.view.state, head, now))
+      bases.set(key, to)
+      // a caret right at the start of the row is drawn at the end of the row above anyway
+      const carry =
+        head === undefined
+          ? undefined
+          : this.carried.find(
+              (c) =>
+                head >= c.start && head <= c.end && Math.abs(box.top - dy - c.top) < lineHeight / 2,
+            )
+      // in a word that slides to its place: drawn with it
+      if (carry?.sliding) next.set(key, { ...still(to, now), carry })
+      // in a word drawn at the end of the row above: it goes there, as if it was
+      else if (carry) {
+        const offset = carry.offset(now)
+        const there = { x: to.x + offset.x, y: to.y + offset.y }
+        next.set(key, retarget(before, there, now, animate, lineHeight, width, charWidth))
+      } else if (head !== undefined && growsUpTo(this.view.state, head, now))
         next.set(key, { ...still(to, now), riding: true, rodeAt: head })
       // the growth ended where the layout carried it: on from there, without a glide
       else if (before?.riding && (head === before.rodeAt || before.rodeAt === undefined))
@@ -500,6 +537,7 @@ class CursorGlider {
     for (const [key, last] of this.drawn)
       if (present.has(key) && !drawn.has(key)) drawn.set(key, last)
     this.glides = next
+    this.bases = bases
     this.drawn = drawn
   }
 
@@ -552,17 +590,23 @@ class CursorGlider {
     for (const caret of this.view.contentDOM.querySelectorAll<HTMLElement>(CARET)) {
       const key = caret.dataset.peer!
       const glide = this.glides.get(key)
+      const base = this.bases.get(key) ?? (glide && { x: glide.toX, y: glide.toY })
       let dx = 0
       let dy = 0
-      if (!glide || !moving(glide, now)) {
+      if (glide && base) {
+        if (moving(glide, now)) running = true
+        const at = glide.carry
+          ? { x: base.x + glide.carry.offset(now).x, y: base.y + glide.carry.offset(now).y }
+          : glidePosition(glide, now)
+        dx = at.x - base.x
+        dy = at.y - base.y
+      }
+      if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
+        dx = dy = 0
         caret.style.transform = ''
         delete caret.dataset.dx
         delete caret.dataset.dy
       } else {
-        running = true
-        const at = glidePosition(glide, now)
-        dx = at.x - glide.toX
-        dy = at.y - glide.toY
         caret.style.transform = `translate(${dx}px, ${dy}px)`
         caret.dataset.dx = String(dx)
         caret.dataset.dy = String(dy)
@@ -571,8 +615,9 @@ class CursorGlider {
       const info = this.labelInfo.get(key)
       if (info && origin) this.placeLabel(caret, key, info, dx, dy, origin, now, animate)
     }
+    this.shift(now)
     this.clip()
-    if (this.labels.busy(now)) running = true
+    if (this.labels.busy(now) || this.carries.busy(now)) running = true
     if (running) this.frame = requestAnimationFrame(() => this.draw())
     // a writer who rests, or has written steadily for long enough, changes its label later
     if (this.labelTimer) clearTimeout(this.labelTimer)
@@ -584,6 +629,35 @@ class CursorGlider {
             this.labelTimer = null
             this.draw()
           }, wait + 1)
+  }
+
+  /** Draws the carried words where they are now (R8): their spans, shifted. */
+  private shift(now: number): void {
+    const done = new Set<HTMLElement>()
+    const spans = this.carried.some((c) => !c.caretOnly) ? appearingSpans(this.view.state) : []
+    for (const carry of this.carried) {
+      if (carry.caretOnly) continue
+      const { x, y } = carry.offset(now)
+      if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) continue
+      for (const piece of spans) {
+        if (piece.from < carry.start || piece.to > carry.end) continue
+        for (const span of this.view.contentDOM.querySelectorAll<HTMLElement>(
+          `[data-appear="${piece.id}"]`,
+        )) {
+          span.style.position = 'relative'
+          span.style.left = `${x}px`
+          span.style.top = `${y}px`
+          done.add(span)
+        }
+      }
+    }
+    for (const span of this.shifted) if (!done.has(span)) unshiftSpan(span)
+    this.shifted = done
+  }
+
+  private unshift(): void {
+    for (const span of this.shifted) unshiftSpan(span)
+    this.shifted.clear()
   }
 
   /** A caret that comes fades in, from where it was if it left a moment ago. */
@@ -711,6 +785,12 @@ class CursorGlider {
     this.view.scrollDOM.removeEventListener('scroll', this.onScroll)
     this.fading.remove()
   }
+}
+
+function unshiftSpan(span: HTMLElement): void {
+  span.style.position = ''
+  span.style.left = ''
+  span.style.top = ''
 }
 
 /** Whether `head` is at the start of a row that continues a wrapped line. */

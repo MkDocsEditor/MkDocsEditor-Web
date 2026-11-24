@@ -267,9 +267,11 @@ function update(value: AppearState, tr: Transaction): AppearState {
         const pieces =
           !reveal && to - from <= TYPED_CHARS
             ? Array.from({ length: to - from }, (_, k) => [from + k, from + k + 1] as const)
-            : to > from
-              ? [[from, to] as const]
-              : []
+            : reveal
+              ? wordPieces(tr.state, from, to)
+              : to > from
+                ? [[from, to] as const]
+                : []
         for (const [a, b] of pieces)
           next = [
             ...next,
@@ -295,6 +297,23 @@ function update(value: AppearState, tr: Transaction): AppearState {
     return next.length > 0 || rates.size > 0 ? { ranges: [], rates: new Map() } : value
   if (added && next.length > config.maxRanges) next = cap(next, config, now())
   return next === ranges && rates === value.rates ? value : { ranges: next, rates }
+}
+
+/**
+ * A piece of a reveal from `from` to `to`, split where a word starts: a word carried over a wrap
+ * (`wrapCarry`, R8) is drawn apart from the space in front of it. The parts fade alike.
+ */
+function wordPieces(state: EditorState, from: number, to: number): (readonly [number, number])[] {
+  const text = state.doc.sliceString(from, to)
+  const pieces: (readonly [number, number])[] = []
+  let start = 0
+  for (let k = 1; k < text.length; k++)
+    if (/\s/.test(text[k - 1]!) && !/\s/.test(text[k]!)) {
+      pieces.push([from + start, from + k])
+      start = k
+    }
+  if (text.length > start) pieces.push([from + start, to])
+  return pieces
 }
 
 const appearing = StateField.define<AppearState>({

@@ -395,6 +395,19 @@ describe('typing reveal', () => {
     view.destroy()
   })
 
+  it('splits what a step reveals where a word starts, so a word can be carried (R8)', () => {
+    const view = editor('')
+    // a backlog: several characters a step
+    agentWrites(view, 0, 'ab cd  ef '.repeat(200))
+    vi.advanceTimersByTime(200)
+    const pieces = appearingRanges(view.state).map((r) => view.state.sliceDoc(r.from, r.to))
+    expect(pieces.join('')).toBe(view.state.sliceDoc(0, revealHeads(view.state).get('agent')))
+    expect(Math.max(...pieces.map((p) => p.length))).toBeGreaterThan(2)
+    // no piece has a word start after a space inside it
+    expect(pieces.filter((p) => /\s\S/.test(p))).toEqual([])
+    view.destroy()
+  })
+
   it('shows the reveal of one agent at once and leaves the others', () => {
     const view = editor('')
     agentWrites(view, 0, 'eins ')
