@@ -96,3 +96,27 @@ test('the files panel lists and inserts files of the page', async ({
   if (isMobile) await page.getByTestId('toggle-files').click()
   await expect(panel.getByTestId('panel-broken')).toContainText('fehlt.png')
 })
+
+test('opens a file in a tab of its own, as the server sends it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the same on every screen')
+  const folder = await createFolder(testName('Öffnen', testInfo))
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>'
+  const file = await uploadResource(folder.id, 'Bild.svg', svg, 'image/svg+xml')
+  await login(page)
+  await page.goto(`/resource/${file.id}`)
+  const [tab] = await Promise.all([
+    page.context().waitForEvent('page'),
+    page.getByTestId('resource-open').click(),
+  ])
+  await tab.waitForLoadState()
+  expect(tab.url()).toMatch(new RegExp(`/resource/${file.id}/content/$`))
+  // the file itself, from the server, with the session's cookie: an SVG with its type and the
+  // server's policy, not an object URL of this app
+  const response = await page.context().request.get(tab.url())
+  expect(response.status()).toBe(200)
+  expect(response.headers()['content-type']).toBe('image/svg+xml')
+  expect(response.headers()['content-security-policy']).toContain("default-src 'none'")
+  await expect(tab.locator('rect')).toHaveAttribute('fill', 'red')
+  expect(await tab.evaluate(() => window.opener)).toBeNull()
+})

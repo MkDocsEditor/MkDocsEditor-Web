@@ -122,7 +122,7 @@ function onScroll(): void {
 }
 
 function openWithRetry(id: string, name: string): void {
-  openFile(id, name).catch((e: unknown) =>
+  openFile(id).catch((e: unknown) =>
     notify.error(e, 'Could not open the file', () => openWithRetry(id, name)),
   )
 }
