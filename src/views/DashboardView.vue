@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
   mdiAccountGroupOutline,
+  mdiChevronDown,
+  mdiChevronUp,
   mdiDragVertical,
   mdiFileDocumentOutline,
   mdiFolderOutline,
@@ -23,7 +25,10 @@ import { usePagesStore } from '@/stores/pages'
 import { usePinsStore } from '@/stores/pins'
 import { useTreeStore } from '@/stores/tree'
 
-import { detailsOf, headingsText, nameOf, peopleText, verbOf } from './dashboard/feedText'
+import FeedEntryItem from './dashboard/FeedEntryItem.vue'
+import { groupAuthors, groupFeed, groupHeadings, isExpanded } from './dashboard/feedGroups'
+import type { FeedGroup } from './dashboard/feedGroups'
+import { detailsOf, nameOf, peopleText } from './dashboard/feedText'
 import { useFeed } from './dashboard/useFeed'
 
 /**
@@ -35,6 +40,17 @@ const pageMeta = usePageMetaStore()
 const pages = usePagesStore()
 const pins = usePinsStore()
 const feed = useFeed()
+/** The edits of a page folded into one row (`groupFeed`), over what is loaded. */
+const groups = computed(() => groupFeed(feed.entries.value))
+/** The entries of the groups shown open: a group stays open when edits join it. */
+const expanded = ref<ReadonlySet<string>>(new Set())
+
+function toggle(group: FeedGroup): void {
+  const next = new Set(expanded.value)
+  if (isExpanded(group, next)) for (const e of group.entries) next.delete(e.id)
+  else next.add(group.entries[0]!.id)
+  expanded.value = next
+}
 
 onMounted(() => {
   pins.ensureLoaded()
@@ -296,58 +312,80 @@ function entryLink(entry: FeedEntry) {
         class="app-card-list py-0"
         data-testid="feed"
       >
-        <v-list-item
-          v-for="entry in feed.entries.value"
-          :key="entry.id"
-          :to="entryLink(entry)"
-          data-testid="feed-entry"
-        >
-          <template #prepend>
-            <v-avatar-group class="me-4 dashboard-view__authors">
-              <UserAvatar
-                v-for="author in entry.authors.slice(0, 3)"
-                :key="author.accountId ?? author.displayName"
-                :name="author.displayName"
-                :color="author.color"
-                :account-id="author.accountId"
-                :avatar="author.avatar"
-                size="32"
-                class="text-body-small"
+        <template v-for="group in groups" :key="group.entries[0]!.id">
+          <FeedEntryItem
+            v-if="group.entries.length === 1"
+            :entry="group.entries[0]!"
+            :name="entryName(group.entries[0]!)"
+            :to="entryLink(group.entries[0]!)"
+          />
+          <template v-else>
+            <!-- the edits of one page: opens where the newest one is -->
+            <v-list-item :to="entryLink(group.entries[0]!)" data-testid="feed-group">
+              <template #prepend>
+                <v-avatar-group class="me-4">
+                  <UserAvatar
+                    v-for="author in groupAuthors(group).slice(0, 3)"
+                    :key="author.accountId ?? author.displayName"
+                    :name="author.displayName"
+                    :color="author.color"
+                    :account-id="author.accountId"
+                    :avatar="author.avatar"
+                    size="32"
+                    class="text-body-small"
+                  />
+                </v-avatar-group>
+              </template>
+              <v-list-item-title class="text-wrap">
+                {{ peopleText(groupAuthors(group)) }} edited
+                <strong>{{ entryName(group.entries[0]!) }}</strong>
+              </v-list-item-title>
+              <v-list-item-subtitle class="text-wrap">
+                {{ detailsOf(group.entries[0]!) }} ·
+                <span data-testid="feed-group-count">{{ group.entries.length }} edits</span>
+                <span
+                  v-if="groupHeadings(group).length > 0"
+                  class="d-block"
+                  data-testid="feed-headings"
+                >
+                  In {{ groupHeadings(group).join(', ') }}
+                </span>
+              </v-list-item-subtitle>
+              <template #append>
+                <span
+                  class="text-body-small text-medium-emphasis ms-2"
+                  :title="formatDate(group.entries[0]!.time)"
+                >
+                  {{ formatWhen(group.entries[0]!.time) }}
+                </span>
+                <v-btn
+                  :icon="isExpanded(group, expanded) ? mdiChevronUp : mdiChevronDown"
+                  :aria-label="
+                    isExpanded(group, expanded)
+                      ? 'Hide the single edits'
+                      : `Show the ${group.entries.length} edits`
+                  "
+                  :aria-expanded="isExpanded(group, expanded)"
+                  variant="text"
+                  size="small"
+                  class="ms-1"
+                  data-testid="feed-group-toggle"
+                  @click.prevent.stop="toggle(group)"
+                />
+              </template>
+            </v-list-item>
+            <template v-if="isExpanded(group, expanded)">
+              <FeedEntryItem
+                v-for="entry in group.entries"
+                :key="entry.id"
+                :entry="entry"
+                :name="entryName(entry)"
+                :to="entryLink(entry)"
+                nested
               />
-            </v-avatar-group>
-          </template>
-          <v-list-item-title class="text-wrap">
-            {{ peopleText(entry.authors) }} {{ verbOf(entry) }}
-            <strong>{{ entryName(entry) }}</strong>
-          </v-list-item-title>
-          <v-list-item-subtitle class="text-wrap">
-            {{ detailsOf(entry) }}
-            <template v-if="entry.summary?.linesAdded || entry.summary?.linesRemoved">
-              ·
-              <!-- a count of zero is left out: "+4", "−2" or "+4 −2" -->
-              <span
-                v-if="entry.summary.linesAdded"
-                class="dashboard-view__added"
-                data-testid="feed-added"
-                >+{{ entry.summary.linesAdded }}</span
-              >
-              <span
-                v-if="entry.summary.linesRemoved"
-                class="dashboard-view__removed"
-                data-testid="feed-removed"
-                >−{{ entry.summary.linesRemoved }}</span
-              >
             </template>
-            <span v-if="headingsText(entry)" class="d-block" data-testid="feed-headings">
-              {{ headingsText(entry) }}
-            </span>
-          </v-list-item-subtitle>
-          <template #append>
-            <span class="text-body-small text-medium-emphasis ms-2" :title="formatDate(entry.time)">
-              {{ formatWhen(entry.time) }}
-            </span>
           </template>
-        </v-list-item>
+        </template>
       </v-list>
       <p
         v-else-if="feed.available.value && !feed.loading.value"
@@ -366,15 +404,6 @@ function entryLink(entry: FeedEntry) {
 </template>
 
 <style scoped>
-/* added and removed lines as the diff views show them (the code palette, as on Android) */
-.dashboard-view__added {
-  color: rgb(var(--v-theme-code-inserted));
-  font-weight: 500;
-}
-.dashboard-view__removed {
-  color: rgb(var(--v-theme-code-deleted));
-  font-weight: 500;
-}
 .dashboard-view__index {
   padding: var(--app-space-4);
 }
