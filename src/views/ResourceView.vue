@@ -98,7 +98,7 @@ watch(
 
 async function open(): Promise<void> {
   try {
-    await openFile(props.id, resource.value?.name ?? 'file')
+    await openFile(props.id)
   } catch (error) {
     notify.error(error, 'Could not open the file', () => void open())
   }

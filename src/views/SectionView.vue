@@ -76,7 +76,7 @@ function linkTo(item: TreeItem) {
 
 async function open(item: TreeItem): Promise<void> {
   try {
-    await openFile(item.id, item.name)
+    await openFile(item.id)
   } catch (error) {
     notify.error(error, 'Could not open the file', () => void open(item))
   }
